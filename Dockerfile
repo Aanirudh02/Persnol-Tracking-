@@ -15,8 +15,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq-dev \
         libzip-dev \
+        libonig-dev \
         unzip \
-    && docker-php-ext-install pdo_pgsql pdo_mysql mbstring bcmath exif pcntl \
+    && docker-php-ext-install -j"$(nproc)" pdo_pgsql pdo_mysql mbstring bcmath exif pcntl \
     && a2enmod rewrite \
     && sed -ri -e "s!/var/www/html!$APACHE_DOCUMENT_ROOT!g" /etc/apache2/sites-available/*.conf \
     && sed -ri -e "s!/var/www/!$APACHE_DOCUMENT_ROOT!g" /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
