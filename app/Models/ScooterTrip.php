@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Services\TripDistanceService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScooterTrip extends Model
 {
@@ -53,8 +53,84 @@ class ScooterTrip extends Model
         'duration_minutes' => 'integer',
         'odometer_reading' => 'integer',
         'to_and_fro' => 'boolean',
-        'stops' => 'array',
     ];
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function normalizedStops(): array
+    {
+        $raw = $this->attributes['stops'] ?? null;
+
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+            // Double-encoded JSON string
+            $decoded = json_decode((string) json_decode($raw, true), true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+
+    public function getStopsAttribute(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+
+    public function setStopsAttribute(mixed $value): void
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            $value = is_array($decoded) ? $decoded : [];
+        }
+
+        $this->attributes['stops'] = json_encode(is_array($value) ? array_values($value) : []);
+    }
+
+    public function mapsDirUrl(): string
+    {
+        $origin = $this->from_label ?: $this->start_address;
+        $destination = $this->to_label ?: $this->end_address;
+
+        if ($origin && $destination) {
+            return 'https://www.google.com/maps/dir/?api=1&origin='.rawurlencode($origin)
+                .'&destination='.rawurlencode($destination)
+                .'&travelmode=driving';
+        }
+
+        if ($this->start_latitude && $this->start_longitude && $this->end_latitude && $this->end_longitude) {
+            return 'https://www.google.com/maps/dir/?api=1&origin='
+                .$this->start_latitude.','.$this->start_longitude
+                .'&destination='.$this->end_latitude.','.$this->end_longitude
+                .'&travelmode=driving';
+        }
+
+        return 'https://www.google.com/maps';
+    }
 
     public function user(): BelongsTo
     {

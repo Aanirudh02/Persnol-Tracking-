@@ -3,13 +3,13 @@
 namespace App\Services;
 
 use App\Models\Expense;
+use App\Models\Friend;
+use App\Models\FriendTransaction;
 use App\Models\Income;
 use App\Models\Payment;
 use App\Models\PaymentReconciliation;
-use App\Models\Friend;
-use App\Models\FriendTransaction;
-use App\Models\Settlement;
 use App\Models\Setting;
+use App\Models\Settlement;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -21,8 +21,12 @@ class FinanceService
     public function canEdit(string $module, object $record): bool
     {
         $user = auth()->user();
-        if (!$user) return false;
-        if ($user->isAdmin()) return true;
+        if (! $user) {
+            return false;
+        }
+        if ($user->isAdmin()) {
+            return true;
+        }
 
         if (property_exists($record, 'is_locked') && $record->is_locked) {
             return false;
@@ -37,7 +41,9 @@ class FinanceService
         };
 
         $windowDays = (int) Setting::getVal($key, 7);
-        if ($windowDays === 0) return false;
+        if ($windowDays === 0) {
+            return false;
+        }
 
         return Carbon::parse($record->created_at)->addDays($windowDays)->isFuture();
     }
@@ -49,7 +55,7 @@ class FinanceService
     {
         return DB::transaction(function () use ($payment, $data) {
             $oldStatus = $payment->status;
-            
+
             $reconciliation = PaymentReconciliation::create([
                 'payment_id' => $payment->id,
                 'user_id' => auth()->id(),
@@ -137,7 +143,7 @@ class FinanceService
                 $q->whereNull('expense_categories.is_archived')
                     ->orWhere('expense_categories.is_archived', false);
             })
-            ->sum('expenses.amount');
+            ->sum(DB::raw('expenses.amount + expenses.gst_amount'));
 
         $totalIncome = (float) Income::query()
             ->where('incomes.user_id', $userId)
@@ -152,7 +158,7 @@ class FinanceService
         $voluntarySpend = (float) Expense::where('user_id', $userId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('is_voluntary', true)
-            ->sum('amount');
+            ->sum(DB::raw('amount + gst_amount'));
 
         $pendingPayments = (float) Payment::where('user_id', $userId)
             ->where('status', 'Pending')

@@ -1,31 +1,31 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DailyRecordController;
-use App\Http\Controllers\FinanceDashboardController;
-use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\IncomeController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\FriendController;
-use App\Http\Controllers\FoodController;
 use App\Http\Controllers\ActivityController;
-use App\Http\Controllers\ScooterController;
-use App\Http\Controllers\PetrolController;
+use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CreditDebtController;
+use App\Http\Controllers\DailyRecordController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\FinanceDashboardController;
+use App\Http\Controllers\FoodController;
+use App\Http\Controllers\FriendController;
+use App\Http\Controllers\GeoController;
+use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\MistakeController;
 use App\Http\Controllers\NoteController;
-use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\OptionController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PetrolController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ScooterController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\GeoController;
-use App\Http\Controllers\VehicleController;
-use App\Http\Controllers\CreditDebtController;
-use App\Http\Controllers\OptionController;
-use App\Http\Controllers\WalletController;
 use App\Http\Controllers\SleepController;
+use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\WalletController;
+use Illuminate\Support\Facades\Route;
 
 // Authentication (Private App: Strictly NO Public Registration)
 Route::middleware('guest')->group(function () {
@@ -41,7 +41,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middl
 
 // Protected Application Routes
 Route::middleware('auth')->group(function () {
-    Route::get('/', fn() => redirect()->route('dashboard'));
+    Route::get('/', fn () => redirect()->route('dashboard'));
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('permission:dashboard.view');
 
     // Daily Life & Prompts
@@ -57,6 +57,10 @@ Route::middleware('auth')->group(function () {
 
         // Expenses
         Route::resource('expenses', ExpenseController::class)->names('expenses');
+        Route::post('/expenses/group', [ExpenseController::class, 'group'])->name('expenses.group');
+        Route::put('/expense-groups/{expenseGroup}', [ExpenseController::class, 'renameGroup'])->name('expense-groups.update');
+        Route::delete('/expense-groups/{expenseGroup}', [ExpenseController::class, 'ungroup'])->name('expense-groups.destroy');
+        Route::put('/expense-groups/{expenseGroup}/expenses/{expense}/payment-method', [ExpenseController::class, 'updateGroupPaymentMethod'])->name('expense-groups.expenses.payment-method');
         Route::post('/expenses/{expense}/link-food', [ExpenseController::class, 'linkFood'])->name('expenses.link-food');
 
         // Income

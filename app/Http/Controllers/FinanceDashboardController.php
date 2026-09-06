@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\CreditDebt;
 use App\Models\Expense;
+use App\Models\Friend;
 use App\Models\Income;
 use App\Models\Payment;
-use App\Models\Friend;
-use App\Models\CreditDebt;
 use App\Services\FinanceService;
 use App\Services\WalletService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class FinanceDashboardController extends Controller
 {
@@ -65,12 +65,13 @@ class FinanceDashboardController extends Controller
             ->where('expenses.is_voluntary', false)
             ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
             ->where('expense_categories.is_archived', false)
-            ->selectRaw('expense_categories.name, sum(expenses.amount) as total, expense_categories.color')
+            ->selectRaw('expense_categories.name, sum(expenses.amount + expenses.gst_amount) as total, expense_categories.color')
             ->groupBy('expense_categories.name', 'expense_categories.color')
             ->orderByDesc('total')
             ->get();
 
-        $wallets = $walletService->enabledWallets($user->id);
+        $wallets = $walletService->displayWallets($user->id);
+        $showBalances = $request->boolean('show_balances');
         $openCredits = (float) CreditDebt::where('user_id', $user->id)->where('type', 'credit')->whereNotIn('status', ['fully_paid'])->get()->sum(fn ($i) => $i->remaining());
         $openDebts = (float) CreditDebt::where('user_id', $user->id)->where('type', 'debt')->whereNotIn('status', ['fully_paid'])->get()->sum(fn ($i) => $i->remaining());
 
@@ -84,6 +85,7 @@ class FinanceDashboardController extends Controller
             'totalIOwe',
             'categorySpending',
             'wallets',
+            'showBalances',
             'openCredits',
             'openDebts'
         ));

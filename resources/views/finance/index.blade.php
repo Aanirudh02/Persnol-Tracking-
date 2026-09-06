@@ -19,7 +19,15 @@
             </div>
         </div>
 
-        @if($wallets->count())
+        <div class="flex justify-end">
+            @if($showBalances)
+                <a href="{{ route('finance.index') }}" class="text-xs font-semibold text-slate-600 hover:underline">Hide Cash / UPI balances</a>
+            @else
+                <a href="{{ route('finance.index', ['show_balances' => 1]) }}" class="text-xs font-semibold text-sky-700 hover:underline">Show Cash / UPI balances</a>
+            @endif
+        </div>
+
+        @if($showBalances && $wallets->count())
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 @foreach($wallets as $wallet)
                     <div class="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm">

@@ -3,13 +3,27 @@
         <div>
             <a href="{{ route('expenses.index') }}" class="text-sm font-semibold text-slate-600 hover:underline">&larr; Expenses</a>
             <h1 class="text-2xl font-bold text-slate-900 mt-2">{{ $expense->description }}</h1>
-            <p class="text-sm text-slate-500">₹{{ number_format($expense->amount, 2) }} · {{ $expense->category?->name ?? 'Uncategorized' }} · {{ $expense->date->format('d M Y') }}</p>
+            <p class="text-sm text-slate-500">₹{{ number_format($expense->totalAmount(), 2) }} · {{ $expense->category?->name ?? 'Uncategorized' }} · {{ $expense->date->format('d M Y') }}</p>
             @if($expense->is_voluntary)<span class="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-pink-50 text-pink-700">Voluntary</span>@endif
         </div>
 
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-sm space-y-2">
             <p>Paid by: <strong>{{ $expense->paid_by }}</strong> · {{ $expense->payment_method }}</p>
-            <p>Cash total (parent): <strong>₹{{ number_format($expense->amount, 2) }}</strong></p>
+            @if($expense->expenseGroup)
+                <p>Group: <strong>{{ $expense->expenseGroup->name }}</strong> · {{ $expense->expenseGroup->expenses->count() }} payment rows</p>
+                <form action="{{ route('expense-groups.update', $expense->expenseGroup) }}" method="POST" class="flex items-center gap-2">
+                    @csrf
+                    @method('PUT')
+                    <input type="text" name="name" value="{{ $expense->expenseGroup->name }}" required class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm">
+                    <button class="text-sm font-semibold text-sky-700 hover:underline">Save group name</button>
+                </form>
+                <form action="{{ route('expense-groups.destroy', $expense->expenseGroup) }}" method="POST" onsubmit="return confirm('Remove this group while keeping the expense rows?');">
+                    @csrf
+                    @method('DELETE')
+                    <button class="text-sm font-semibold text-rose-600 hover:underline">Remove group</button>
+                </form>
+            @endif
+            <p>Expense total: <strong>₹{{ number_format($expense->totalAmount(), 2) }}</strong>@if((float) $expense->gst_amount > 0) <span class="text-xs text-slate-500">(GST ₹{{ number_format($expense->gst_amount, 2) }})</span>@endif</p>
             <p>Explained by sub-items / food: <strong>₹{{ number_format($expense->subItemsExplainedTotal(), 2) }}</strong></p>
             @if(abs($expense->subItemsExplainedTotal() - (float) $expense->amount) > 0.01 && $expense->subItemsExplainedTotal() > 0)
                 <p class="text-amber-700 text-xs">Breakdown does not match parent total yet — edit amounts or add remaining items.</p>
@@ -17,6 +31,29 @@
             @if($expense->notes)<p class="text-slate-500">{{ $expense->notes }}</p>@endif
             <a href="{{ route('expenses.edit', $expense) }}" class="inline-block text-sm font-semibold text-slate-800 hover:underline">Edit expense</a>
         </div>
+
+        @if($expense->expenseGroup)
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                <h2 class="font-bold text-slate-900">Individual payments</h2>
+                @foreach($expense->expenseGroup->expenses as $member)
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-2 text-sm">
+                        <div class="flex items-center gap-2">
+                            <form action="{{ route('expense-groups.expenses.payment-method', [$expense->expenseGroup, $member]) }}" method="POST" class="flex items-center gap-2">
+                                @csrf
+                                @method('PUT')
+                                <select name="payment_method" onchange="this.form.submit()" class="px-2 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs">
+                                    @foreach($paymentMethods as $method)
+                                        <option value="{{ $method }}" @selected($member->payment_method === $method)>{{ $method }}</option>
+                                    @endforeach
+                                </select>
+                            </form>
+                            <a href="{{ route('expenses.show', $member) }}" class="text-sky-700 hover:underline">{{ $member->description }}</a>
+                        </div>
+                        <span class="font-semibold">₹{{ number_format($member->totalAmount(), 2) }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
 
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
             <h2 class="font-bold text-slate-900">Sub-items & linked food</h2>

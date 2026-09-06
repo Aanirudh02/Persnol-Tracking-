@@ -17,7 +17,9 @@ class Expense extends Model
         'daily_record_id',
         'category_id',
         'parent_id',
+        'expense_group_id',
         'amount',
+        'gst_amount',
         'date',
         'time',
         'description',
@@ -38,6 +40,7 @@ class Expense extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'gst_amount' => 'decimal:2',
         'date' => 'date',
         'is_locked' => 'boolean',
         'is_voluntary' => 'boolean',
@@ -70,6 +73,11 @@ class Expense extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    public function expenseGroup(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseGroup::class);
+    }
+
     public function paidByFriend(): BelongsTo
     {
         return $this->belongsTo(Friend::class, 'paid_by_friend_id');
@@ -87,13 +95,28 @@ class Expense extends Model
 
     public function totalWithChildren(): float
     {
-        // Parent amount is cash truth; sub-items are breakdown only.
-        return (float) $this->amount;
+        return $this->totalAmount();
+    }
+
+    public function totalAmount(): float
+    {
+        return round((float) $this->amount + (float) $this->gst_amount, 2);
     }
 
     public function subItemsExplainedTotal(): float
     {
-        return (float) $this->subItems()->sum('amount') + (float) $this->foodEntries()->sum('amount');
+        return (float) $this->subItems()->get()->sum(fn (self $expense): float => $expense->totalAmount())
+            + (float) $this->foodEntries()->get()->sum(fn (FoodEntry $food): float => $food->totalAmount());
+    }
+
+    public function consumedAmount(): float
+    {
+        return $this->subItemsExplainedTotal();
+    }
+
+    public function remainingAmount(): float
+    {
+        return round(max(0, $this->totalAmount() - $this->consumedAmount()), 2);
     }
 
     public function isEditableByUser(?User $user = null): bool

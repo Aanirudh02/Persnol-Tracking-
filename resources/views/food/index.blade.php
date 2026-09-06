@@ -16,11 +16,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">How many items? (1–4)</label>
-                    <select id="item_count" name="item_count" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                        @for($n = 1; $n <= 4; $n++)
-                            <option value="{{ $n }}" @selected($n === 1)>{{ $n }}</option>
-                        @endfor
-                    </select>
+                    <input id="item_count" name="item_count" type="number" min="1" max="4" step="1" value="1" inputmode="numeric" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                 </div>
                 <label class="flex items-center gap-2 pt-6">
                     <input type="checkbox" name="is_snack" value="1" @checked(request()->boolean('is_snack'))>
@@ -36,6 +32,7 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input type="text" name="location" placeholder="Location" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                <input type="number" name="gst_amount" step="0.01" min="0" value="0" placeholder="GST total (₹, optional)" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                 <select name="expense_mode" id="expense_mode" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     <option value="none">No new expense (habit only)</option>
                     <option value="separate">Create separate expense (total)</option>
@@ -45,7 +42,7 @@
                 <select name="parent_expense_id" id="parent_expense_id" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     <option value="">Link to existing expense…</option>
                     @foreach($parentExpenses as $pe)
-                        <option value="{{ $pe->id }}">{{ $pe->description }} · ₹{{ number_format($pe->amount, 2) }} · {{ $pe->date->format('d M') }}</option>
+                        <option value="{{ $pe->id }}" @disabled($pe->remaining_amount <= 0)>{{ $pe->description }} · ₹{{ number_format($pe->remaining_amount, 2) }} remaining · {{ $pe->date->format('d M') }}</option>
                     @endforeach
                 </select>
                 <select name="payment_method" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
@@ -98,10 +95,13 @@
                                 <td class="py-3 px-4 font-bold">{{ $item->item_name }}</td>
                                 <td class="py-3 px-4">{{ $item->category?->name ?? '—' }}</td>
                                 <td class="py-3 px-4">{{ $item->quantity }}</td>
-                                <td class="py-3 px-4 font-bold">₹{{ number_format($item->amount, 2) }}</td>
+                                <td class="py-3 px-4 font-bold">₹{{ number_format($item->totalAmount(), 2) }}@if((float) $item->gst_amount > 0) <span class="block text-[10px] text-slate-400">GST ₹{{ number_format($item->gst_amount, 2) }}</span>@endif</td>
                                 <td class="py-3 px-4">
                                     @if($item->expense)
                                         <a href="{{ route('expenses.show', $item->expense) }}" class="text-sky-700 hover:underline">{{ $item->expense->description }}</a>
+                                        @if($item->expense->expenseGroup)
+                                            <span class="block text-[10px] text-slate-500">Group: {{ $item->expense->expenseGroup->name }}</span>
+                                        @endif
                                     @else
                                         —
                                     @endif
@@ -129,12 +129,13 @@
                                         </select>
                                         <input type="number" name="quantity" value="{{ $item->quantity }}" min="1" class="px-2 py-2 border border-slate-300 rounded-xl">
                                         <input type="number" step="0.01" name="amount" value="{{ $item->amount }}" class="px-2 py-2 border border-slate-300 rounded-xl">
+                                        <input type="number" step="0.01" min="0" name="gst_amount" value="{{ $item->gst_amount }}" placeholder="GST ₹" class="px-2 py-2 border border-slate-300 rounded-xl">
                                         <input type="date" name="date" value="{{ $item->date->toDateString() }}" class="px-2 py-2 border border-slate-300 rounded-xl">
                                         <input type="text" name="location" value="{{ $item->location }}" placeholder="Location" class="px-2 py-2 border border-slate-300 rounded-xl">
                                         <select name="parent_expense_id" class="px-2 py-2 border border-slate-300 rounded-xl sm:col-span-2">
                                             <option value="">No linked expense</option>
                                             @foreach($parentExpenses as $pe)
-                                                <option value="{{ $pe->id }}" @selected($item->expense_id === $pe->id)>{{ $pe->description }} · ₹{{ number_format($pe->amount, 2) }}</option>
+                                                <option value="{{ $pe->id }}" @selected($item->expense_id === $pe->id) @disabled($pe->remaining_amount <= 0 && $item->expense_id !== $pe->id)>{{ $pe->description }} · ₹{{ number_format($pe->remaining_amount, 2) }} remaining</option>
                                             @endforeach
                                         </select>
                                         <label class="flex items-center gap-2"><input type="checkbox" name="is_snack" value="1" @checked($item->is_snack)> Snack</label>
@@ -160,7 +161,8 @@
         const modeSel = document.getElementById('expense_mode');
 
         function renderRows() {
-            const n = parseInt(countSel.value || '1', 10);
+            const n = Math.min(4, Math.max(1, parseInt(countSel.value || '1', 10)));
+            countSel.value = n;
             let html = '';
             for (let i = 0; i < n; i++) {
                 const catOpts = foodCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -186,6 +188,7 @@
             rowsBox.innerHTML = html;
         }
 
+        countSel?.addEventListener('input', renderRows);
         countSel?.addEventListener('change', renderRows);
         parentSel?.addEventListener('change', () => {
             if (parentSel.value) modeSel.value = 'sub_item';

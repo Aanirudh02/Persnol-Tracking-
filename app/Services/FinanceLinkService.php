@@ -27,8 +27,8 @@ class FinanceLinkService
                 'friend_id' => $expense->paid_by_friend_id,
                 'type' => 'friend_paid_for_me',
                 'paid_by_me' => false,
-                'total_amount' => $expense->amount,
-                'my_share' => $expense->amount,
+                'total_amount' => $expense->totalAmount(),
+                'my_share' => $expense->totalAmount(),
                 'friend_share' => 0,
                 'description' => $expense->description,
                 'date' => $expense->date,
@@ -47,9 +47,9 @@ class FinanceLinkService
                 'friend_id' => $expense->split_with_friend_id,
                 'type' => 'shared_expense',
                 'paid_by_me' => ($expense->paid_by_type ?? 'me') === 'me',
-                'total_amount' => $expense->amount,
-                'my_share' => $expense->split_my_share ?? round($expense->amount / 2, 2),
-                'friend_share' => $expense->split_friend_share ?? round($expense->amount / 2, 2),
+                'total_amount' => $expense->totalAmount(),
+                'my_share' => $expense->split_my_share ?? round($expense->totalAmount() / 2, 2),
+                'friend_share' => $expense->split_friend_share ?? round($expense->totalAmount() / 2, 2),
                 'description' => $expense->description,
                 'date' => $expense->date,
                 'payment_method' => $expense->payment_method,
@@ -79,16 +79,16 @@ class FinanceLinkService
             $tx->friend_id = $expense->paid_by_friend_id;
             $tx->type = 'friend_paid_for_me';
             $tx->paid_by_me = false;
-            $tx->total_amount = $expense->amount;
-            $tx->my_share = $expense->amount;
+            $tx->total_amount = $expense->totalAmount();
+            $tx->my_share = $expense->totalAmount();
             $tx->friend_share = 0;
         } elseif ($expense->split_with_friend_id) {
             $tx->friend_id = $expense->split_with_friend_id;
             $tx->type = 'shared_expense';
             $tx->paid_by_me = ($expense->paid_by_type ?? 'me') === 'me';
-            $tx->total_amount = $expense->amount;
-            $tx->my_share = $expense->split_my_share ?? round($expense->amount / 2, 2);
-            $tx->friend_share = $expense->split_friend_share ?? round($expense->amount / 2, 2);
+            $tx->total_amount = $expense->totalAmount();
+            $tx->my_share = $expense->split_my_share ?? round($expense->totalAmount() / 2, 2);
+            $tx->friend_share = $expense->split_friend_share ?? round($expense->totalAmount() / 2, 2);
         }
 
         $tx->description = $expense->description;

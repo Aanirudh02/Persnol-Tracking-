@@ -11,6 +11,7 @@ use App\Models\Income;
 use App\Models\Mistake;
 use App\Models\ScooterTrip;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DayTimelineService
 {
@@ -67,14 +68,14 @@ class DayTimelineService
             foreach ($e->subItems as $sub) {
                 $children[] = [
                     'title' => $sub->description,
-                    'desc' => '₹'.number_format((float) $sub->amount, 2),
+                    'desc' => '₹'.number_format($sub->totalAmount(), 2),
                 ];
             }
             foreach ($e->foodEntries as $f) {
                 $linkedFoodIds[] = $f->id;
                 $children[] = [
                     'title' => $f->item_name.($f->is_snack ? ' (snack)' : ''),
-                    'desc' => '₹'.number_format((float) $f->amount, 2).($f->category ? ' · '.$f->category->name : ''),
+                    'desc' => '₹'.number_format($f->totalAmount(), 2).($f->category ? ' · '.$f->category->name : ''),
                 ];
             }
 
@@ -84,7 +85,7 @@ class DayTimelineService
                 'type' => 'expense',
                 'icon' => '💰',
                 'title' => "Expense: {$e->description}",
-                'desc' => '₹'.number_format((float) $e->amount, 2).' via '.$e->payment_method,
+                'desc' => '₹'.number_format($e->totalAmount(), 2).' via '.$e->payment_method,
                 'badge' => 'Finance',
                 'badge_color' => 'bg-rose-100 text-rose-800',
                 'color' => 'rose',
@@ -103,7 +104,7 @@ class DayTimelineService
                 'type' => 'food',
                 'icon' => $f->is_snack ? '☕' : '🍔',
                 'title' => $f->item_name,
-                'desc' => '₹'.number_format((float) $f->amount, 2).($f->location ? " @ {$f->location}" : ''),
+                'desc' => '₹'.number_format($f->totalAmount(), 2).($f->location ? " @ {$f->location}" : ''),
                 'badge' => $f->is_snack ? 'Snack' : 'Meal',
                 'badge_color' => 'bg-orange-100 text-orange-800',
                 'color' => 'orange',
@@ -182,9 +183,9 @@ class DayTimelineService
     public function dayWorkings(int $userId, string $date): array
     {
         $income = (float) Income::where('user_id', $userId)->where('date', $date)->sum('amount');
-        $expenses = (float) Expense::where('user_id', $userId)->where('date', $date)->whereNull('parent_id')->where('is_voluntary', false)->sum('amount');
+        $expenses = (float) Expense::where('user_id', $userId)->where('date', $date)->whereNull('parent_id')->where('is_voluntary', false)->sum(DB::raw('amount + gst_amount'));
         $fuel = (float) FuelEntry::where('user_id', $userId)->where('date', $date)->sum('amount');
-        $snackSpend = (float) FoodEntry::where('user_id', $userId)->where('date', $date)->where('is_snack', true)->sum('amount');
+        $snackSpend = (float) FoodEntry::where('user_id', $userId)->where('date', $date)->where('is_snack', true)->sum(DB::raw('amount + gst_amount'));
         $snackCount = (int) FoodEntry::where('user_id', $userId)->where('date', $date)->where('is_snack', true)->count();
 
         return [

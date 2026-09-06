@@ -10,7 +10,11 @@
                 @csrf
                 <div>
                     <label class="block font-semibold text-slate-700 mb-1">Amount (₹) *</label>
-                    <input type="number" step="0.01" name="amount" required value="{{ old('amount') }}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-lg font-bold">
+                    <input id="expense-total" type="number" step="0.01" name="amount" required value="{{ old('amount') }}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-lg font-bold">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">GST (₹, optional)</label>
+                    <input type="number" step="0.01" min="0" name="gst_amount" value="{{ old('gst_amount', 0) }}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-700 mb-1">Description *</label>
@@ -40,6 +44,19 @@
                             @endforeach
                         </select>
                     </div>
+                </div>
+                <label class="flex items-center gap-2 font-semibold text-slate-700">
+                    <input id="add-group-expense" type="checkbox" name="add_group_expense" value="1" @checked(old('add_group_expense')) class="rounded border-slate-300">
+                    Add as grouped expense with separate payment methods
+                </label>
+                <div id="group-expense-lines" class="hidden space-y-2 rounded-xl border border-sky-100 bg-sky-50/50 p-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs font-semibold text-slate-700">Payment breakdown</p>
+                        <button type="button" id="add-group-line" class="text-xs font-semibold text-sky-700 hover:underline">+ Add payment</button>
+                    </div>
+                    <div id="group-line-list" class="space-y-2"></div>
+                    <p id="group-total-hint" class="text-xs text-slate-500"></p>
+                    @error('group_expenses')<p class="text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -112,4 +129,53 @@
             </form>
         </div>
     </div>
+    <script>
+        const groupToggle = document.getElementById('add-group-expense');
+        const groupLines = document.getElementById('group-expense-lines');
+        const groupList = document.getElementById('group-line-list');
+        const groupTotal = document.getElementById('expense-total');
+        const groupHint = document.getElementById('group-total-hint');
+        const paymentMethods = @json(collect($paymentMethods)->values());
+        let groupLineCount = 0;
+
+        function addGroupLine(amount = '', method = null) {
+            const index = groupLineCount++;
+            const preferredMethods = ['Cash', 'UPI'];
+            method = method || preferredMethods[index] || paymentMethods[index] || paymentMethods[0] || 'Cash';
+            if (!paymentMethods.includes(method)) method = paymentMethods[0] || 'Cash';
+            const options = paymentMethods.map((item) => `<option value="${item}">${item}</option>`).join('');
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-[1fr_1fr_auto] gap-2';
+            row.innerHTML = `<input type="number" step="0.01" min="0.01" name="group_expenses[${index}][amount]" value="${amount}" placeholder="Amount" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl group-amount">
+                <select name="group_expenses[${index}][payment_method]" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl">${options}</select>
+                <button type="button" class="px-2 text-rose-600" aria-label="Remove payment">&times;</button>`;
+            row.querySelector('select').value = method;
+            row.querySelector('button').addEventListener('click', () => {
+                if (groupList.children.length <= 2) return;
+                row.remove();
+                updateGroupHint();
+            });
+            groupList.appendChild(row);
+            row.querySelector('input').addEventListener('input', updateGroupHint);
+            updateGroupHint();
+        }
+
+        function updateGroupHint() {
+            const total = [...document.querySelectorAll('.group-amount')].reduce((sum, input) => sum + (Number(input.value) || 0), 0);
+            const expected = Number(groupTotal.value) || 0;
+            groupHint.textContent = `Breakdown: ₹${total.toFixed(2)} of ₹${expected.toFixed(2)}`;
+            groupHint.className = `text-xs ${Math.abs(total - expected) < 0.01 ? 'text-emerald-700' : 'text-amber-700'}`;
+        }
+
+        groupToggle.addEventListener('change', () => {
+            groupLines.classList.toggle('hidden', !groupToggle.checked);
+            if (groupToggle.checked && groupList.children.length === 0) {
+                addGroupLine();
+                addGroupLine();
+            }
+        });
+        document.getElementById('add-group-line').addEventListener('click', () => addGroupLine());
+        groupTotal.addEventListener('input', updateGroupHint);
+        if (groupToggle.checked) groupToggle.dispatchEvent(new Event('change'));
+    </script>
 </x-app-layout>

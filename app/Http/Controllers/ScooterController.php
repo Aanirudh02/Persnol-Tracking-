@@ -77,7 +77,7 @@ class ScooterController extends Controller
             'to_and_fro' => 'nullable|boolean',
             'vehicle_id' => 'nullable|exists:vehicles,id',
             'purpose' => 'nullable|string|max:100',
-            'date' => 'nullable|date',
+            'date' => 'nullable|date|before_or_equal:today',
             'notes' => 'nullable|string',
             'stops' => 'nullable|json',
         ]);
@@ -300,7 +300,7 @@ class ScooterController extends Controller
             'end_address' => 'nullable|string|max:255',
             'to_and_fro' => 'nullable|boolean',
             'vehicle_id' => 'nullable|exists:vehicles,id',
-            'date' => 'nullable|date',
+            'date' => 'nullable|date|before_or_equal:today',
             'notes' => 'nullable|string',
         ]);
 

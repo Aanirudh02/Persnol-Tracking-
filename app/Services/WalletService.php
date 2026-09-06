@@ -6,6 +6,7 @@ use App\Models\Expense;
 use App\Models\Income;
 use App\Models\PaymentWallet;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class WalletService
 {
@@ -16,6 +17,22 @@ class WalletService
             ->orderBy('payment_method')
             ->get()
             ->map(function (PaymentWallet $wallet) use ($userId) {
+                $wallet->current_balance = $this->balanceFor($userId, $wallet);
+
+                return $wallet;
+            });
+    }
+
+    public function displayWallets(int $userId): Collection
+    {
+        $this->ensureDefaults($userId);
+
+        return PaymentWallet::where('user_id', $userId)
+            ->whereIn('payment_method', ['UPI', 'Cash'])
+            ->get()
+            ->sortBy(fn (PaymentWallet $wallet): int => array_search($wallet->payment_method, ['UPI', 'Cash'], true))
+            ->values()
+            ->map(function (PaymentWallet $wallet) use ($userId): PaymentWallet {
                 $wallet->current_balance = $this->balanceFor($userId, $wallet);
 
                 return $wallet;
@@ -52,7 +69,7 @@ class WalletService
                 $q->whereNull('expense_categories.is_archived')
                     ->orWhere('expense_categories.is_archived', false);
             })
-            ->sum('expenses.amount');
+            ->sum(DB::raw('expenses.amount + expenses.gst_amount'));
 
         return round((float) $wallet->opening_balance + $income - $expense, 2);
     }

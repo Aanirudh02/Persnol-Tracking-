@@ -15,86 +15,21 @@
             </div>
         </div>
 
-        <!-- ONGOING TRIP BANNER -->
+        <!-- Ongoing GPS trip (optional) — dismiss if you only log completed trips -->
         @if($activeTrip)
-            <div class="p-5 rounded-3xl bg-gradient-to-r from-sky-500 via-cyan-600 to-blue-600 text-white shadow-lg shadow-sky-500/20 border border-sky-400/40 space-y-4">
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex items-center gap-3">
-                        <span class="w-10 h-10 rounded-2xl bg-cyan-500/20 flex items-center justify-center text-xl animate-pulse">🛵</span>
-                        <div>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-400 text-slate-950 uppercase tracking-wider">Trip In Progress</span>
-                            <h2 class="font-bold text-lg mt-1">{{ $activeTrip->title ?? 'Ongoing Ride' }}</h2>
-                        </div>
+            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <p class="font-semibold text-amber-900">Unfinished live trip: {{ $activeTrip->title ?? 'Ongoing Ride' }}</p>
+                        <p class="text-xs text-amber-800 mt-0.5">You can discard this and use “Log completed trip” with start/end places instead.</p>
                     </div>
-                    <div class="text-right">
-                        <span class="text-xs font-mono text-cyan-200">Started {{ \Carbon\Carbon::parse($activeTrip->start_time)->format('g:i A') }}</span>
-                        @if($activeTrip->start_address)
-                            <p class="text-xs text-cyan-100 mt-0.5">📍 From: {{ $activeTrip->start_address }}</p>
-                        @endif
-                        @if($activeTrip->start_latitude && $activeTrip->start_longitude)
-                            <p class="text-[10px] text-cyan-300 font-mono">{{ number_format($activeTrip->start_latitude, 5) }}, {{ number_format($activeTrip->start_longitude, 5) }}</p>
-                            <a href="https://www.google.com/maps/search/?api=1&query={{ $activeTrip->start_latitude }},{{ $activeTrip->start_longitude }}" target="_blank"
-                               class="inline-block mt-1 text-[10px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded-full transition font-semibold">
-                                🗺️ View Start on Maps
-                            </a>
-                        @endif
-                    </div>
+                    <form action="{{ route('scooter.destroy', $activeTrip) }}" method="POST" onsubmit="return confirm('Discard this unfinished trip?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="px-3 py-2 rounded-xl bg-white border border-amber-300 text-amber-900 text-xs font-semibold hover:bg-amber-100">Discard unfinished trip</button>
+                    </form>
                 </div>
-
-                @if($activeTrip->to_and_fro)
-                    <div class="flex items-center gap-2 text-xs bg-white/10 rounded-xl px-3 py-1.5 w-fit">
-                        <span>🔁</span>
-                        <span class="font-semibold">Round Trip (To &amp; Fro) — distance will be doubled</span>
-                    </div>
-                @endif
-
-                <!-- End Trip Form -->
-                <form action="{{ route('scooter.end', $activeTrip) }}" method="POST" enctype="multipart/form-data"
-                      class="pt-3 border-t border-cyan-800/60 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                    @csrf
-                    <input type="hidden" name="end_latitude" id="end-trip-lat">
-                    <input type="hidden" name="end_longitude" id="end-trip-lon">
-
-                    <div>
-                        <label class="block text-cyan-200 text-xs font-semibold mb-1">📍 Destination</label>
-                        <div class="flex gap-1.5">
-                            <input type="text" name="end_address" id="end-trip-addr" value="Current GPS Location" required
-                                   class="flex-1 px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs placeholder-white/50">
-                            <button type="button" onclick="window.fetchEndLocation()" class="px-2.5 py-1.5 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs whitespace-nowrap">📍 GPS</button>
-                        </div>
-                        <p id="end-coords-preview" class="text-[10px] text-cyan-300 font-mono mt-1 hidden"></p>
-                    </div>
-
-                    <div>
-                        <label class="block text-cyan-200 text-xs font-semibold mb-1">📷 Speedometer (Optional)</label>
-                        <input type="file" name="speedometer_image" accept="image/*"
-                               class="w-full px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-white text-xs">
-                    </div>
-
-                    <div class="flex items-end">
-                        <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-md transition">
-                            🏁 Finish &amp; End Trip
-                        </button>
-                    </div>
-                </form>
             </div>
-
-            <script>
-                window.fetchEndLocation = async function() {
-                    try {
-                        const coords = await window.getCurrentCoordinates();
-                        document.getElementById('end-trip-lat').value = coords.latitude;
-                        document.getElementById('end-trip-lon').value = coords.longitude;
-                        document.getElementById('end-trip-addr').value = `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
-                        const preview = document.getElementById('end-coords-preview');
-                        preview.textContent = `✅ GPS: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
-                        preview.classList.remove('hidden');
-                        window.showToast('📍 End Location Acquired!', 'info');
-                    } catch (e) {
-                        window.showToast('GPS: ' + e.message, 'warning');
-                    }
-                };
-            </script>
         @endif
 
         <!-- Metrics -->
@@ -172,14 +107,15 @@
                                         </span>
                                     </div>
 
-                                    @if($t->stops && count($t->stops) > 0)
-                                        @foreach($t->stops as $stop)
+                                    @php $stops = is_array($t->stops) ? $t->stops : []; @endphp
+                                    @if(count($stops) > 0)
+                                        @foreach($stops as $stop)
                                             <div class="flex items-start gap-1.5 ml-2">
-                                                <span class="text-yellow-500 mt-0.5">🟡</span>
+                                                <span class="text-yellow-500 mt-0.5">•</span>
                                                 <span>
                                                     <span class="font-semibold text-slate-600">Stop:</span>
-                                                    {{ $stop['label'] ?? 'Unnamed stop' }}
-                                                    @if(!empty($stop['lat']) && !empty($stop['lng']))
+                                                    {{ is_array($stop) ? ($stop['label'] ?? 'Unnamed stop') : (string) $stop }}
+                                                    @if(is_array($stop) && !empty($stop['lat']) && !empty($stop['lng']))
                                                         <span class="text-slate-400 font-mono">({{ number_format($stop['lat'], 4) }}, {{ number_format($stop['lng'], 4) }})</span>
                                                     @endif
                                                 </span>
@@ -208,13 +144,11 @@
 
                             <!-- Right: Actions -->
                             <div class="flex flex-row sm:flex-col items-center sm:items-end gap-2 flex-shrink-0">
-                                @if($t->start_latitude && $t->start_longitude && $t->end_latitude && $t->end_longitude)
-                                    <a href="https://www.google.com/maps/dir/?api=1&origin={{ $t->start_latitude }},{{ $t->start_longitude }}&destination={{ $t->end_latitude }},{{ $t->end_longitude }}"
-                                       target="_blank"
-                                       class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition">
-                                        Maps Route
-                                    </a>
-                                @endif
+                                <a href="{{ $t->mapsDirUrl() }}"
+                                   target="_blank"
+                                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition">
+                                    Maps Route
+                                </a>
                                 <a href="{{ route('scooter.edit', $t) }}"
                                    class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition">
                                     Edit

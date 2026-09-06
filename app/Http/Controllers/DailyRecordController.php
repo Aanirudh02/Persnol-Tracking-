@@ -103,7 +103,7 @@ class DailyRecordController extends Controller
         $expensesByDate = Expense::where('user_id', $user->id)
             ->whereNull('parent_id')
             ->whereBetween('date', [$monthStart, $monthEnd])
-            ->selectRaw('date, sum(amount) as total')
+            ->selectRaw('date, sum(amount + gst_amount) as total')
             ->groupBy('date')
             ->pluck('total', 'date')
             ->toArray();

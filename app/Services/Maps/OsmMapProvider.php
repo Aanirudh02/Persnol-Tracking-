@@ -10,7 +10,7 @@ class OsmMapProvider implements MapProviderInterface
 {
     public function searchPlaces(string $query): array
     {
-        $query = trim(preg_replace('/\s+/', ' ', $query) ?? '');
+        $query = $this->normalizeQuery($query);
         if (strlen($query) < 3) {
             return [];
         }
@@ -185,6 +185,14 @@ class OsmMapProvider implements MapProviderInterface
                 }
                 if (str_contains($q, 'goldwin') && str_contains($label, 'goldwin')) {
                     $score += 100;
+                }
+                if (str_contains($q, 'dmart') || str_contains($q, 'd mart')) {
+                    if (str_contains($label, 'dmart') || str_contains($label, 'd mart')) {
+                        $score += 180;
+                    }
+                    if (str_contains($label, 'coimbatore') || str_contains($label, 'chinniyampalayam')) {
+                        $score += 80;
+                    }
                 }
                 if (str_contains($q, '641062') && str_contains($label, '641062')) {
                     $score += 100;
@@ -364,6 +372,12 @@ class OsmMapProvider implements MapProviderInterface
         $variants[] = preg_replace('/^\d+[,\s\-]*/', '', $query) ?? $query;
         $variants[] = preg_replace('/\bTechnolgies\b/i', 'Technologies', $query) ?? $query;
 
+        if (stripos($query, 'dmart') !== false || stripos($query, 'd mart') !== false) {
+            $variants[] = 'DMart Chinniyampalayam Coimbatore Tamil Nadu';
+            $variants[] = 'DMart Coimbatore Tamil Nadu';
+            $variants[] = 'DMart near Chinniyampalayam Coimbatore';
+        }
+
         if (stripos($query, 'Chinni') !== false || stripos($query, 'Goldwin') !== false || stripos($query, '641062') !== false) {
             $variants[] = 'Chinniyampalayam Coimbatore 641062';
             $variants[] = 'Goldwins Chinniyampalayam Coimbatore';
@@ -380,5 +394,15 @@ class OsmMapProvider implements MapProviderInterface
         }
 
         return array_values(array_unique(array_filter($variants, fn ($v) => strlen(trim($v)) >= 3)));
+    }
+
+    protected function normalizeQuery(string $query): string
+    {
+        $query = trim(preg_replace('/\s+/', ' ', $query) ?? '');
+        $query = preg_replace('/\bD\s*[-]?\s*Mart\b/i', 'DMart', $query) ?? $query;
+        $query = preg_replace('/\bChinniampalayam\b/i', 'Chinniyampalayam', $query) ?? $query;
+        $query = preg_replace('/\bTamilnadu\b/i', 'Tamil Nadu', $query) ?? $query;
+
+        return $query;
     }
 }

@@ -85,6 +85,7 @@ window.bindPlaceAutocomplete = function(inputId, suggestId, hiddenIds, onPick) {
     const input = document.getElementById(inputId);
     const box = document.getElementById(suggestId);
     if (!input || !box) return;
+    let latestResults = [];
 
     const applyPlace = (label, lat, lng) => {
         input.value = label;
@@ -124,9 +125,17 @@ window.bindPlaceAutocomplete = function(inputId, suggestId, hiddenIds, onPick) {
                 box.classList.remove('hidden');
                 return;
             }
-            box.innerHTML = data.map((p) =>
-                `<button type="button" data-lat="${p.lat}" data-lng="${p.lng}" data-label="${String(p.label).replace(/"/g, '&quot;')}">${p.label}</button>`
-            ).join('');
+            latestResults = data;
+            box.innerHTML = '';
+            data.forEach((place) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.dataset.lat = place.lat;
+                button.dataset.lng = place.lng;
+                button.dataset.label = place.label;
+                button.textContent = place.label;
+                box.appendChild(button);
+            });
             box.classList.remove('hidden');
             box.querySelectorAll('button').forEach((btn) => {
                 btn.addEventListener('click', () => applyPlace(btn.dataset.label, btn.dataset.lat, btn.dataset.lng));
@@ -138,6 +147,7 @@ window.bindPlaceAutocomplete = function(inputId, suggestId, hiddenIds, onPick) {
     }, 350);
 
     input.addEventListener('input', () => {
+        latestResults = [];
         if (hiddenIds.lat) document.getElementById(hiddenIds.lat).value = '';
         if (hiddenIds.lng) document.getElementById(hiddenIds.lng).value = '';
         if (hiddenIds.picked) {
@@ -151,21 +161,24 @@ window.bindPlaceAutocomplete = function(inputId, suggestId, hiddenIds, onPick) {
         run();
     });
 
-    // If user leaves the field without picking, auto-pick first match
-    input.addEventListener('blur', async () => {
-        setTimeout(async () => {
-            const latEl = hiddenIds.lat ? document.getElementById(hiddenIds.lat) : null;
-            if (latEl && latEl.value) return;
-            const q = input.value.trim();
-            if (q.length < 3) return;
-            try {
-                const res = await fetch(`/geo/search?q=${encodeURIComponent(q)}`);
-                const data = await res.json();
-                if (Array.isArray(data) && data[0]) {
-                    applyPlace(data[0].label, data[0].lat, data[0].lng);
-                }
-            } catch (e) {}
-        }, 200);
+    input.addEventListener('keydown', async (event) => {
+        if (event.key !== 'Enter') return;
+
+        event.preventDefault();
+        const q = input.value.trim();
+        if (q.length < 3) return;
+
+        try {
+            const data = latestResults.length
+                ? latestResults
+                : await fetch(`/geo/search?q=${encodeURIComponent(q)}`).then((response) => response.json());
+            if (!Array.isArray(data) || !data[0]) return;
+
+            applyPlace(data[0].label, data[0].lat, data[0].lng);
+            input.form?.requestSubmit();
+        } catch (e) {
+            latestResults = [];
+        }
     });
 
     document.addEventListener('click', (e) => {

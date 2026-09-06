@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Expense;
+use App\Models\FuelEntry;
 use App\Models\Income;
+use App\Models\Mistake;
 use App\Models\Payment;
 use App\Models\ScooterTrip;
-use App\Models\FuelEntry;
-use App\Models\Mistake;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
@@ -23,6 +23,7 @@ class ReportController extends Controller
 
         $expenses = Expense::where('user_id', $user->id)
             ->whereBetween('date', [$startDate, $endDate])
+            ->whereNull('parent_id')
             ->with('category')
             ->orderBy('date')
             ->get();
@@ -54,7 +55,7 @@ class ReportController extends Controller
             ->orderBy('date')
             ->get();
 
-        $totalExpenses = $expenses->sum('amount');
+        $totalExpenses = $expenses->sum(fn (Expense $expense): float => $expense->totalAmount());
         $totalIncome = $incomes->sum('amount');
         $totalDistance = $trips->sum('distance_km');
         $totalPetrol = $fuelEntries->sum('amount');
@@ -89,10 +90,10 @@ class ReportController extends Controller
             $handle = fopen('php://output', 'w');
 
             if ($module === 'expenses') {
-                fputcsv($handle, ['ID', 'Date', 'Time', 'Category', 'Description', 'Amount', 'Payment Method', 'Paid By', 'Notes']);
-                $records = Expense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->with('category')->get();
+                fputcsv($handle, ['ID', 'Date', 'Time', 'Category', 'Description', 'Amount', 'GST', 'Total', 'Payment Method', 'Paid By', 'Notes']);
+                $records = Expense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->whereNull('parent_id')->with('category')->get();
                 foreach ($records as $r) {
-                    fputcsv($handle, [$r->id, $r->date->toDateString(), $r->time, $r->category?->name ?? 'Other', $r->description, $r->amount, $r->payment_method, $r->paid_by, $r->notes]);
+                    fputcsv($handle, [$r->id, $r->date->toDateString(), $r->time, $r->category?->name ?? 'Other', $r->description, $r->amount, $r->gst_amount, $r->totalAmount(), $r->payment_method, $r->paid_by, $r->notes]);
                 }
             } elseif ($module === 'income') {
                 fputcsv($handle, ['ID', 'Date', 'Source', 'Description', 'Amount', 'Payment Method', 'Notes']);

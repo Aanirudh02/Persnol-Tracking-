@@ -15,6 +15,10 @@
                     <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Amount (₹) *</label>
                     <input type="number" step="0.01" name="amount" required value="{{ old('amount', $expense->amount) }}" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-lg font-bold text-slate-900 dark:text-white">
                 </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">GST (₹, optional)</label>
+                    <input type="number" step="0.01" min="0" name="gst_amount" value="{{ old('gst_amount', $expense->gst_amount) }}" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                </div>
 
                 <div>
                     <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Description *</label>

@@ -11,6 +11,7 @@ use App\Services\DailyPromptService;
 use App\Services\DayTimelineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -56,7 +57,7 @@ class DashboardController extends Controller
             $expenseChartData[] = (float) Expense::where('user_id', $user->id)
                 ->whereNull('parent_id')
                 ->where('date', $dateStr)
-                ->sum('amount');
+                ->sum(DB::raw('amount + gst_amount'));
         }
 
         $prevDate = Carbon::parse($date)->subDay()->toDateString();

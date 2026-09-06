@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Expense;
-use App\Models\Income;
-use App\Models\FoodEntry;
-use App\Models\ScooterTrip;
-use App\Models\FuelEntry;
-use App\Models\DailyRecord;
-use App\Models\Mistake;
 use App\Models\Activity;
+use App\Models\DailyRecord;
+use App\Models\Expense;
+use App\Models\FoodEntry;
+use App\Models\FuelEntry;
+use App\Models\Income;
+use App\Models\Mistake;
+use App\Models\ScooterTrip;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsController extends Controller
@@ -25,7 +25,7 @@ class AnalyticsController extends Controller
         // 1. Finance Analytics
         $expensesByDay = Expense::where('user_id', $user->id)
             ->where('date', '>=', $startDate)
-            ->selectRaw('date, sum(amount) as total')
+            ->selectRaw('date, sum(amount + gst_amount) as total')
             ->groupBy('date')
             ->orderBy('date')
             ->pluck('total', 'date')
@@ -42,14 +42,14 @@ class AnalyticsController extends Controller
         $categorySpending = Expense::where('expenses.user_id', $user->id)
             ->where('expenses.date', '>=', $startDate)
             ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
-            ->selectRaw('expense_categories.name, sum(expenses.amount) as total, expense_categories.color')
+            ->selectRaw('expense_categories.name, sum(expenses.amount + expenses.gst_amount) as total, expense_categories.color')
             ->groupBy('expense_categories.name', 'expense_categories.color')
             ->orderByDesc('total')
             ->get();
 
         $paymentMethods = Expense::where('user_id', $user->id)
             ->where('date', '>=', $startDate)
-            ->selectRaw('payment_method, sum(amount) as total')
+            ->selectRaw('payment_method, sum(amount + gst_amount) as total')
             ->groupBy('payment_method')
             ->orderByDesc('total')
             ->pluck('total', 'payment_method')
@@ -59,7 +59,7 @@ class AnalyticsController extends Controller
         $snackTrend = FoodEntry::where('user_id', $user->id)
             ->where('is_snack', true)
             ->where('date', '>=', $startDate)
-            ->selectRaw('date, count(*) as count, sum(amount) as total_spent')
+            ->selectRaw('date, count(*) as count, sum(amount + gst_amount) as total_spent')
             ->groupBy('date')
             ->orderBy('date')
             ->get();
@@ -67,13 +67,16 @@ class AnalyticsController extends Controller
         $topSnacks = FoodEntry::where('user_id', $user->id)
             ->where('is_snack', true)
             ->where('date', '>=', $startDate)
-            ->selectRaw('item_name, count(*) as count, sum(amount) as total_spent')
+            ->selectRaw('item_name, count(*) as count, sum(amount + gst_amount) as total_spent')
             ->groupBy('item_name')
             ->orderByDesc('count')
             ->take(6)
             ->get();
 
         // 3. Scooter Analytics
+        $fuelMonthExpression = DB::connection()->getDriverName() === 'pgsql'
+            ? "to_char(date, 'YYYY-MM')"
+            : 'DATE_FORMAT(date, "%Y-%m")';
         $scooterDistanceByDay = ScooterTrip::where('user_id', $user->id)
             ->where('date', '>=', $startDate)
             ->selectRaw('date, sum(distance_km) as total_km, count(*) as trips')
@@ -82,7 +85,7 @@ class AnalyticsController extends Controller
             ->get();
 
         $petrolByMonth = FuelEntry::where('user_id', $user->id)
-            ->selectRaw('DATE_FORMAT(date, "%Y-%m") as month, sum(amount) as total_spent, sum(litres) as total_litres')
+            ->selectRaw("{$fuelMonthExpression} as month, sum(amount) as total_spent, sum(litres) as total_litres")
             ->groupBy('month')
             ->orderBy('month')
             ->get();

@@ -17,6 +17,7 @@ class FoodEntry extends Model
         'is_snack',
         'quantity',
         'amount',
+        'gst_amount',
         'date',
         'time',
         'location',
@@ -29,6 +30,7 @@ class FoodEntry extends Model
         'auto_create_expense' => 'boolean',
         'quantity' => 'integer',
         'amount' => 'decimal:2',
+        'gst_amount' => 'decimal:2',
         'date' => 'date',
     ];
 
@@ -50,5 +52,10 @@ class FoodEntry extends Model
     public function expense(): BelongsTo
     {
         return $this->belongsTo(Expense::class);
+    }
+
+    public function totalAmount(): float
+    {
+        return round((float) $this->amount + (float) $this->gst_amount, 2);
     }
 }

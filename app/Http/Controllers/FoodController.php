@@ -29,22 +29,22 @@ class FoodController extends Controller
         $weeklySnackSpend = (float) FoodEntry::where('user_id', $user->id)
             ->where('date', '>=', $startOfWeek)
             ->where('is_snack', true)
-            ->sum('amount');
+            ->sum(DB::raw('amount + gst_amount'));
 
         $monthlySnackSpend = (float) FoodEntry::where('user_id', $user->id)
             ->where('date', '>=', $startOfMonth)
             ->where('is_snack', true)
-            ->sum('amount');
+            ->sum(DB::raw('amount + gst_amount'));
 
         $frequentSnacks = FoodEntry::where('user_id', $user->id)
             ->where('is_snack', true)
-            ->select('item_name', DB::raw('count(*) as count'), DB::raw('sum(amount) as total_spent'))
+            ->select('item_name', DB::raw('count(*) as count'), DB::raw('sum(amount + gst_amount) as total_spent'))
             ->groupBy('item_name')
             ->orderByDesc('count')
             ->take(5)
             ->get();
 
-        $query = FoodEntry::where('user_id', $user->id)->with(['category', 'expense']);
+        $query = FoodEntry::where('user_id', $user->id)->with(['category', 'expense.expenseGroup']);
         if ($request->filled('is_snack')) {
             $query->where('is_snack', $request->boolean('is_snack'));
         }
@@ -57,9 +57,16 @@ class FoodController extends Controller
         $paymentMethods = $options->names('payment_method');
         $parentExpenses = Expense::where('user_id', $user->id)
             ->whereNull('parent_id')
+            ->withSum('subItems as sub_items_total', 'amount')
+            ->withSum('subItems as sub_items_gst_total', 'gst_amount')
+            ->withSum('foodEntries as food_entries_total', 'amount')
+            ->withSum('foodEntries as food_entries_gst_total', 'gst_amount')
             ->latest()
             ->take(40)
             ->get();
+        $parentExpenses->each(function (Expense $expense): void {
+            $expense->remaining_amount = round(max(0, $expense->totalAmount() - (float) ($expense->sub_items_total ?? 0) - (float) ($expense->sub_items_gst_total ?? 0) - (float) ($expense->food_entries_total ?? 0) - (float) ($expense->food_entries_gst_total ?? 0)), 2);
+        });
 
         return view('food.index', compact(
             'entries',
@@ -82,6 +89,7 @@ class FoodController extends Controller
             'items.*.category_id' => 'nullable|exists:food_categories,id',
             'items.*.quantity' => 'nullable|integer|min:1',
             'items.*.amount' => 'nullable|numeric|min:0',
+            'gst_amount' => 'nullable|numeric|min:0',
             'is_snack' => 'nullable|boolean',
             'date' => 'required|date',
             'time' => 'nullable',
@@ -118,14 +126,34 @@ class FoodController extends Controller
         }
 
         $totalAmount = (float) $items->sum('amount');
+        $gstAmount = round((float) ($validated['gst_amount'] ?? 0), 2);
         $names = $items->pluck('item_name')->implode(', ');
         $expenseId = null;
         $autoCreated = false;
+        $allocatedGst = $items->map(function (array $row, int $index) use ($items, $totalAmount, $gstAmount): array {
+            $row['gst_amount'] = $index === $items->count() - 1
+                ? 0
+                : ($totalAmount > 0 ? round($gstAmount * ((float) $row['amount'] / $totalAmount), 2) : 0);
+
+            return $row;
+        })->values();
+        if ($allocatedGst->isNotEmpty()) {
+            $allocatedGst = $allocatedGst->map(function (array $row, int $index) use ($allocatedGst, $gstAmount): array {
+                if ($index === $allocatedGst->count() - 1) {
+                    $row['gst_amount'] = round($gstAmount - (float) $allocatedGst->slice(0, $index)->sum('gst_amount'), 2);
+                }
+
+                return $row;
+            });
+        }
 
         if ($mode === 'sub_item' && $parentExpenseId) {
             $parent = Expense::where('user_id', $request->user()->id)->whereNull('parent_id')->findOrFail($parentExpenseId);
+            if ($totalAmount + $gstAmount > $parent->remainingAmount()) {
+                return back()->withInput()->with('error', 'The food items exceed the remaining amount of the selected expense.');
+            }
             $expenseId = $parent->id;
-        } elseif (in_array($mode, ['separate', 'voluntary'], true) && $totalAmount > 0) {
+        } elseif (in_array($mode, ['separate', 'voluntary'], true) && $totalAmount + $gstAmount > 0) {
             $expCat = null;
             if ($mode === 'voluntary') {
                 $expCat = ExpenseCategory::where('is_voluntary', true)->first()
@@ -144,6 +172,7 @@ class FoodController extends Controller
                 'parent_id' => null,
                 'description' => $names,
                 'amount' => $totalAmount,
+                'gst_amount' => $gstAmount,
                 'date' => $validated['date'],
                 'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
                 'payment_method' => $validated['payment_method'] ?? 'Cash',
@@ -156,7 +185,7 @@ class FoodController extends Controller
             $autoCreated = true;
         }
 
-        foreach ($items as $row) {
+        foreach ($allocatedGst as $row) {
             FoodEntry::create([
                 'user_id' => $request->user()->id,
                 'daily_record_id' => $dailyRecord->id,
@@ -167,6 +196,7 @@ class FoodController extends Controller
                 'is_snack' => $request->boolean('is_snack'),
                 'quantity' => $row['quantity'],
                 'amount' => $row['amount'],
+                'gst_amount' => $row['gst_amount'],
                 'date' => $validated['date'],
                 'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
                 'location' => $validated['location'] ?? null,
@@ -200,6 +230,7 @@ class FoodController extends Controller
             'category_id' => 'nullable|exists:food_categories,id',
             'quantity' => 'nullable|integer|min:1',
             'amount' => 'nullable|numeric|min:0',
+            'gst_amount' => 'nullable|numeric|min:0',
             'date' => 'required|date',
             'time' => 'nullable',
             'location' => 'nullable|string|max:100',
@@ -216,11 +247,26 @@ class FoodController extends Controller
             $expenseId = $parent->id;
         }
 
+        $currentAmount = (float) $food->amount;
+        $currentGst = (float) $food->gst_amount;
+        $newAmount = (float) ($validated['amount'] ?? 0);
+        $newGst = (float) ($validated['gst_amount'] ?? 0);
+        if ($expenseId) {
+            $remaining = $parent->remainingAmount();
+            if ($food->expense_id === $expenseId) {
+                $remaining += $currentAmount + $currentGst;
+            }
+            if ($newAmount + $newGst > $remaining) {
+                return back()->withInput()->with('error', 'The food amount exceeds the remaining amount of the selected expense.');
+            }
+        }
+
         $food->update([
             'item_name' => $validated['item_name'],
             'category_id' => $validated['category_id'] ?? null,
             'quantity' => max(1, (int) ($validated['quantity'] ?? 1)),
             'amount' => (float) ($validated['amount'] ?? 0),
+            'gst_amount' => $newGst,
             'date' => $validated['date'],
             'time' => $validated['time'] ?? $food->time,
             'location' => $validated['location'] ?? null,

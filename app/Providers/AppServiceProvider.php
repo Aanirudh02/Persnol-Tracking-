@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\DailyPromptService;
 use App\Services\Maps\GoogleMapProvider;
 use App\Services\Maps\MapProviderInterface;
 use App\Services\Maps\OsmMapProvider;
-use App\Services\DailyPromptService;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -15,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(MapProviderInterface::class, function () {
             return match (config('services.maps.provider', 'osm')) {
-                'google' => new GoogleMapProvider,
+                'google' => new GoogleMapProvider(new OsmMapProvider),
                 default => new OsmMapProvider,
             };
         });
