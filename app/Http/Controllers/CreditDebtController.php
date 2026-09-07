@@ -108,22 +108,70 @@ class CreditDebtController extends Controller
             abort(403);
         }
 
-        $validated = $this->validateCreditDebt($request, false);
+        $validated = $this->validateCreditDebt($request, true);
         $friend = Friend::query()->where('user_id', $request->user()->id)->findOrFail($validated['friend_id']);
 
-        $creditDebt->update([
-            'friend_id' => $friend->id,
-            'type' => $validated['type'],
-            'amount' => $validated['amount'],
-            'date' => $validated['date'],
-            'location' => $validated['location'] ?? null,
-            'description' => $validated['description'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'due_date' => $validated['due_date'] ?? null,
-            'status' => $validated['status'] ?? $creditDebt->status,
-        ]);
+        DB::transaction(function () use ($creditDebt, $validated, $friend): void {
+            $creditDebt->update([
+                'friend_id' => $friend->id,
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'date' => $validated['date'],
+                'location' => $validated['location'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'due_date' => $validated['due_date'] ?? null,
+                'status' => $validated['status'] ?? $creditDebt->status,
+            ]);
 
-        $this->refreshCreditDebtAmounts($creditDebt);
+            if (array_key_exists('amount_paid', $validated)) {
+                $targetPaid = round((float) $validated['amount_paid'], 2);
+                $existingPaymentsCount = $creditDebt->payments()->count();
+
+                if ($existingPaymentsCount === 0) {
+                    if ($targetPaid > 0) {
+                        CreditDebtPayment::create([
+                            'credit_debt_id' => $creditDebt->id,
+                            'amount' => $targetPaid,
+                            'paid_on' => $validated['date'],
+                            'payment_method' => $validated['payment_method'] ?? null,
+                            'notes' => 'Direct paid update',
+                        ]);
+                    }
+                } elseif ($existingPaymentsCount === 1) {
+                    $singlePayment = $creditDebt->payments()->first();
+                    if ($targetPaid <= 0) {
+                        $singlePayment->delete();
+                    } else {
+                        $singlePayment->update([
+                            'amount' => $targetPaid,
+                            'payment_method' => $validated['payment_method'] ?? $singlePayment->payment_method,
+                        ]);
+                    }
+                } else {
+                    // Multiple payments exist; if targetPaid differs from current total, adjust/reconcile the payments
+                    $currentPaid = (float) $creditDebt->payments()->sum('amount');
+                    $diff = round($targetPaid - $currentPaid, 2);
+
+                    if ($diff != 0) {
+                        // Delete existing payments and replace with a consolidated payment to accurately reflect the user-entered paid amount
+                        $creditDebt->payments()->delete();
+                        if ($targetPaid > 0) {
+                            CreditDebtPayment::create([
+                                'credit_debt_id' => $creditDebt->id,
+                                'amount' => $targetPaid,
+                                'paid_on' => $validated['date'],
+                                'payment_method' => $validated['payment_method'] ?? null,
+                                'notes' => 'Adjusted paid amount',
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            $this->refreshCreditDebtAmounts($creditDebt);
+        });
+
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
         return redirect()->route('credits.index', ['type' => $creditDebt->type])->with('success', ucfirst($creditDebt->type).' updated.');

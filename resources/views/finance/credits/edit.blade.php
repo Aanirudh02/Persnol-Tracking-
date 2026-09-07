@@ -25,12 +25,25 @@
                     </select>
                 </div>
                 <div>
-                    <label class="font-semibold text-slate-700">Amount</label>
-                    <input type="number" step="0.01" name="amount" value="{{ old('amount', $creditDebt->amount) }}" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                    <label class="font-semibold text-slate-700">Total Amount</label>
+                    <input type="number" step="0.01" min="0.01" name="amount" value="{{ old('amount', $creditDebt->amount) }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                </div>
+                <div>
+                    <label class="font-semibold text-slate-700">Amount Paid</label>
+                    <input type="number" step="0.01" min="0" name="amount_paid" value="{{ old('amount_paid', $creditDebt->amount_paid) }}" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
                 </div>
                 <div>
                     <label class="font-semibold text-slate-700">Date</label>
-                    <input type="date" name="date" value="{{ old('date', $creditDebt->date->toDateString()) }}" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                    <input type="date" name="date" value="{{ old('date', $creditDebt->date->toDateString()) }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                </div>
+                <div>
+                    <label class="font-semibold text-slate-700">Payment Method (if paying now)</label>
+                    <select name="payment_method" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                        <option value="">None / Existing</option>
+                        @foreach($paymentMethods as $method)
+                            <option value="{{ $method }}">{{ $method }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label class="font-semibold text-slate-700">Due date</label>

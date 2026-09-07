@@ -170,6 +170,7 @@ class FinanceFriendsOverhaulTest extends TestCase
             'type' => 'credit',
             'friend_id' => $friend->id,
             'amount' => 150,
+            'amount_paid' => 80,
             'date' => '2026-09-07',
             'description' => 'Actually I owed Asha',
             'status' => 'yet_to_pay',
@@ -177,6 +178,8 @@ class FinanceFriendsOverhaulTest extends TestCase
 
         $debt->refresh();
         $this->assertSame('credit', $debt->type);
+        $this->assertSame(150.0, (float) $debt->amount);
+        $this->assertSame(80.0, (float) $debt->amount_paid);
         $this->assertSame(70.0, $debt->remaining());
         $this->assertSame(-70.0, $friend->fresh()->getBalance()['net']);
 
