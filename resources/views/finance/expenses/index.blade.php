@@ -27,7 +27,7 @@
                     <label class="block text-slate-400 mb-1">Method</label>
                     <select name="payment_method" onchange="this.form.submit()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
                         <option value="">All Methods</option>
-                        @foreach($paymentMethods ?? ['UPI', 'Cash', 'Card', 'Bank Transfer', 'Other'] as $m)
+                        @foreach($paymentMethods as $m)
                             <option value="{{ $m }}" {{ request('payment_method') == $m ? 'selected' : '' }}>{{ $m }}</option>
                         @endforeach
                     </select>
@@ -117,6 +117,9 @@
                                             <span class="block text-[10px] font-normal text-slate-500">{{ $displayBreakdown }}</span>
                                         @elseif($exp->receipt_image)
                                             <a href="{{ asset('storage/' . $exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px]">📷 receipt</a>
+                                        @endif
+                                        @if(!$isGroup && $exp->friendSplit)
+                                            <span class="block text-[10px] font-normal text-indigo-600">Split with {{ $exp->friendSplit->friend?->name }} · net {{ $exp->friendSplit->netAmount() >= 0 ? '+' : '-' }}₹{{ number_format(abs($exp->friendSplit->netAmount()), 2) }}</span>
                                         @endif
                                         @if(!$isGroup && $exp->notes)
                                             <span class="block text-[10px] text-slate-400 font-normal">{{ $exp->notes }}</span>

@@ -17,23 +17,37 @@ class DailyPromptService
         $today = $now->toDateString();
         $yesterday = $now->copy()->subDay()->toDateString();
 
-        $dailyRecord = DailyRecord::firstOrCreate(
-            ['user_id' => $userId, 'record_date' => $today],
-            [
+        $dailyRecord = DailyRecord::query()
+            ->where('user_id', $userId)
+            ->whereDate('record_date', $today)
+            ->first();
+
+        if (! $dailyRecord) {
+            $dailyRecord = DailyRecord::create([
+                'user_id' => $userId,
+                'record_date' => $today,
                 'wake_up_prompt_dismissed' => false,
                 'sleep_prompt_dismissed' => false,
-            ]
-        );
+            ]);
+        }
 
         $mStart = Setting::getVal('morning_prompt_start', '07:00');
         $mEnd = Setting::getVal('morning_prompt_end', '09:00');
 
         if ($currentTime >= $mStart && $currentTime <= $mEnd) {
             // Morning: ask previous night's sleep time if missing
-            $yesterdayRecord = DailyRecord::firstOrCreate(
-                ['user_id' => $userId, 'record_date' => $yesterday],
-                ['sleep_prompt_dismissed' => false]
-            );
+            $yesterdayRecord = DailyRecord::query()
+                ->where('user_id', $userId)
+                ->whereDate('record_date', $yesterday)
+                ->first();
+
+            if (! $yesterdayRecord) {
+                $yesterdayRecord = DailyRecord::create([
+                    'user_id' => $userId,
+                    'record_date' => $yesterday,
+                    'sleep_prompt_dismissed' => false,
+                ]);
+            }
 
             if (! $yesterdayRecord->sleep_time && ! $yesterdayRecord->sleep_prompt_dismissed) {
                 $prompts[] = [

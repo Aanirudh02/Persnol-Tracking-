@@ -2,14 +2,14 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\LookupOption;
 use App\Models\ExpenseCategory;
 use App\Models\IncomeCategory;
+use App\Models\LookupOption;
+use App\Models\PaymentWallet;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Models\PaymentWallet;
+use Illuminate\Database\Seeder;
 
 class LookupAndVehicleSeeder extends Seeder
 {
@@ -19,6 +19,7 @@ class LookupAndVehicleSeeder extends Seeder
             'payment_method' => ['UPI', 'Cash', 'Card', 'Bank Transfer', 'Other'],
             'paid_by' => ['Me', 'Parent'],
             'friend_role' => ['Parent', 'Friend', 'Sibling', 'Colleague', 'Other'],
+            'income_source' => ['Pocket Money', 'Salary', 'Friend Returned Money', 'Transfer', 'Freelance', 'Other'],
             'credit_status' => [
                 'yet_to_pay' => 'Yet to pay',
                 'partially_paid' => 'Partially paid',
@@ -47,6 +48,13 @@ class LookupAndVehicleSeeder extends Seeder
         foreach ($lookups['friend_role'] as $name) {
             LookupOption::updateOrCreate(
                 ['user_id' => null, 'type' => 'friend_role', 'name' => $name],
+                ['sort_order' => $sort++, 'is_system' => true, 'is_active' => true]
+            );
+        }
+        $sort = 0;
+        foreach ($lookups['income_source'] as $name) {
+            LookupOption::updateOrCreate(
+                ['user_id' => null, 'type' => 'income_source', 'name' => $name],
                 ['sort_order' => $sort++, 'is_system' => true, 'is_active' => true]
             );
         }
@@ -98,6 +106,25 @@ class LookupAndVehicleSeeder extends Seeder
             ['key' => 'debit_wallet_for_voluntary'],
             ['value' => 'false', 'type' => 'boolean', 'group' => 'finance', 'description' => 'Debit wallets for voluntary spend']
         );
+        Setting::updateOrCreate(
+            ['key' => 'finance_dashboard_sections'],
+            ['value' => json_encode([
+                'show_wallet_balances' => true,
+                'show_total_expense' => true,
+                'show_current_balance' => true,
+                'show_expense_by_payment_type' => true,
+                'show_expense_by_category' => true,
+                'show_friend_overview' => true,
+            ]), 'type' => 'json', 'group' => 'finance', 'description' => 'Finance dashboard section toggles']
+        );
+        Setting::updateOrCreate(
+            ['key' => 'food_default_expense_category_id'],
+            ['value' => null, 'type' => 'string', 'group' => 'finance', 'description' => 'Default expense category for auto-created food expenses']
+        );
+        Setting::updateOrCreate(
+            ['key' => 'snack_default_expense_category_id'],
+            ['value' => null, 'type' => 'string', 'group' => 'finance', 'description' => 'Default expense category for auto-created snack expenses']
+        );
 
         foreach (User::all() as $user) {
             Vehicle::firstOrCreate(
@@ -112,7 +139,7 @@ class LookupAndVehicleSeeder extends Seeder
                 ]
             );
 
-            foreach (['UPI', 'Cash'] as $method) {
+            foreach ($lookups['payment_method'] as $method) {
                 PaymentWallet::firstOrCreate(
                     ['user_id' => $user->id, 'payment_method' => $method],
                     ['is_enabled' => false, 'opening_balance' => 0, 'opening_as_of' => now()->toDateString()]

@@ -341,7 +341,7 @@ class OsmMapProvider implements MapProviderInterface
 
             return collect($response->json() ?? [])
                 ->map(fn ($row) => [
-                    'label' => $row['display_name'] ?? '',
+                    'label' => $this->formatNominatimLabel($row),
                     'lat' => (float) ($row['lat'] ?? 0),
                     'lng' => (float) ($row['lon'] ?? 0),
                 ])
@@ -404,5 +404,28 @@ class OsmMapProvider implements MapProviderInterface
         $query = preg_replace('/\bTamilnadu\b/i', 'Tamil Nadu', $query) ?? $query;
 
         return $query;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    protected function formatNominatimLabel(array $row): string
+    {
+        $address = $row['address'] ?? [];
+        $parts = array_filter([
+            trim(implode(' ', array_filter([
+                $address['house_number'] ?? null,
+                $address['road'] ?? null,
+            ]))),
+            $address['building'] ?? null,
+            $address['neighbourhood'] ?? ($address['suburb'] ?? ($address['hamlet'] ?? null)),
+            $address['city_district'] ?? null,
+            $address['city'] ?? ($address['town'] ?? ($address['village'] ?? null)),
+            $address['state'] ?? null,
+            $address['postcode'] ?? null,
+            $address['country'] ?? null,
+        ]);
+
+        return implode(', ', array_unique($parts)) ?: (string) ($row['display_name'] ?? '');
     }
 }

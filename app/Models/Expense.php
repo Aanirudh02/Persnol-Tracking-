@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Expense extends Model
@@ -86,6 +87,11 @@ class Expense extends Model
     public function splitWithFriend(): BelongsTo
     {
         return $this->belongsTo(Friend::class, 'split_with_friend_id');
+    }
+
+    public function friendSplit(): HasOne
+    {
+        return $this->hasOne(FriendSplit::class);
     }
 
     public function foodEntries(): HasMany

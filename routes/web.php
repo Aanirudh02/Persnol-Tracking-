@@ -11,6 +11,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\FoodController;
 use App\Http\Controllers\FriendController;
+use App\Http\Controllers\FriendSplitController;
 use App\Http\Controllers\GeoController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\MistakeController;
@@ -75,11 +76,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/friends/store', [FriendController::class, 'storeFriend'])->name('friends.store');
         Route::post('/friends/transactions', [FriendController::class, 'storeTransaction'])->name('friends.transactions.store');
         Route::post('/friends/{friend}/settle', [FriendController::class, 'settle'])->name('friends.settle');
+        Route::resource('friend-splits', FriendSplitController::class)->except(['index', 'show', 'create']);
 
         // Credits & Debts
         Route::get('/credits', [CreditDebtController::class, 'index'])->name('credits.index');
         Route::post('/credits', [CreditDebtController::class, 'store'])->name('credits.store');
+        Route::get('/credits/{creditDebt}/edit', [CreditDebtController::class, 'edit'])->name('credits.edit');
+        Route::put('/credits/{creditDebt}', [CreditDebtController::class, 'update'])->name('credits.update');
+        Route::delete('/credits/{creditDebt}', [CreditDebtController::class, 'destroy'])->name('credits.destroy');
         Route::post('/credits/{creditDebt}/payments', [CreditDebtController::class, 'addPayment'])->name('credits.payments');
+        Route::put('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'updatePayment'])->name('credits.payments.update');
+        Route::delete('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'deletePayment'])->name('credits.payments.destroy');
         Route::post('/credits/{creditDebt}/status', [CreditDebtController::class, 'updateStatus'])->name('credits.status');
     });
 

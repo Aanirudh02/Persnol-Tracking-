@@ -10,9 +10,16 @@ use Illuminate\Support\Facades\DB;
 
 class WalletService
 {
+    public function __construct(
+        private readonly OptionsService $options
+    ) {}
+
     public function enabledWallets(int $userId): Collection
     {
-        return PaymentWallet::where('user_id', $userId)
+        $this->ensureDefaults($userId);
+
+        return PaymentWallet::query()
+            ->where('user_id', $userId)
             ->where('is_enabled', true)
             ->orderBy('payment_method')
             ->get()
@@ -26,11 +33,16 @@ class WalletService
     public function displayWallets(int $userId): Collection
     {
         $this->ensureDefaults($userId);
+        $order = $this->options->names('payment_method', $userId);
 
-        return PaymentWallet::where('user_id', $userId)
-            ->whereIn('payment_method', ['UPI', 'Cash'])
+        return PaymentWallet::query()
+            ->where('user_id', $userId)
             ->get()
-            ->sortBy(fn (PaymentWallet $wallet): int => array_search($wallet->payment_method, ['UPI', 'Cash'], true))
+            ->sortBy(function (PaymentWallet $wallet) use ($order): int {
+                $index = array_search($wallet->payment_method, $order, true);
+
+                return $index === false ? 999 : $index;
+            })
             ->values()
             ->map(function (PaymentWallet $wallet) use ($userId): PaymentWallet {
                 $wallet->current_balance = $this->balanceFor($userId, $wallet);
@@ -49,8 +61,8 @@ class WalletService
             ->where('incomes.payment_method', $method)
             ->where('incomes.date', '>=', $asOf)
             ->leftJoin('income_categories', 'incomes.category_id', '=', 'income_categories.id')
-            ->where(function ($q) {
-                $q->whereNull('income_categories.is_archived')
+            ->where(function ($query) {
+                $query->whereNull('income_categories.is_archived')
                     ->orWhere('income_categories.is_archived', false);
             })
             ->sum('incomes.amount');
@@ -59,24 +71,27 @@ class WalletService
             ->where('expenses.user_id', $userId)
             ->where('expenses.payment_method', $method)
             ->where('expenses.date', '>=', $asOf)
-            ->where(function ($q) {
-                $q->whereNull('expenses.paid_by_type')->orWhere('expenses.paid_by_type', 'me');
-            })
             ->where('expenses.is_voluntary', false)
             ->whereNull('expenses.parent_id')
             ->leftJoin('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
-            ->where(function ($q) {
-                $q->whereNull('expense_categories.is_archived')
+            ->leftJoin('friend_splits', 'friend_splits.expense_id', '=', 'expenses.id')
+            ->where(function ($query) {
+                $query->whereNull('expense_categories.is_archived')
                     ->orWhere('expense_categories.is_archived', false);
             })
-            ->sum(DB::raw('expenses.amount + expenses.gst_amount'));
+            ->sum(DB::raw('CASE WHEN friend_splits.id IS NULL THEN expenses.amount + expenses.gst_amount ELSE friend_splits.paid_by_me_amount END'));
 
         return round((float) $wallet->opening_balance + $income - $expense, 2);
     }
 
+    public function currentBalanceTotal(int $userId): float
+    {
+        return round((float) $this->enabledWallets($userId)->sum('current_balance'), 2);
+    }
+
     public function ensureDefaults(int $userId): void
     {
-        foreach (['UPI', 'Cash'] as $method) {
+        foreach ($this->options->names('payment_method', $userId) as $method) {
             PaymentWallet::firstOrCreate(
                 ['user_id' => $userId, 'payment_method' => $method],
                 [

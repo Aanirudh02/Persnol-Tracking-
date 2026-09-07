@@ -7,6 +7,7 @@ use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\FoodCategory;
 use App\Models\FoodEntry;
+use App\Models\Setting;
 use App\Services\OptionsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -80,7 +81,7 @@ class FoodController extends Controller
         ));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, OptionsService $options)
     {
         $validated = $request->validate([
             'item_count' => 'nullable|integer|min:1|max:4',
@@ -159,11 +160,19 @@ class FoodController extends Controller
                 $expCat = ExpenseCategory::where('is_voluntary', true)->first()
                     ?? ExpenseCategory::whereRaw('LOWER(name) = ?', ['voluntary'])->first();
             } else {
-                $expCat = ExpenseCategory::where(function ($q) {
-                    $q->whereRaw('LOWER(name) LIKE ?', ['%food%'])
-                        ->orWhereRaw('LOWER(name) LIKE ?', ['%snack%']);
-                })->where('is_archived', false)->first();
+                $settingKey = $request->boolean('is_snack')
+                    ? 'snack_default_expense_category_id'
+                    : 'food_default_expense_category_id';
+                $categoryId = Setting::getVal($settingKey);
+                if ($categoryId) {
+                    $expCat = ExpenseCategory::query()
+                        ->where('is_archived', false)
+                        ->find($categoryId);
+                }
             }
+
+            $defaultMethod = $validated['payment_method']
+                ?? ($options->names('payment_method')[0] ?? 'Cash');
 
             $expense = Expense::create([
                 'user_id' => $request->user()->id,
@@ -175,7 +184,7 @@ class FoodController extends Controller
                 'gst_amount' => $gstAmount,
                 'date' => $validated['date'],
                 'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
-                'payment_method' => $validated['payment_method'] ?? 'Cash',
+                'payment_method' => $defaultMethod,
                 'notes' => '(From Food / Snack log)',
                 'is_voluntary' => $mode === 'voluntary',
                 'paid_by' => 'Me',

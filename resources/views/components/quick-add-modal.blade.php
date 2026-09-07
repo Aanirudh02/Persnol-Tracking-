@@ -37,11 +37,9 @@
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Method</label>
                         <select name="payment_method" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-900 dark:text-white">
-                            <option value="UPI">UPI</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Card">Card</option>
-                            <option value="Bank">Bank Transfer</option>
-                            <option value="Other">Other</option>
+                            @foreach($quickAddOptions['paymentMethods'] as $method)
+                                <option value="{{ $method }}">{{ $method }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -55,7 +53,7 @@
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
                         <select name="category_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
-                            @foreach(\App\Models\ExpenseCategory::all() as $cat)
+                            @foreach($quickAddOptions['expenseCategories'] as $cat)
                                 <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                             @endforeach
                         </select>
@@ -83,11 +81,9 @@
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Source</label>
                         <select name="source" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
-                            <option value="Pocket Money">Pocket Money</option>
-                            <option value="Salary">Salary</option>
-                            <option value="Friend Returned Money">Friend Returned Money</option>
-                            <option value="Transfer">Transfer</option>
-                            <option value="Other">Other</option>
+                            @foreach($quickAddOptions['incomeSources'] as $source)
+                                <option value="{{ $source }}">{{ $source }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -95,9 +91,9 @@
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Payment Method</label>
                     <select name="payment_method" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
-                        <option value="UPI">UPI</option>
-                        <option value="Bank">Bank Transfer</option>
-                        <option value="Cash">Cash</option>
+                        @foreach($quickAddOptions['paymentMethods'] as $method)
+                            <option value="{{ $method }}">{{ $method }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -154,10 +150,9 @@
                     <div id="food-payment-row" style="display:none">
                         <label class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Payment Method</label>
                         <select name="payment_method" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900">
-                            <option value="Cash">Cash</option>
-                            <option value="UPI">UPI</option>
-                            <option value="Card">Card</option>
-                            <option value="Other">Other</option>
+                            @foreach($quickAddOptions['paymentMethods'] as $method)
+                                <option value="{{ $method }}">{{ $method }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>
@@ -248,7 +243,7 @@
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Category</label>
                     <select name="category_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
-                        @foreach(\App\Models\ActivityCategory::all() as $cat)
+                        @foreach($quickAddOptions['activityCategories'] as $cat)
                             <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                         @endforeach
                     </select>

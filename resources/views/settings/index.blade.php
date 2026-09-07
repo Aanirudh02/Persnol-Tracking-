@@ -89,7 +89,7 @@
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100">
                 <h2 class="text-lg font-semibold text-slate-900">Wallets & balances</h2>
-                <p class="text-sm text-slate-500 mt-1">UPI / Cash off by default. Enable + opening balance to reconcile expenses and money received.</p>
+                <p class="text-sm text-slate-500 mt-1">Each active payment method can have its own opening balance and current wallet calculation.</p>
             </div>
             <div class="p-6 space-y-4">
                 @foreach($wallets ?? [] as $wallet)
@@ -110,6 +110,93 @@
                     </form>
                 @endforeach
             </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-lg font-semibold text-slate-900">Payment Types</h2>
+                <p class="text-sm text-slate-500 mt-1">Manage the dynamic payment methods used across expenses, credits, payments, and dashboard totals.</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <form action="{{ route('options.store') }}" method="POST" class="flex gap-2">
+                    @csrf
+                    <input type="hidden" name="type" value="payment_method">
+                    <input type="text" name="name" required placeholder="New payment method..." class="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
+                    <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add</button>
+                </form>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    @foreach($paymentMethods as $method)
+                        <div class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                            <div>
+                                <span class="font-medium text-slate-800">{{ $method['name'] }}</span>
+                                @if($method['is_system'])
+                                    <span class="ml-2 text-[10px] text-slate-400">System</span>
+                                @endif
+                            </div>
+                            @if(!$method['is_system'])
+                                <form action="{{ route('options.destroy', $method['id']) }}" method="POST" onsubmit="return confirm('Delete this payment method?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-xs font-semibold text-rose-600 hover:underline">Delete</button>
+                                </form>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-lg font-semibold text-slate-900">Finance Dashboard</h2>
+                <p class="text-sm text-slate-500 mt-1">Choose which sections show on the finance dashboard.</p>
+            </div>
+            <form action="{{ route('settings.system') }}" method="POST" class="p-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                @csrf
+                @foreach([
+                    'show_wallet_balances' => 'Wallet balances',
+                    'show_total_expense' => 'Total expense card',
+                    'show_current_balance' => 'Current balance card',
+                    'show_expense_by_payment_type' => 'Expense by payment type',
+                    'show_expense_by_category' => 'Expense by category',
+                    'show_friend_overview' => 'Friend overview',
+                ] as $key => $label)
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                        <input type="checkbox" name="finance_dashboard_sections[{{ $key }}]" value="1" @checked($financeDashboardSections[$key] ?? false)>
+                        <span>{{ $label }}</span>
+                    </label>
+                @endforeach
+                <button class="sm:col-span-2 rounded-xl bg-slate-900 py-2.5 font-semibold text-white">Save dashboard settings</button>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-lg font-semibold text-slate-900">Food Expense Mapping</h2>
+                <p class="text-sm text-slate-500 mt-1">Use explicit categories for auto-created food and snack expenses instead of name-based guesses.</p>
+            </div>
+            <form action="{{ route('settings.system') }}" method="POST" class="p-6 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                @csrf
+                <div>
+                    <label class="mb-1 block font-semibold text-slate-700">Food default expense category</label>
+                    <select name="food_default_expense_category_id" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                        <option value="">None</option>
+                        @foreach($expenseCategories as $cat)
+                            <option value="{{ $cat->id }}" @selected((string) $foodDefaultExpenseCategoryId === (string) $cat->id)>{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block font-semibold text-slate-700">Snack default expense category</label>
+                    <select name="snack_default_expense_category_id" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                        <option value="">None</option>
+                        @foreach($expenseCategories as $cat)
+                            <option value="{{ $cat->id }}" @selected((string) $snackDefaultExpenseCategoryId === (string) $cat->id)>{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <button class="sm:col-span-2 rounded-xl bg-slate-900 py-2.5 font-semibold text-white">Save food mapping</button>
+            </form>
         </div>
 
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

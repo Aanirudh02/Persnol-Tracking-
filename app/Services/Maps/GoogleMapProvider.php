@@ -5,9 +5,6 @@ namespace App\Services\Maps;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Google Geocoding API adapter with the no-key OSM fallback.
- */
 class GoogleMapProvider implements MapProviderInterface
 {
     public function __construct(private readonly OsmMapProvider $fallback) {}
@@ -27,11 +24,13 @@ class GoogleMapProvider implements MapProviderInterface
             ]);
 
             $results = collect($response->json('results') ?? [])
-                ->map(fn (array $result): array => [
-                    'label' => (string) ($result['formatted_address'] ?? ''),
-                    'lat' => (float) data_get($result, 'geometry.location.lat', 0),
-                    'lng' => (float) data_get($result, 'geometry.location.lng', 0),
-                ])
+                ->map(function (array $result): array {
+                    return [
+                        'label' => $this->formatGoogleAddress($result),
+                        'lat' => (float) data_get($result, 'geometry.location.lat', 0),
+                        'lng' => (float) data_get($result, 'geometry.location.lng', 0),
+                    ];
+                })
                 ->filter(fn (array $result): bool => $result['label'] !== '' && $result['lat'] !== 0.0 && $result['lng'] !== 0.0)
                 ->values()
                 ->all();
@@ -47,5 +46,32 @@ class GoogleMapProvider implements MapProviderInterface
     public function routeDistanceKm(array $waypoints): ?float
     {
         return $this->fallback->routeDistanceKm($waypoints);
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function formatGoogleAddress(array $result): string
+    {
+        $components = collect($result['address_components'] ?? []);
+        $lookup = function (array $types) use ($components): ?string {
+            return $components
+                ->first(fn (array $component): bool => count(array_intersect($types, $component['types'] ?? [])) > 0)['long_name'] ?? null;
+        };
+
+        $parts = array_filter([
+            trim(implode(' ', array_filter([
+                $lookup(['street_number']),
+                $lookup(['route']),
+            ]))),
+            $lookup(['premise', 'subpremise', 'point_of_interest', 'establishment']),
+            $lookup(['neighborhood', 'sublocality', 'sublocality_level_1']),
+            $lookup(['locality', 'administrative_area_level_2']),
+            $lookup(['administrative_area_level_1']),
+            $lookup(['postal_code']),
+            $lookup(['country']),
+        ]);
+
+        return implode(', ', array_unique($parts)) ?: (string) ($result['formatted_address'] ?? '');
     }
 }

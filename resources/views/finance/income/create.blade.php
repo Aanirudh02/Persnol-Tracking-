@@ -19,21 +19,17 @@
                     <div>
                         <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Source *</label>
                         <select name="source" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                            <option value="Pocket Money">Pocket Money</option>
-                            <option value="Salary">Salary</option>
-                            <option value="Friend Returned Money">Friend Returned Money</option>
-                            <option value="Transfer">Transfer</option>
-                            <option value="Other">Other</option>
+                            @foreach($incomeSources as $source)
+                                <option value="{{ $source }}">{{ $source }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Payment Method</label>
                         <select name="payment_method" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                            <option value="UPI">UPI</option>
-                            <option value="Bank">Bank Transfer</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Card">Card</option>
-                            <option value="Other">Other</option>
+                            @foreach($paymentMethods as $method)
+                                <option value="{{ $method }}">{{ $method }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>

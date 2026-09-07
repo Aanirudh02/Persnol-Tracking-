@@ -76,11 +76,9 @@
                             name="payment_method"
                             class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
                         >
-                            <option value="UPI" {{ old('payment_method', $payment->payment_method) === 'UPI' ? 'selected' : '' }}>UPI</option>
-                            <option value="Bank" {{ old('payment_method', $payment->payment_method) === 'Bank' ? 'selected' : '' }}>Bank Transfer</option>
-                            <option value="Cash" {{ old('payment_method', $payment->payment_method) === 'Cash' ? 'selected' : '' }}>Cash</option>
-                            <option value="Card" {{ old('payment_method', $payment->payment_method) === 'Card' ? 'selected' : '' }}>Card</option>
-                            <option value="Other" {{ old('payment_method', $payment->payment_method) === 'Other' ? 'selected' : '' }}>Other</option>
+                            @foreach($paymentMethods as $method)
+                                <option value="{{ $method }}" {{ old('payment_method', $payment->payment_method) === $method ? 'selected' : '' }}>{{ $method }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div>

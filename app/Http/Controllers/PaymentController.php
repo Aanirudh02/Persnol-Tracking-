@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Payment;
 use App\Services\AuditService;
 use App\Services\FinanceService;
+use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class PaymentController extends Controller
 {
@@ -29,9 +30,11 @@ class PaymentController extends Controller
         return view('finance.payments.index', compact('payments', 'totalPending', 'totalReconciled'));
     }
 
-    public function create()
+    public function create(OptionsService $options)
     {
-        return view('finance.payments.create');
+        $paymentMethods = $options->names('payment_method');
+
+        return view('finance.payments.create', compact('paymentMethods'));
     }
 
     public function store(Request $request)
@@ -72,7 +75,9 @@ class PaymentController extends Controller
 
     public function reconcile(Request $request, Payment $payment, FinanceService $financeService)
     {
-        if ($payment->user_id !== auth()->id()) abort(403);
+        if ($payment->user_id !== auth()->id()) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'reconciled_date' => 'required|date',
@@ -85,22 +90,28 @@ class PaymentController extends Controller
         return redirect()->route('payments.index')->with('success', 'Payment reconciled successfully!');
     }
 
-    public function edit(Payment $payment, FinanceService $financeService)
+    public function edit(Payment $payment, FinanceService $financeService, OptionsService $options)
     {
-        if ($payment->user_id !== auth()->id()) abort(403);
+        if ($payment->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        if (!$financeService->canEdit('payment', $payment)) {
+        if (! $financeService->canEdit('payment', $payment)) {
             return redirect()->route('payments.index')->with('error', '🔒 This payment is locked from editing.');
         }
 
-        return view('finance.payments.edit', compact('payment'));
+        $paymentMethods = $options->names('payment_method');
+
+        return view('finance.payments.edit', compact('payment', 'paymentMethods'));
     }
 
     public function update(Request $request, Payment $payment, FinanceService $financeService)
     {
-        if ($payment->user_id !== auth()->id()) abort(403);
+        if ($payment->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        if (!$financeService->canEdit('payment', $payment)) {
+        if (! $financeService->canEdit('payment', $payment)) {
             return redirect()->route('payments.index')->with('error', '🔒 This payment is locked from editing.');
         }
 
@@ -136,7 +147,9 @@ class PaymentController extends Controller
 
     public function destroy(Request $request, Payment $payment)
     {
-        if ($payment->user_id !== auth()->id()) abort(403);
+        if ($payment->user_id !== auth()->id()) {
+            abort(403);
+        }
 
         AuditService::log('payment', $payment->id, 'deleted', $payment->toArray(), null, $request->input('reason', 'Payment deleted'));
         $payment->delete();

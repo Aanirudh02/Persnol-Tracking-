@@ -1,340 +1,398 @@
-<x-app-layout title="Friends & Shared Debts">
+<x-app-layout title="Friends & Splits">
     <div class="space-y-6">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Friends & Shared Expenses</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Friends & Splits</h1>
                 <p class="text-xs text-slate-500">
-                    Owed to you: <span class="font-bold text-emerald-600">₹{{ number_format($totalOwedToMe, 2) }}</span> &bull;
+                    Owed to you: <span class="font-bold text-emerald-600">₹{{ number_format($totalOwedToMe, 2) }}</span>
+                    <span class="mx-1">&bull;</span>
                     You owe: <span class="font-bold text-rose-600">₹{{ number_format($totalIOwe, 2) }}</span>
                 </p>
             </div>
 
-            <div class="flex items-center gap-2">
-                <button type="button" onclick="document.getElementById('add-friend-modal').classList.remove('hidden')" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition">
-                    + Add User
+            <div class="flex gap-2">
+                <button type="button" onclick="document.getElementById('add-friend-modal').classList.remove('hidden')" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+                    + Add Friend
                 </button>
-                <button onclick="document.getElementById('add-split-modal').classList.remove('hidden')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 transition">
-                    + Record Split / Debt
+                <button type="button" onclick="document.getElementById('add-split-modal').classList.remove('hidden')" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-500">
+                    + Add Split Record
                 </button>
             </div>
         </div>
 
-        <!-- Friend Balance Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-            @foreach($friendData as $fd)
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            @forelse($friendData as $fd)
                 @php
-                    $f = $fd['friend'];
-                    $b = $fd['balance'];
+                    $friend = $fd['friend'];
+                    $balance = $fd['balance'];
                 @endphp
-                <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
-                    <div class="flex items-start justify-between">
+                <div class="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                    <div class="flex items-start justify-between gap-3">
                         <div>
-                            <h2 class="font-bold text-base text-slate-900 dark:text-white">{{ $f->name }}</h2>
-                            <span class="text-xs text-slate-400">{{ $f->phone ?? $f->email ?? '—' }}</span>
-                            <span class="mt-1 inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold {{ $f->isFriend() ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">{{ $f->role ?? 'Friend' }}</span>
+                            <h2 class="text-lg font-bold text-slate-900">{{ $friend->name }}</h2>
+                            <p class="text-xs text-slate-400">{{ $friend->phone ?: ($friend->email ?: 'No contact added') }}</p>
+                            <span class="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{{ $friend->role }}</span>
                         </div>
-                        <span class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
-                            {{ substr($f->name, 0, 1) }}
-                        </span>
-                    </div>
-
-                    <!-- Balance breakdown -->
-                    <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
-                        <div class="flex justify-between text-slate-600 dark:text-slate-400">
-                            <span>You owe {{ $f->name }}:</span>
-                            <span class="font-mono font-semibold text-rose-500">₹{{ number_format($b['i_owe_friend'], 2) }}</span>
-                        </div>
-                        <div class="flex justify-between text-slate-600 dark:text-slate-400">
-                            <span>{{ $f->name }} owes you:</span>
-                            <span class="font-mono font-semibold text-emerald-500">₹{{ number_format($b['friend_owes_me'], 2) }}</span>
-                        </div>
-                        <div class="pt-1.5 border-t border-slate-200 dark:border-slate-700 flex justify-between font-bold text-sm">
-                            <span>Net left:</span>
-                            <span class="{{ $b['net'] > 0 ? 'text-emerald-600 dark:text-emerald-400' : ($b['net'] < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400') }}">
-                                @if($b['net'] > 0)
-                                    Owes you ₹{{ number_format($b['net'], 2) }}
-                                @elseif($b['net'] < 0)
-                                    You owe ₹{{ number_format(abs($b['net']), 2) }}
-                                @else
-                                    Settled
-                                @endif
-                            </span>
+                        <div class="rounded-2xl bg-slate-50 px-3 py-2 text-right text-xs">
+                            <div class="text-slate-400">Net</div>
+                            <div class="font-bold {{ $balance['net'] >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                {{ $balance['net'] >= 0 ? '₹'.number_format($balance['net'], 2).' owed to you' : '₹'.number_format(abs($balance['net']), 2).' you owe' }}
+                            </div>
                         </div>
                     </div>
 
-                    @if($fd['open_items']->count())
-                        <div class="space-y-2">
-                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Open credits / debts</p>
-                            @foreach($fd['open_items'] as $item)
-                                <div class="rounded-2xl border border-slate-200 p-3 space-y-2">
-                                    <div class="flex justify-between gap-2 text-xs">
-                                        <div class="min-w-0">
-                                            <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold {{ $item->type === 'credit' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700' }}">
-                                                {{ $item->type === 'credit' ? 'Credit · I owe' : 'Debt · owes me' }}
-                                            </span>
-                                            <p class="mt-1 text-slate-600 truncate">{{ $item->description ?? '—' }} · {{ $item->date->format('d M') }}</p>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="rounded-2xl border border-rose-100 bg-rose-50 px-3 py-3">
+                            <div class="text-slate-500">You owe</div>
+                            <div class="mt-1 text-lg font-bold text-rose-600">₹{{ number_format($balance['i_owe_friend'], 2) }}</div>
+                        </div>
+                        <div class="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                            <div class="text-slate-500">{{ $friend->name }} owes you</div>
+                            <div class="mt-1 text-lg font-bold text-emerald-600">₹{{ number_format($balance['friend_owes_me'], 2) }}</div>
+                        </div>
+                    </div>
+
+                    @if($balance['net'] !== 0.0)
+                        <button
+                            type="button"
+                            onclick="window.openSettleModal({{ $friend->id }}, '{{ $friend->name }}', {{ abs($balance['net']) }}, '{{ $balance['net'] < 0 ? 'i_paid_friend' : 'friend_paid_me' }}')"
+                            class="w-full rounded-xl bg-emerald-600 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"
+                        >
+                            Record Settlement
+                        </button>
+                    @endif
+
+                    <div class="space-y-2 rounded-2xl border border-slate-200 p-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-slate-900">Split Records</h3>
+                            <span class="text-[10px] text-slate-400">Authoritative split rows</span>
+                        </div>
+
+                        @forelse($fd['split_records'] as $split)
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-xs">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="font-semibold text-slate-800">{{ $split->description }}</p>
+                                        <p class="mt-1 text-slate-500">
+                                            {{ $split->date->format('d M Y') }}
+                                            <span class="mx-1">&bull;</span>
+                                            {{ $split->payment_method ?: 'No method' }}
+                                            <span class="mx-1">&bull;</span>
+                                            {{ $split->paymentMode() === 'split' ? 'Split payment' : ($split->paymentMode() === 'friend' ? 'Friend paid' : 'You paid') }}
+                                        </p>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-bold text-slate-900">₹{{ number_format($split->total_amount, 2) }}</div>
+                                        <div class="text-[10px] {{ $split->netAmount() >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                            {{ $split->netAmount() >= 0 ? 'Net +₹'.number_format($split->netAmount(), 2) : 'Net -₹'.number_format(abs($split->netAmount()), 2) }}
                                         </div>
                                     </div>
-                                    <div class="grid grid-cols-3 gap-1.5 text-center">
-                                        <div class="rounded-lg bg-slate-50 border border-slate-200 px-1.5 py-1.5">
-                                            <p class="text-[9px] font-semibold uppercase text-slate-400">Original</p>
-                                            <p class="text-xs font-bold text-slate-800">₹{{ number_format($item->amount, 2) }}</p>
-                                        </div>
-                                        <div class="rounded-lg bg-slate-50 border border-slate-200 px-1.5 py-1.5">
-                                            <p class="text-[9px] font-semibold uppercase text-slate-400">Paid</p>
-                                            <p class="text-xs font-bold text-slate-800">₹{{ number_format($item->amount_paid, 2) }}</p>
-                                        </div>
-                                        <div class="rounded-lg border-2 border-amber-400 bg-amber-50 px-1.5 py-1.5">
-                                            <p class="text-[9px] font-semibold uppercase text-amber-700">Left</p>
-                                            <p class="text-sm font-bold text-amber-800">₹{{ number_format($item->remaining(), 2) }}</p>
-                                        </div>
+                                </div>
+                                <div class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                                    <div class="rounded-xl bg-white px-2 py-2">Share: you ₹{{ number_format($split->my_share, 2) }}</div>
+                                    <div class="rounded-xl bg-white px-2 py-2">Share: friend ₹{{ number_format($split->friend_share, 2) }}</div>
+                                    <div class="rounded-xl bg-white px-2 py-2">Paid: you ₹{{ number_format($split->paid_by_me_amount, 2) }}</div>
+                                    <div class="rounded-xl bg-white px-2 py-2">Paid: friend ₹{{ number_format($split->paid_by_friend_amount, 2) }}</div>
+                                </div>
+                                <div class="mt-3 flex items-center justify-end gap-3">
+                                    @if(!$split->expense_id)
+                                        <a href="{{ route('friend-splits.edit', $split) }}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
+                                        <form action="{{ route('friend-splits.destroy', $split) }}" method="POST" onsubmit="return confirm('Delete this split record?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="font-semibold text-rose-600 hover:underline">Delete</button>
+                                        </form>
+                                    @else
+                                        <a href="{{ route('expenses.edit', $split->expense_id) }}" class="font-semibold text-indigo-600 hover:underline">Edit from expense</a>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-xs text-slate-400">No split records yet.</p>
+                        @endforelse
+                    </div>
+
+                    <div class="space-y-2 rounded-2xl border border-slate-200 p-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-slate-900">Credits / Debts</h3>
+                            <a href="{{ route('credits.index', ['type' => 'credit']) }}" class="text-[11px] font-semibold text-slate-600 hover:underline">Open module</a>
+                        </div>
+
+                        @forelse($fd['open_items'] as $item)
+                            <div class="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-xs">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <span class="rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                            {{ $item->type === 'credit' ? 'Credit (I owe)' : 'Debt (owes me)' }}
+                                        </span>
+                                        <p class="mt-2 font-semibold text-slate-800">{{ $item->description ?: 'No description' }}</p>
+                                        <p class="text-slate-500">{{ $item->date->format('d M Y') }}</p>
                                     </div>
-                                    <a href="{{ route('credits.index', ['type' => $item->type]) }}" class="block text-center text-[11px] font-semibold text-slate-700 hover:underline">Manage on {{ $item->type === 'credit' ? 'Credits' : 'Debts' }} →</a>
+                                    <div class="text-right">
+                                        <div class="font-bold text-slate-900">₹{{ number_format($item->amount, 2) }}</div>
+                                        <div class="text-[10px] text-amber-700">Left ₹{{ number_format($item->remaining(), 2) }}</div>
+                                    </div>
+                                </div>
+                                <div class="mt-3 flex items-center justify-between">
+                                    <span class="text-[11px] text-slate-500">{{ $item->payments->count() }} payment record(s)</span>
+                                    <a href="{{ route('credits.edit', $item) }}" class="font-semibold text-indigo-600 hover:underline">Manage</a>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-xs text-slate-400">No open credit/debt records.</p>
+                        @endforelse
+                    </div>
+
+                    @if($fd['recent_settlements']->isNotEmpty())
+                        <div class="space-y-2 rounded-2xl border border-slate-200 p-4">
+                            <h3 class="text-sm font-bold text-slate-900">Recent Settlements</h3>
+                            @foreach($fd['recent_settlements'] as $settlement)
+                                <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs">
+                                    <div>
+                                        <div class="font-semibold text-slate-800">{{ $settlement->direction === 'i_paid_friend' ? 'You paid friend' : 'Friend paid you' }}</div>
+                                        <div class="text-slate-500">{{ $settlement->date->format('d M Y') }} · {{ $settlement->payment_method }}</div>
+                                    </div>
+                                    <div class="font-bold text-slate-900">₹{{ number_format($settlement->amount, 2) }}</div>
                                 </div>
                             @endforeach
                         </div>
                     @endif
-
-                    <!-- Actions -->
-                    <div class="flex items-center gap-2 pt-2">
-                        @if($b['net'] != 0)
-                            <button
-                                type="button"
-                                onclick="window.openSettleModal({{ $f->id }}, '{{ $f->name }}', {{ abs($b['net']) }}, '{{ $b['net'] < 0 ? 'i_paid_friend' : 'friend_paid_me' }}')"
-                                class="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-sm transition"
-                            >
-                                Mark as Settled
-                            </button>
-                        @endif
-                    </div>
                 </div>
-            @endforeach
+            @empty
+                <div class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
+                    No friends added yet.
+                </div>
+            @endforelse
         </div>
     </div>
 
-    <!-- ADD USER MODAL -->
-    <div id="add-friend-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target === this) this.classList.add('hidden')">
-        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
-                <h3 class="font-bold text-lg text-slate-900 dark:text-white">Add User</h3>
-                <button type="button" onclick="document.getElementById('add-friend-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl leading-none font-bold" aria-label="Close">&times;</button>
+    <div id="add-friend-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-bold text-slate-900">Add Friend</h3>
+                <button type="button" onclick="document.getElementById('add-friend-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400">&times;</button>
             </div>
 
             <form action="{{ route('friends.store') }}" method="POST" class="space-y-4 text-sm">
                 @csrf
-
                 <div>
-                    <label for="add-user-name" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Full Name *</label>
-                    <input
-                        type="text"
-                        id="add-user-name"
-                        name="name"
-                        required
-                        value="{{ old('name') }}"
-                        placeholder="Enter full name"
-                        class="w-full h-11 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-400"
-                    >
-                    @error('name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                    <label class="mb-1 block font-semibold text-slate-700">Name</label>
+                    <input type="text" name="name" value="{{ old('name') }}" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
                 </div>
-
-                <div>
-                    <label for="add-user-phone" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Phone Number *</label>
-                    <input
-                        type="text"
-                        id="add-user-phone"
-                        name="phone"
-                        required
-                        value="{{ old('phone') }}"
-                        placeholder="Enter phone number"
-                        class="w-full h-11 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-400"
-                    >
-                    @error('phone')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Phone</label>
+                        <input type="text" name="phone" value="{{ old('phone') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                    </div>
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Email</label>
+                        <input type="email" name="email" value="{{ old('email') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                    </div>
                 </div>
-
                 <div>
-                    <label for="add-user-email" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Email ID *</label>
-                    <input
-                        type="email"
-                        id="add-user-email"
-                        name="email"
-                        required
-                        value="{{ old('email') }}"
-                        placeholder="Enter email address"
-                        class="w-full h-11 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-400"
-                    >
-                    @error('email')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
-                </div>
-
-                <div>
-                    <label for="add-user-type" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">User Type *</label>
-                    <select
-                        id="add-user-type"
-                        name="user_type"
-                        required
-                        class="w-full h-11 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-400"
-                    >
-                        <option value="Friend" @selected(old('user_type', 'Friend') === 'Friend')>Friend</option>
-                        <option value="Not a Friend" @selected(old('user_type') === 'Not a Friend')>Not a Friend</option>
+                    <label class="mb-1 block font-semibold text-slate-700">Role</label>
+                    <select name="user_type" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                        <option value="Friend">Friend</option>
+                        <option value="Not a Friend">Not a Friend</option>
                     </select>
-                    @error('user_type')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                 </div>
-
                 <div>
-                    <label for="add-user-dob" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Date of Birth</label>
-                    <input
-                        type="date"
-                        id="add-user-dob"
-                        name="date_of_birth"
-                        value="{{ old('date_of_birth') }}"
-                        class="w-full h-11 px-3.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-400"
-                    >
-                    @error('date_of_birth')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                    <label class="mb-1 block font-semibold text-slate-700">Date of birth</label>
+                    <input type="date" name="date_of_birth" value="{{ old('date_of_birth') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
                 </div>
-
                 <div>
-                    <label for="add-user-notes" class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Details</label>
-                    <textarea
-                        id="add-user-notes"
-                        name="notes"
-                        rows="3"
-                        placeholder="Optional notes"
-                        class="w-full min-h-[5.5rem] px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-400 resize-y"
-                    >{{ old('notes') }}</textarea>
-                    @error('notes')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                    <label class="mb-1 block font-semibold text-slate-700">Notes</label>
+                    <textarea name="notes" rows="3" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">{{ old('notes') }}</textarea>
                 </div>
-
-                <button type="submit" class="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/20 transition">
-                    Add User
-                </button>
+                <button type="submit" class="w-full rounded-xl bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-500">Save Friend</button>
             </form>
         </div>
     </div>
 
-    <!-- RECORD SPLIT MODAL -->
-    <div id="add-split-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                <h3 class="font-bold text-base text-slate-900 dark:text-white">Record Shared Expense / Debt</h3>
-                <button onclick="document.getElementById('add-split-modal').classList.add('hidden')" class="text-slate-400 text-2xl font-bold">&times;</button>
+    <div id="add-split-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Add Split Record</h3>
+                    <p class="text-xs text-slate-500">Store shares and actual amounts separately. This does not create a normal expense row.</p>
+                </div>
+                <button type="button" onclick="document.getElementById('add-split-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400">&times;</button>
             </div>
-            <form action="{{ route('friends.transactions.store') }}" method="POST" class="space-y-3 text-xs">
+
+            <form action="{{ route('friend-splits.store') }}" method="POST" class="space-y-4 text-sm" id="split-form">
                 @csrf
-                <input type="hidden" name="date" value="{{ date('Y-m-d') }}">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Friend</label>
+                        <select name="friend_id" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            @foreach($friendData as $fd)
+                                <option value="{{ $fd['friend']->id }}">{{ $fd['friend']->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Date</label>
+                        <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                    </div>
+                </div>
 
                 <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Friend *</label>
-                    <select name="friend_id" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                        @foreach($friendData as $fd)
-                            <option value="{{ $fd['friend']->id }}">{{ $fd['friend']->name }}</option>
+                    <label class="mb-1 block font-semibold text-slate-700">Description</label>
+                    <input type="text" name="description" required placeholder="Dinner, cab fare, tickets..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Total amount</label>
+                        <input type="number" step="0.01" name="total_amount" id="split-total-amount" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                    </div>
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Your share</label>
+                        <input type="number" step="0.01" name="my_share" id="split-my-share" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                    </div>
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Friend share</label>
+                        <input type="number" step="0.01" name="friend_share" id="split-friend-share" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Who paid?</label>
+                            <select name="paid_by_mode" id="split-paid-mode" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                                <option value="me">I paid</option>
+                                <option value="friend">Friend paid</option>
+                                <option value="split">Split payment</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Paid by me</label>
+                            <input type="number" step="0.01" name="paid_by_me_amount" id="split-paid-by-me" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                        </div>
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Paid by friend</label>
+                            <input type="number" step="0.01" name="paid_by_friend_amount" id="split-paid-by-friend" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                        </div>
+                    </div>
+                    <div class="mt-3 flex gap-2 text-xs">
+                        <button type="button" onclick="window.fillEqualSplit()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">Equal split</button>
+                        <button type="button" onclick="window.fillFullMine()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">All mine</button>
+                        <button type="button" onclick="window.fillFullFriend()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">All friend</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="mb-1 block font-semibold text-slate-700">Payment method</label>
+                    <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                        @foreach($paymentMethods as $method)
+                            <option value="{{ $method }}">{{ $method }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Split Type *</label>
-                    <select name="type" id="split-type" onchange="window.adjustShares()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                        <option value="shared_expense">Shared Expense (Split Equally)</option>
-                        <option value="paid_for_friend">I Paid for Friend (Friend owes me all)</option>
-                        <option value="friend_paid_for_me">Friend Paid for Me (I owe friend all)</option>
-                    </select>
+                    <label class="mb-1 block font-semibold text-slate-700">Notes</label>
+                    <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5"></textarea>
                 </div>
 
-                <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Total Amount (₹) *</label>
-                    <input type="number" step="0.01" name="total_amount" id="split-total" oninput="window.adjustShares()" required placeholder="0.00" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-base text-slate-900 dark:text-white">
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-slate-500 mb-1">My Share (₹)</label>
-                        <input type="number" step="0.01" name="my_share" id="split-my-share" required class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold">
-                    </div>
-                    <div>
-                        <label class="block text-slate-500 mb-1">Friend Share (₹)</label>
-                        <input type="number" step="0.01" name="friend_share" id="split-friend-share" required class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-semibold">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Description *</label>
-                    <input type="text" name="description" required placeholder="e.g. Dinner at cafe, Auto fare" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                </div>
-
-                <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Payment Method</label>
-                    <select name="payment_method" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                        <option value="UPI">UPI</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Card">Card</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-semibold shadow-md transition">Save Split</button>
+                <button type="submit" class="w-full rounded-xl bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-500">Save Split Record</button>
             </form>
         </div>
     </div>
 
-    <!-- SETTLE MODAL -->
-    <div id="settle-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                <h3 class="font-bold text-base text-slate-900 dark:text-white">Settle Balance</h3>
-                <button onclick="document.getElementById('settle-modal').classList.add('hidden')" class="text-slate-400 text-2xl font-bold">&times;</button>
+    <div id="settle-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div class="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-bold text-slate-900">Record Settlement</h3>
+                <button type="button" onclick="document.getElementById('settle-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400">&times;</button>
             </div>
-            <form id="settle-form" action="" method="POST" class="space-y-3 text-xs">
+            <form id="settle-form" action="" method="POST" class="space-y-3 text-sm">
                 @csrf
                 <div>
-                    <label class="block text-slate-500 mb-1">Friend</label>
-                    <input type="text" id="settle-name" readonly class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">
+                    <label class="mb-1 block text-slate-500">Friend</label>
+                    <input type="text" id="settle-name" readonly class="w-full rounded-xl bg-slate-100 px-3 py-2.5 font-semibold">
                 </div>
                 <div>
-                    <label class="block text-slate-500 mb-1">Settlement Amount (₹) *</label>
-                    <input type="number" step="0.01" name="amount" id="settle-amount" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-emerald-600 text-base">
+                    <label class="mb-1 block text-slate-500">Amount</label>
+                    <input type="number" step="0.01" name="amount" id="settle-amount" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold">
                 </div>
                 <input type="hidden" name="direction" id="settle-direction">
                 <div>
-                    <label class="block text-slate-500 mb-1">Payment Method</label>
-                    <select name="payment_method" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
-                        <option value="UPI">UPI</option>
-                        <option value="Cash">Cash</option>
-                        <option value="Bank">Bank Transfer</option>
+                    <label class="mb-1 block text-slate-500">Payment method</label>
+                    <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                        @foreach($paymentMethods as $method)
+                            <option value="{{ $method }}">{{ $method }}</option>
+                        @endforeach
                     </select>
                 </div>
-                <button type="submit" class="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-semibold shadow-md transition">Confirm Settlement</button>
+                <div>
+                    <label class="mb-1 block text-slate-500">Notes</label>
+                    <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5"></textarea>
+                </div>
+                <button type="submit" class="w-full rounded-xl bg-emerald-600 py-2.5 font-semibold text-white transition hover:bg-emerald-500">Save Settlement</button>
             </form>
         </div>
     </div>
 
     <script>
-        window.adjustShares = function() {
-            const type = document.getElementById('split-type').value;
-            const total = parseFloat(document.getElementById('split-total').value) || 0;
-            const myShare = document.getElementById('split-my-share');
-            const friendShare = document.getElementById('split-friend-share');
+        window.fillEqualSplit = function () {
+            const total = Number(document.getElementById('split-total-amount').value || 0);
+            const half = (total / 2).toFixed(2);
+            document.getElementById('split-my-share').value = half;
+            document.getElementById('split-friend-share').value = (total - Number(half)).toFixed(2);
+        };
 
-            if (type === 'shared_expense') {
-                myShare.value = (total / 2).toFixed(2);
-                friendShare.value = (total / 2).toFixed(2);
-            } else if (type === 'paid_for_friend') {
-                myShare.value = '0.00';
-                friendShare.value = total.toFixed(2);
-            } else if (type === 'friend_paid_for_me') {
-                myShare.value = total.toFixed(2);
-                friendShare.value = '0.00';
+        window.fillFullMine = function () {
+            const total = Number(document.getElementById('split-total-amount').value || 0).toFixed(2);
+            document.getElementById('split-my-share').value = total;
+            document.getElementById('split-friend-share').value = '0.00';
+        };
+
+        window.fillFullFriend = function () {
+            const total = Number(document.getElementById('split-total-amount').value || 0).toFixed(2);
+            document.getElementById('split-my-share').value = '0.00';
+            document.getElementById('split-friend-share').value = total;
+        };
+
+        window.updatePaidAmounts = function () {
+            const total = Number(document.getElementById('split-total-amount').value || 0);
+            const mode = document.getElementById('split-paid-mode').value;
+            const paidByMe = document.getElementById('split-paid-by-me');
+            const paidByFriend = document.getElementById('split-paid-by-friend');
+
+            if (mode === 'me') {
+                paidByMe.value = total.toFixed(2);
+                paidByFriend.value = '0.00';
+                paidByMe.readOnly = true;
+                paidByFriend.readOnly = true;
+            } else if (mode === 'friend') {
+                paidByMe.value = '0.00';
+                paidByFriend.value = total.toFixed(2);
+                paidByMe.readOnly = true;
+                paidByFriend.readOnly = true;
+            } else {
+                if (!paidByMe.value) paidByMe.value = (total / 2).toFixed(2);
+                if (!paidByFriend.value) paidByFriend.value = (total - Number(paidByMe.value || 0)).toFixed(2);
+                paidByMe.readOnly = false;
+                paidByFriend.readOnly = false;
             }
         };
 
-        window.openSettleModal = function(friendId, friendName, amount, direction) {
+        window.openSettleModal = function (friendId, friendName, amount, direction) {
             document.getElementById('settle-form').action = `/finance/friends/${friendId}/settle`;
             document.getElementById('settle-name').value = friendName;
-            document.getElementById('settle-amount').value = amount;
+            document.getElementById('settle-amount').value = amount.toFixed(2);
             document.getElementById('settle-direction').value = direction;
             document.getElementById('settle-modal').classList.remove('hidden');
         };
 
-        @if($errors->any() && (old('user_type') !== null || old('name') || $errors->has('name') || $errors->has('phone') || $errors->has('email') || $errors->has('user_type')))
-            document.getElementById('add-friend-modal')?.classList.remove('hidden');
-        @endif
+        document.getElementById('split-total-amount')?.addEventListener('input', () => {
+            window.updatePaidAmounts();
+        });
+        document.getElementById('split-paid-mode')?.addEventListener('change', () => {
+            window.updatePaidAmounts();
+        });
+        window.updatePaidAmounts();
     </script>
 </x-app-layout>

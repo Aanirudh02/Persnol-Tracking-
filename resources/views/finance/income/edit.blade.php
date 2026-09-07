@@ -43,7 +43,7 @@
                             name="source"
                             class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
                         >
-                            @foreach(['Pocket Money', 'Salary', 'Friend Returned Money', 'Transfer', 'Freelance', 'Other'] as $src)
+                            @foreach($incomeSources as $src)
                                 <option value="{{ $src }}" {{ old('source', $income->source) === $src ? 'selected' : '' }}>{{ $src }}</option>
                             @endforeach
                         </select>
@@ -54,7 +54,7 @@
                             name="payment_method"
                             class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
                         >
-                            @foreach(['UPI', 'Bank', 'Cash', 'Card', 'Other'] as $pm)
+                            @foreach($paymentMethods as $pm)
                                 <option value="{{ $pm }}" {{ old('payment_method', $income->payment_method) === $pm ? 'selected' : '' }}>{{ $pm }}</option>
                             @endforeach
                         </select>

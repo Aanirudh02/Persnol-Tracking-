@@ -7,73 +7,86 @@ use App\Models\Expense;
 use App\Models\Friend;
 use App\Models\Income;
 use App\Models\Payment;
+use App\Models\Setting;
 use App\Services\FinanceService;
+use App\Services\FriendBalanceService;
 use App\Services\WalletService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class FinanceDashboardController extends Controller
 {
-    public function index(Request $request, FinanceService $financeService, WalletService $walletService)
-    {
+    public function index(
+        Request $request,
+        FinanceService $financeService,
+        WalletService $walletService,
+        FriendBalanceService $balanceService
+    ): View {
         $user = $request->user();
         $stats = $financeService->getMonthlyStats($user->id);
 
-        $recentExpenses = Expense::where('user_id', $user->id)
+        $recentExpenses = Expense::query()
+            ->where('user_id', $user->id)
             ->whereNull('parent_id')
+            ->with(['category', 'friendSplit.friend'])
+            ->orderByDesc('date')
+            ->orderByDesc('created_at')
+            ->take(5)
+            ->get();
+
+        $recentIncomes = Income::query()
+            ->where('user_id', $user->id)
             ->with('category')
             ->orderByDesc('date')
             ->orderByDesc('created_at')
             ->take(5)
             ->get();
 
-        $recentIncomes = Income::where('user_id', $user->id)
-            ->with('category')
-            ->orderByDesc('date')
-            ->orderByDesc('created_at')
-            ->take(5)
-            ->get();
-
-        $pendingPayments = Payment::where('user_id', $user->id)
+        $pendingPayments = Payment::query()
+            ->where('user_id', $user->id)
             ->where('status', 'Pending')
             ->orderBy('date')
             ->take(5)
             ->get();
 
-        $friends = Friend::where('user_id', $user->id)->get();
+        $friends = Friend::query()
+            ->where('user_id', $user->id)
+            ->with(['friendSplits', 'creditDebts.payments', 'settlements'])
+            ->get();
+
         $friendBalances = [];
         $totalOwedToMe = 0;
         $totalIOwe = 0;
 
-        foreach ($friends as $f) {
-            $bal = $f->getBalance();
+        foreach ($friends as $friend) {
+            $balance = $balanceService->forFriend($friend);
             $friendBalances[] = [
-                'friend' => $f,
-                'balance' => $bal,
+                'friend' => $friend,
+                'balance' => $balance,
             ];
-            if ($bal['net'] > 0) {
-                $totalOwedToMe += $bal['net'];
-            } else {
-                $totalIOwe += abs($bal['net']);
+
+            if ($balance['net'] > 0) {
+                $totalOwedToMe += $balance['net'];
+            } elseif ($balance['net'] < 0) {
+                $totalIOwe += abs($balance['net']);
             }
         }
 
-        $startOfMonth = Carbon::today()->startOfMonth()->toDateString();
-        $categorySpending = Expense::where('expenses.user_id', $user->id)
-            ->where('expenses.date', '>=', $startOfMonth)
-            ->whereNull('expenses.parent_id')
-            ->where('expenses.is_voluntary', false)
-            ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
-            ->where('expense_categories.is_archived', false)
-            ->selectRaw('expense_categories.name, sum(expenses.amount + expenses.gst_amount) as total, expense_categories.color')
-            ->groupBy('expense_categories.name', 'expense_categories.color')
-            ->orderByDesc('total')
-            ->get();
-
+        $categorySpending = $financeService->monthlyExpenseByCategory($user->id);
+        $paymentMethodSpending = $financeService->monthlyExpenseByPaymentMethod($user->id);
         $wallets = $walletService->displayWallets($user->id);
-        $showBalances = $request->boolean('show_balances');
-        $openCredits = (float) CreditDebt::where('user_id', $user->id)->where('type', 'credit')->whereNotIn('status', ['fully_paid'])->get()->sum(fn ($i) => $i->remaining());
-        $openDebts = (float) CreditDebt::where('user_id', $user->id)->where('type', 'debt')->whereNotIn('status', ['fully_paid'])->get()->sum(fn ($i) => $i->remaining());
+        $currentBalance = $walletService->currentBalanceTotal($user->id);
+        $openCredits = (float) CreditDebt::query()->where('user_id', $user->id)->where('type', 'credit')->get()->sum(fn ($item) => $item->remaining());
+        $openDebts = (float) CreditDebt::query()->where('user_id', $user->id)->where('type', 'debt')->get()->sum(fn ($item) => $item->remaining());
+
+        $sections = array_merge([
+            'show_wallet_balances' => true,
+            'show_total_expense' => true,
+            'show_current_balance' => true,
+            'show_expense_by_payment_type' => true,
+            'show_expense_by_category' => true,
+            'show_friend_overview' => true,
+        ], Setting::getVal('finance_dashboard_sections', []));
 
         return view('finance.index', compact(
             'stats',
@@ -84,10 +97,12 @@ class FinanceDashboardController extends Controller
             'totalOwedToMe',
             'totalIOwe',
             'categorySpending',
+            'paymentMethodSpending',
             'wallets',
-            'showBalances',
+            'currentBalance',
             'openCredits',
-            'openDebts'
+            'openDebts',
+            'sections'
         ));
     }
 }

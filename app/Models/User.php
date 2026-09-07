@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
@@ -51,6 +51,7 @@ class User extends Authenticatable
         if (is_string($roles)) {
             $roles = [$roles];
         }
+
         return $this->roles()->whereIn('name', $roles)->exists();
     }
 
@@ -64,6 +65,7 @@ class User extends Authenticatable
         if ($this->isAdmin()) {
             return true;
         }
+
         return $this->roles()
             ->whereHas('permissions', function ($q) use ($permission) {
                 $q->where('name', $permission);
@@ -98,6 +100,11 @@ class User extends Authenticatable
     public function friendTransactions(): HasMany
     {
         return $this->hasMany(FriendTransaction::class);
+    }
+
+    public function friendSplits(): HasMany
+    {
+        return $this->hasMany(FriendSplit::class);
     }
 
     public function foodEntries(): HasMany

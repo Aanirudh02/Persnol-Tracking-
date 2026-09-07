@@ -9,6 +9,13 @@
 
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-sm space-y-2">
             <p>Paid by: <strong>{{ $expense->paid_by }}</strong> · {{ $expense->payment_method }}</p>
+            @if($expense->friendSplit)
+                <div class="rounded-2xl border border-indigo-100 bg-indigo-50 p-3 text-xs text-slate-700">
+                    <p class="font-semibold text-slate-900">Friend split with {{ $expense->friendSplit->friend?->name }}</p>
+                    <p class="mt-1">Shares: you ₹{{ number_format($expense->friendSplit->my_share, 2) }} · friend ₹{{ number_format($expense->friendSplit->friend_share, 2) }}</p>
+                    <p>Paid: you ₹{{ number_format($expense->friendSplit->paid_by_me_amount, 2) }} · friend ₹{{ number_format($expense->friendSplit->paid_by_friend_amount, 2) }}</p>
+                </div>
+            @endif
             @if($expense->expenseGroup)
                 <p>Group: <strong>{{ $expense->expenseGroup->name }}</strong> · {{ $expense->expenseGroup->expenses->count() }} payment rows</p>
                 <form action="{{ route('expense-groups.update', $expense->expenseGroup) }}" method="POST" class="flex items-center gap-2">

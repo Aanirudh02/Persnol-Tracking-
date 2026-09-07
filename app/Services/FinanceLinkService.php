@@ -4,141 +4,194 @@ namespace App\Services;
 
 use App\Models\CreditDebt;
 use App\Models\Expense;
+use App\Models\Friend;
+use App\Models\FriendSplit;
 use App\Models\FriendTransaction;
-use Carbon\Carbon;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class FinanceLinkService
 {
-    public function syncExpenseFriendLink(Expense $expense): ?FriendTransaction
+    public function __construct(
+        private readonly FriendTransactionProjector $projector
+    ) {}
+
+    /**
+     * @param  array<string, mixed>|null  $splitData
+     */
+    public function syncExpenseFriendLink(Expense $expense, ?array $splitData = null): ?FriendTransaction
     {
-        if ($expense->friend_transaction_id) {
-            $tx = FriendTransaction::find($expense->friend_transaction_id);
-            if ($tx) {
-                $this->applyExpenseToTransaction($expense, $tx);
-                $tx->save();
+        return DB::transaction(function () use ($expense, $splitData): ?FriendTransaction {
+            $payload = $this->expenseSplitPayload($expense, $splitData);
 
-                return $tx;
+            if ($payload === null) {
+                $this->removeExpenseFriendLink($expense);
+
+                return null;
             }
-        }
 
-        if ($expense->paid_by_type === 'friend' && $expense->paid_by_friend_id) {
-            $tx = FriendTransaction::create([
-                'user_id' => $expense->user_id,
-                'friend_id' => $expense->paid_by_friend_id,
-                'type' => 'friend_paid_for_me',
-                'paid_by_me' => false,
-                'total_amount' => $expense->totalAmount(),
-                'my_share' => $expense->totalAmount(),
-                'friend_share' => 0,
-                'description' => $expense->description,
-                'date' => $expense->date,
-                'payment_method' => $expense->payment_method,
-                'is_settled' => false,
-            ]);
-            $expense->friend_transaction_id = $tx->id;
+            $split = FriendSplit::query()->updateOrCreate(
+                ['expense_id' => $expense->id],
+                $payload
+            );
+
+            $transaction = $this->projector->syncFriendSplit($split);
+            $expense->friend_transaction_id = $transaction->id;
             $expense->saveQuietly();
 
-            return $tx;
-        }
-
-        if ($expense->split_with_friend_id) {
-            $tx = FriendTransaction::create([
-                'user_id' => $expense->user_id,
-                'friend_id' => $expense->split_with_friend_id,
-                'type' => 'shared_expense',
-                'paid_by_me' => ($expense->paid_by_type ?? 'me') === 'me',
-                'total_amount' => $expense->totalAmount(),
-                'my_share' => $expense->split_my_share ?? round($expense->totalAmount() / 2, 2),
-                'friend_share' => $expense->split_friend_share ?? round($expense->totalAmount() / 2, 2),
-                'description' => $expense->description,
-                'date' => $expense->date,
-                'payment_method' => $expense->payment_method,
-                'is_settled' => false,
-            ]);
-            $expense->friend_transaction_id = $tx->id;
-            $expense->saveQuietly();
-
-            return $tx;
-        }
-
-        return null;
+            return $transaction;
+        });
     }
 
     public function removeExpenseFriendLink(Expense $expense): void
     {
-        if ($expense->friend_transaction_id) {
-            FriendTransaction::where('id', $expense->friend_transaction_id)->delete();
+        DB::transaction(function () use ($expense): void {
+            $split = FriendSplit::query()->where('expense_id', $expense->id)->first();
+            if ($split) {
+                $this->projector->deleteBySource('friend_split', $split->id);
+                $split->delete();
+            }
+
+            if ($expense->friend_transaction_id) {
+                FriendTransaction::query()->whereKey($expense->friend_transaction_id)->delete();
+            }
+
             $expense->friend_transaction_id = null;
             $expense->saveQuietly();
-        }
-    }
-
-    protected function applyExpenseToTransaction(Expense $expense, FriendTransaction $tx): void
-    {
-        if ($expense->paid_by_type === 'friend' && $expense->paid_by_friend_id) {
-            $tx->friend_id = $expense->paid_by_friend_id;
-            $tx->type = 'friend_paid_for_me';
-            $tx->paid_by_me = false;
-            $tx->total_amount = $expense->totalAmount();
-            $tx->my_share = $expense->totalAmount();
-            $tx->friend_share = 0;
-        } elseif ($expense->split_with_friend_id) {
-            $tx->friend_id = $expense->split_with_friend_id;
-            $tx->type = 'shared_expense';
-            $tx->paid_by_me = ($expense->paid_by_type ?? 'me') === 'me';
-            $tx->total_amount = $expense->totalAmount();
-            $tx->my_share = $expense->split_my_share ?? round($expense->totalAmount() / 2, 2);
-            $tx->friend_share = $expense->split_friend_share ?? round($expense->totalAmount() / 2, 2);
-        }
-
-        $tx->description = $expense->description;
-        $tx->date = $expense->date;
-        $tx->payment_method = $expense->payment_method;
+        });
     }
 
     public function syncCreditDebtToFriend(CreditDebt $item): ?FriendTransaction
     {
-        $remaining = $item->remaining();
-        if ($remaining <= 0) {
-            if ($item->friend_transaction_id) {
-                FriendTransaction::where('id', $item->friend_transaction_id)->update([
-                    'is_settled' => true,
-                    'settled_at' => Carbon::now(),
-                ]);
-            }
+        return DB::transaction(fn (): ?FriendTransaction => $this->projector->syncCreditDebt($item));
+    }
 
+    public function removeCreditDebtLink(CreditDebt $item): void
+    {
+        DB::transaction(function () use ($item): void {
+            $this->projector->deleteBySource('credit_debt', $item->id);
+            $item->friend_transaction_id = null;
+            $item->saveQuietly();
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $splitData
+     * @return array<string, mixed>|null
+     */
+    public function expenseSplitPayload(Expense $expense, ?array $splitData = null): ?array
+    {
+        $friendId = (int) ($splitData['friend_id'] ?? $expense->split_with_friend_id ?? $expense->paid_by_friend_id ?? 0);
+        if ($friendId <= 0) {
             return null;
         }
 
-        // New rule: Credit = I owe them; Debt = they owe me
-        $type = $item->type === 'credit' ? 'friend_paid_for_me' : 'paid_for_friend';
-        $payload = [
-            'user_id' => $item->user_id,
-            'friend_id' => $item->friend_id,
-            'type' => $type,
-            'paid_by_me' => $item->type === 'debt',
-            'total_amount' => $item->amount,
-            'my_share' => $item->type === 'credit' ? $remaining : 0,
-            'friend_share' => $item->type === 'debt' ? $remaining : 0,
-            'description' => $item->description ?: ($item->type === 'credit' ? 'Credit (I owe)' : 'Debt (they owe me)'),
-            'date' => $item->date,
-            'payment_method' => 'Other',
-            'is_settled' => false,
+        $total = round((float) $expense->totalAmount(), 2);
+        $myShare = round((float) ($splitData['my_share'] ?? $expense->split_my_share ?? $total), 2);
+        $friendShare = round((float) ($splitData['friend_share'] ?? $expense->split_friend_share ?? max(0, $total - $myShare)), 2);
+        $paidByMode = (string) ($splitData['paid_by_mode'] ?? $this->legacyPaidByMode($expense));
+
+        $paidByMe = round((float) ($splitData['paid_by_me_amount'] ?? $this->defaultPaidByMeAmount($paidByMode, $total)), 2);
+        $paidByFriend = round((float) ($splitData['paid_by_friend_amount'] ?? $this->defaultPaidByFriendAmount($paidByMode, $total)), 2);
+
+        return [
+            'user_id' => $expense->user_id,
+            'friend_id' => $friendId,
+            'description' => $expense->description,
+            'date' => $expense->date,
+            'payment_method' => $expense->payment_method,
+            'total_amount' => $total,
+            'my_share' => $myShare,
+            'friend_share' => $friendShare,
+            'paid_by_me_amount' => $paidByMe,
+            'paid_by_friend_amount' => $paidByFriend,
+            'notes' => Arr::get($splitData, 'notes', $expense->notes),
         ];
+    }
 
-        if ($item->friend_transaction_id) {
-            $tx = FriendTransaction::find($item->friend_transaction_id);
-            if ($tx) {
-                $tx->update($payload);
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function createStandaloneSplit(Friend $friend, array $data): FriendSplit
+    {
+        return DB::transaction(function () use ($friend, $data): FriendSplit {
+            $split = FriendSplit::query()->create([
+                'user_id' => $friend->user_id,
+                'friend_id' => $friend->id,
+                'description' => $data['description'],
+                'date' => $data['date'],
+                'payment_method' => $data['payment_method'] ?? null,
+                'total_amount' => $data['total_amount'],
+                'my_share' => $data['my_share'],
+                'friend_share' => $data['friend_share'],
+                'paid_by_me_amount' => $data['paid_by_me_amount'],
+                'paid_by_friend_amount' => $data['paid_by_friend_amount'],
+                'notes' => $data['notes'] ?? null,
+            ]);
 
-                return $tx;
-            }
-        }
+            $this->projector->syncFriendSplit($split);
 
-        $tx = FriendTransaction::create($payload);
-        $item->friend_transaction_id = $tx->id;
-        $item->saveQuietly();
+            return $split;
+        });
+    }
 
-        return $tx;
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function updateStandaloneSplit(FriendSplit $split, array $data): FriendSplit
+    {
+        return DB::transaction(function () use ($split, $data): FriendSplit {
+            $split->update([
+                'friend_id' => $data['friend_id'],
+                'description' => $data['description'],
+                'date' => $data['date'],
+                'payment_method' => $data['payment_method'] ?? null,
+                'total_amount' => $data['total_amount'],
+                'my_share' => $data['my_share'],
+                'friend_share' => $data['friend_share'],
+                'paid_by_me_amount' => $data['paid_by_me_amount'],
+                'paid_by_friend_amount' => $data['paid_by_friend_amount'],
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            $this->projector->syncFriendSplit($split->fresh());
+
+            return $split->fresh();
+        });
+    }
+
+    public function deleteStandaloneSplit(FriendSplit $split): void
+    {
+        DB::transaction(function () use ($split): void {
+            $this->projector->deleteBySource('friend_split', $split->id);
+            $split->delete();
+        });
+    }
+
+    private function legacyPaidByMode(Expense $expense): string
+    {
+        return match ($expense->paid_by_type) {
+            'friend' => 'friend',
+            'split' => 'split',
+            default => 'me',
+        };
+    }
+
+    private function defaultPaidByMeAmount(string $paidByMode, float $total): float
+    {
+        return match ($paidByMode) {
+            'friend' => 0,
+            'split' => 0,
+            default => $total,
+        };
+    }
+
+    private function defaultPaidByFriendAmount(string $paidByMode, float $total): float
+    {
+        return match ($paidByMode) {
+            'friend' => $total,
+            'split' => $total,
+            default => 0,
+        };
     }
 }

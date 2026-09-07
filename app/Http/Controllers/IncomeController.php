@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\DailyRecord;
 use App\Models\Income;
 use App\Models\IncomeCategory;
-use App\Models\DailyRecord;
 use App\Services\AuditService;
 use App\Services\FinanceService;
+use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class IncomeController extends Controller
 {
@@ -34,10 +35,13 @@ class IncomeController extends Controller
         return view('finance.income.index', compact('incomes', 'categories', 'totalAmount'));
     }
 
-    public function create()
+    public function create(OptionsService $options)
     {
         $categories = IncomeCategory::all();
-        return view('finance.income.create', compact('categories'));
+        $paymentMethods = $options->names('payment_method');
+        $incomeSources = $options->names('income_source');
+
+        return view('finance.income.create', compact('categories', 'paymentMethods', 'incomeSources'));
     }
 
     public function store(Request $request)
@@ -76,23 +80,30 @@ class IncomeController extends Controller
         return redirect()->route('income.index')->with('success', 'Income recorded successfully!');
     }
 
-    public function edit(Income $income, FinanceService $financeService)
+    public function edit(Income $income, FinanceService $financeService, OptionsService $options)
     {
-        if ($income->user_id !== auth()->id()) abort(403);
+        if ($income->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        if (!$financeService->canEdit('income', $income)) {
+        if (! $financeService->canEdit('income', $income)) {
             return redirect()->route('income.index')->with('error', '🔒 This income record is locked.');
         }
 
         $categories = IncomeCategory::all();
-        return view('finance.income.edit', compact('income', 'categories'));
+        $paymentMethods = $options->names('payment_method');
+        $incomeSources = $options->names('income_source');
+
+        return view('finance.income.edit', compact('income', 'categories', 'paymentMethods', 'incomeSources'));
     }
 
     public function update(Request $request, Income $income, FinanceService $financeService)
     {
-        if ($income->user_id !== auth()->id()) abort(403);
+        if ($income->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        if (!$financeService->canEdit('income', $income)) {
+        if (! $financeService->canEdit('income', $income)) {
             return redirect()->route('income.index')->with('error', '🔒 This income record is locked.');
         }
 
@@ -125,7 +136,9 @@ class IncomeController extends Controller
 
     public function destroy(Request $request, Income $income)
     {
-        if ($income->user_id !== auth()->id()) abort(403);
+        if ($income->user_id !== auth()->id()) {
+            abort(403);
+        }
 
         AuditService::log('income', $income->id, 'deleted', $income->toArray(), null, $request->input('reason', 'Deleted by user'));
         $income->delete();

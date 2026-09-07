@@ -2,23 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\ActivityCategory;
+use App\Models\AuditLog;
+use App\Models\CustomAnswer;
+use App\Models\CustomQuestion;
+use App\Models\ExpenseCategory;
+use App\Models\FoodCategory;
+use App\Models\IncomeCategory;
+use App\Models\PaymentWallet;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
-use App\Models\Role;
-use App\Models\Permission;
-use App\Models\AuditLog;
-use App\Models\CustomQuestion;
-use App\Models\CustomAnswer;
-use App\Models\ExpenseCategory;
-use App\Models\IncomeCategory;
-use App\Models\FoodCategory;
-use App\Models\ActivityCategory;
-use App\Models\PaymentWallet;
-use App\Services\WalletService;
 use App\Services\OptionsService;
-use Illuminate\Support\Facades\Hash;
+use App\Services\WalletService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 
 class SettingController extends Controller
 {
@@ -49,10 +49,22 @@ class SettingController extends Controller
         $walletService->ensureDefaults($user->id);
         $wallets = PaymentWallet::where('user_id', $user->id)->orderBy('payment_method')->get();
         $friendRoles = $options->names('friend_role');
+        $paymentMethods = $options->for('payment_method', $user->id);
+        $financeDashboardSections = array_merge([
+            'show_wallet_balances' => true,
+            'show_total_expense' => true,
+            'show_current_balance' => true,
+            'show_expense_by_payment_type' => true,
+            'show_expense_by_category' => true,
+            'show_friend_overview' => true,
+        ], Setting::getVal('finance_dashboard_sections', []));
+        $foodDefaultExpenseCategoryId = Setting::getVal('food_default_expense_category_id');
+        $snackDefaultExpenseCategoryId = Setting::getVal('snack_default_expense_category_id');
 
         return view('settings.index', compact(
             'user', 'settings', 'customQuestions', 'auditLogs', 'users', 'roles', 'permissions',
-            'expenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles'
+            'expenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles',
+            'paymentMethods', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId'
         ));
     }
 
@@ -62,8 +74,8 @@ class SettingController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'phone' => 'nullable|string|max:20|unique:users,phone,' . $user->id,
+            'email' => 'required|email|unique:users,email,'.$user->id,
+            'phone' => 'nullable|string|max:20|unique:users,phone,'.$user->id,
             'timezone' => 'required|string',
             'currency' => 'required|string',
             'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
@@ -108,17 +120,29 @@ class SettingController extends Controller
             'app_timezone',
             'app_currency',
             'currency_symbol',
+            'food_default_expense_category_id',
+            'snack_default_expense_category_id',
+            'finance_dashboard_sections',
         ];
 
         foreach ($data as $key => $val) {
             $setting = Setting::where('key', $key)->first();
-            if (! $setting) {
-                continue;
-            }
             if (! auth()->user()->isAdmin() && ! in_array($key, $allowedForAll, true)) {
                 continue;
             }
-            $setting->update(['value' => $val]);
+
+            $storedValue = is_array($val) ? json_encode($val) : $val;
+            if ($setting) {
+                $setting->update(['value' => $storedValue]);
+            } elseif (in_array($key, $allowedForAll, true)) {
+                Setting::create([
+                    'key' => $key,
+                    'value' => $storedValue,
+                    'type' => is_array($val) ? 'json' : 'string',
+                    'group' => 'finance',
+                    'description' => $key,
+                ]);
+            }
         }
 
         return back()->with('success', 'Settings updated successfully!');
@@ -192,7 +216,9 @@ class SettingController extends Controller
 
     public function storeUser(Request $request)
     {
-        if (!auth()->user()->isAdmin()) abort(403);
+        if (! auth()->user()->isAdmin()) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:100',
