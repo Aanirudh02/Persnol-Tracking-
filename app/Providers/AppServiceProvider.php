@@ -6,6 +6,7 @@ use App\Services\DailyPromptService;
 use App\Services\Maps\GoogleMapProvider;
 use App\Services\Maps\MapProviderInterface;
 use App\Services\Maps\OsmMapProvider;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,7 +24,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        View::composer('components.app-layout', function ($view) {
+        if ($this->app->environment('production') || str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
+
+        View::composer('components.app-layout', function ($view): void {
             $prompts = [];
             if (auth()->check()) {
                 $prompts = app(DailyPromptService::class)->getActivePrompts(auth()->id());
