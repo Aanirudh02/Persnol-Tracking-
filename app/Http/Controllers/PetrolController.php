@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\FuelEntry;
 use App\Models\DailyRecord;
+use App\Models\FuelEntry;
 use App\Services\AuditService;
 use App\Services\FinanceService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class PetrolController extends Controller
 {
@@ -82,9 +82,11 @@ class PetrolController extends Controller
 
     public function edit(FuelEntry $petrol, FinanceService $financeService)
     {
-        if ($petrol->user_id !== auth()->id()) abort(403);
+        if ($petrol->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        if (!$financeService->canEdit('petrol', $petrol)) {
+        if (! $financeService->canEdit('petrol', $petrol)) {
             return redirect()->route('petrol.index')->with('error', '🔒 This petrol record is locked.');
         }
 
@@ -93,9 +95,11 @@ class PetrolController extends Controller
 
     public function update(Request $request, FuelEntry $petrol, FinanceService $financeService)
     {
-        if ($petrol->user_id !== auth()->id()) abort(403);
+        if ($petrol->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        if (!$financeService->canEdit('petrol', $petrol)) {
+        if (! $financeService->canEdit('petrol', $petrol)) {
             return redirect()->route('petrol.index')->with('error', '🔒 This petrol record is locked.');
         }
 
@@ -130,7 +134,9 @@ class PetrolController extends Controller
 
     public function destroy(Request $request, FuelEntry $petrol)
     {
-        if ($petrol->user_id !== auth()->id()) abort(403);
+        if ($petrol->user_id !== auth()->id()) {
+            abort(403);
+        }
         $petrol->delete();
 
         return redirect()->route('petrol.index')->with('success', 'Petrol record deleted.');

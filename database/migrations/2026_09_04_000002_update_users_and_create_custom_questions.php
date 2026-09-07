@@ -43,7 +43,7 @@ return new class extends Migration
         Schema::dropIfExists('custom_questions');
         Schema::table('users', function (Blueprint $table) {
             $table->dropColumn([
-                'phone', 'profile_photo', 'timezone', 'currency', 'is_active', 'last_login_at', 'preferences'
+                'phone', 'profile_photo', 'timezone', 'currency', 'is_active', 'last_login_at', 'preferences',
             ]);
         });
     }

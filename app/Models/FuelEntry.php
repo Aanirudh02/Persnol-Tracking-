@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FuelEntry extends Model
 {
@@ -55,12 +55,20 @@ class FuelEntry extends Model
     public function isEditableByUser(?User $user = null): bool
     {
         $user = $user ?? auth()->user();
-        if (!$user) return false;
-        if ($user->isAdmin()) return true;
-        if ($this->is_locked) return false;
+        if (! $user) {
+            return false;
+        }
+        if ($user->isAdmin()) {
+            return true;
+        }
+        if ($this->is_locked) {
+            return false;
+        }
 
         $windowDays = (int) Setting::getVal('petrol_edit_window_days', 7);
-        if ($windowDays === 0) return false;
+        if ($windowDays === 0) {
+            return false;
+        }
 
         return Carbon::parse($this->created_at)->addDays($windowDays)->isFuture();
     }

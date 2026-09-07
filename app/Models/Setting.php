@@ -11,7 +11,7 @@ class Setting extends Model
     public static function getVal(string $key, mixed $default = null): mixed
     {
         $setting = self::where('key', $key)->first();
-        if (!$setting) {
+        if (! $setting) {
             return $default;
         }
 
@@ -26,6 +26,7 @@ class Setting extends Model
     public static function setVal(string $key, mixed $value, string $type = 'string', string $group = 'general', ?string $desc = null): self
     {
         $storeValue = is_array($value) ? json_encode($value) : (string) $value;
+
         return self::updateOrCreate(
             ['key' => $key],
             [

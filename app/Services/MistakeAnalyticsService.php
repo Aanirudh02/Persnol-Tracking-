@@ -33,7 +33,7 @@ class MistakeAnalyticsService
             ->get();
 
         // Identify repeated mistakes (categories with > 1 mistake)
-        $repeatedCategories = $categoryBreakdown->filter(fn($item) => $item->count > 1);
+        $repeatedCategories = $categoryBreakdown->filter(fn ($item) => $item->count > 1);
 
         return [
             'total' => $totalMistakes,

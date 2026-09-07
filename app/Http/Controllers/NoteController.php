@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Note;
-use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class NoteController extends Controller
 {
@@ -17,8 +16,8 @@ class NoteController extends Controller
             $s = $request->search;
             $query->where(function ($q) use ($s) {
                 $q->where('title', 'like', "%{$s}%")
-                  ->orWhere('content', 'like', "%{$s}%")
-                  ->orWhere('tags', 'like', "%{$s}%");
+                    ->orWhere('content', 'like', "%{$s}%")
+                    ->orWhere('tags', 'like', "%{$s}%");
             });
         }
 
@@ -62,15 +61,19 @@ class NoteController extends Controller
 
     public function togglePin(Request $request, Note $note)
     {
-        if ($note->user_id !== auth()->id()) abort(403);
-        $note->update(['is_pinned' => !$note->is_pinned]);
+        if ($note->user_id !== auth()->id()) {
+            abort(403);
+        }
+        $note->update(['is_pinned' => ! $note->is_pinned]);
 
         return back()->with('success', $note->is_pinned ? 'Note pinned!' : 'Note unpinned.');
     }
 
     public function update(Request $request, Note $note)
     {
-        if ($note->user_id !== auth()->id()) abort(403);
+        if ($note->user_id !== auth()->id()) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'title' => 'required|string|max:200',
@@ -93,7 +96,9 @@ class NoteController extends Controller
 
     public function destroy(Request $request, Note $note)
     {
-        if ($note->user_id !== auth()->id()) abort(403);
+        if ($note->user_id !== auth()->id()) {
+            abort(403);
+        }
         $note->delete();
 
         return redirect()->route('notes.index')->with('success', 'Note deleted.');

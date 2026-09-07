@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
 
 class DailyRecord extends Model
 {
@@ -84,8 +84,8 @@ class DailyRecord extends Model
                 ->first();
 
             if ($prevRecord && $prevRecord->sleep_time) {
-                $sleepDateTime = Carbon::parse($prevRecord->record_date->toDateString() . ' ' . $prevRecord->sleep_time);
-                $wakeDateTime = Carbon::parse($this->record_date->toDateString() . ' ' . $this->wake_up_time);
+                $sleepDateTime = Carbon::parse($prevRecord->record_date->toDateString().' '.$prevRecord->sleep_time);
+                $wakeDateTime = Carbon::parse($this->record_date->toDateString().' '.$this->wake_up_time);
                 if ($wakeDateTime->gt($sleepDateTime)) {
                     $this->sleep_duration_hours = round($wakeDateTime->diffInMinutes($sleepDateTime) / 60, 2);
                     $this->save();

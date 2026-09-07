@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -13,7 +13,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $permissions = [
             // Dashboard
             ['name' => 'dashboard.view', 'display_name' => 'View Dashboard', 'module' => 'Dashboard'],
-            
+
             // Finance
             ['name' => 'finance.view', 'display_name' => 'View Finance Overview', 'module' => 'Finance'],
             ['name' => 'finance.create', 'display_name' => 'Create Finance Records', 'module' => 'Finance'],
@@ -110,14 +110,14 @@ class RolesAndPermissionsSeeder extends Seeder
         );
 
         // Assign all permissions to Admin
-        $adminRole->permissions()->sync(array_values(array_map(fn($p) => $p->id, $permissionModels)));
+        $adminRole->permissions()->sync(array_values(array_map(fn ($p) => $p->id, $permissionModels)));
 
         // Assign standard permissions to User (everything except administration)
         $userPermissionIds = [];
         $viewerPermissionIds = [];
 
         foreach ($permissionModels as $name => $perm) {
-            if (!str_contains($name, '.manage')) {
+            if (! str_contains($name, '.manage')) {
                 $userPermissionIds[] = $perm->id;
             }
             if (str_ends_with($name, '.view')) {

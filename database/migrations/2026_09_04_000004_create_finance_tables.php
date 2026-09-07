@@ -122,7 +122,7 @@ return new class extends Migration
             $table->enum('type', [
                 'paid_for_friend',   // I paid, friend owes me
                 'friend_paid_for_me', // Friend paid, I owe friend
-                'shared_expense'     // Shared total, split shares
+                'shared_expense',     // Shared total, split shares
             ]);
             $table->decimal('total_amount', 12, 2);
             $table->decimal('my_share', 12, 2);

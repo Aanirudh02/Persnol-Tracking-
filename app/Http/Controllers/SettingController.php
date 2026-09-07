@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\OptionsService;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 
@@ -60,11 +61,13 @@ class SettingController extends Controller
         ], Setting::getVal('finance_dashboard_sections', []));
         $foodDefaultExpenseCategoryId = Setting::getVal('food_default_expense_category_id');
         $snackDefaultExpenseCategoryId = Setting::getVal('snack_default_expense_category_id');
+        $friendsResyncedAt = Setting::getVal('friends_resynced_at');
 
         return view('settings.index', compact(
             'user', 'settings', 'customQuestions', 'auditLogs', 'users', 'roles', 'permissions',
             'expenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles',
-            'paymentMethods', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId'
+            'paymentMethods', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId',
+            'friendsResyncedAt'
         ));
     }
 
@@ -244,5 +247,28 @@ class SettingController extends Controller
         }
 
         return back()->with('success', "User {$newUser->name} created successfully!");
+    }
+
+    public function resyncFriends(Request $request)
+    {
+        $alreadyResynced = Setting::getVal('friends_resynced_at');
+        if ($alreadyResynced && ! $request->boolean('force')) {
+            return back()->with('info', 'Friend transactions have already been resynced on '.$alreadyResynced.'.');
+        }
+
+        Artisan::call('finance:resync-friends');
+        $output = Artisan::output();
+
+        Setting::updateOrCreate(
+            ['key' => 'friends_resynced_at'],
+            [
+                'value' => now()->toDateTimeString(),
+                'type' => 'string',
+                'group' => 'system',
+                'description' => 'Timestamp of last successful friend data resync execution',
+            ]
+        );
+
+        return back()->with('success', 'Friend balances and split records successfully resynced!')->with('resync_output', $output);
     }
 }

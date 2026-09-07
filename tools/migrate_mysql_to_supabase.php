@@ -30,7 +30,7 @@ $options = getopt('', [
 ]);
 
 if (in_array('--help', $argv, true) || in_array('-h', $argv, true)) {
-        echo <<<'HELP'
+    echo <<<'HELP'
 Windows-native MySQL to Supabase PostgreSQL importer
 
 Dry run:
@@ -48,7 +48,7 @@ Optional source settings:
 Optional target settings:
     --target-port=5432 --target-db=postgres --batch-size=200
 HELP;
-        exit(0);
+    exit(0);
 }
 
 $sourcePassword = (string) ($options['source-password'] ?? getenv('SOURCE_DB_PASSWORD') ?: '');
@@ -122,12 +122,12 @@ echo 'Source: '.$source['username'].'@'.$source['host'].':'.$source['port'].'/'.
 echo 'Target: '.$target['username'].'@'.$target['host'].':'.$target['port'].'/'.$target['database'].PHP_EOL;
 
 if (! isset($options['apply'])) {
-    echo PHP_EOL."Dry run complete. Re-run with --apply only after reviewing the table counts.".PHP_EOL;
+    echo PHP_EOL.'Dry run complete. Re-run with --apply only after reviewing the table counts.'.PHP_EOL;
     exit(0);
 }
 
 if (! confirm('Import these rows into Supabase? This writes to Supabase but does not modify MySQL')) {
-    echo "Cancelled.".PHP_EOL;
+    echo 'Cancelled.'.PHP_EOL;
     exit(0);
 }
 
@@ -157,7 +157,7 @@ foreach ($tables as $table) {
     echo $table.': source='.$sourceCount.' target='.$targetCount.($sourceCount === $targetCount ? ' OK' : ' MISMATCH').PHP_EOL;
 }
 
-echo PHP_EOL."Import complete. Uploads are separate: archive storage/app/public and migrate them to persistent storage.".PHP_EOL;
+echo PHP_EOL.'Import complete. Uploads are separate: archive storage/app/public and migrate them to persistent storage.'.PHP_EOL;
 
 function connectMysql(array $config): PDO
 {
@@ -301,7 +301,7 @@ function resetSequences(PDO $pdo, array $tables, array $primaryKeys): void
         if (! $sequence) {
             continue;
         }
-        $pdo->exec("SELECT setval('".$sequence."', COALESCE((SELECT MAX(".quotePg($primaryKey).") FROM ".quotePg($table)."), 1), true)");
+        $pdo->exec("SELECT setval('".$sequence."', COALESCE((SELECT MAX(".quotePg($primaryKey).') FROM '.quotePg($table).'), 1), true)');
     }
 }
 
@@ -333,12 +333,14 @@ function quoteMysql(string $identifier): string
 function prompt(string $label): string
 {
     fwrite(STDOUT, $label.': ');
+
     return trim((string) fgets(STDIN));
 }
 
 function confirm(string $message): bool
 {
     fwrite(STDOUT, $message.' [type YES]: ');
+
     return trim((string) fgets(STDIN)) === 'YES';
 }
 

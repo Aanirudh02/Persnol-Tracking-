@@ -9,6 +9,7 @@ use App\Models\Friend;
 use App\Models\FriendSplit;
 use App\Models\FriendTransaction;
 use App\Models\Role;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -114,6 +115,22 @@ class FinanceResyncFriendsCommandTest extends TestCase
 
         $manualSplit = FriendSplit::query()->where('legacy_friend_transaction_id', 1)->firstOrFail();
         $this->assertSame(40.0, $manualSplit->netAmount());
+    }
+
+    public function test_settings_resync_friends_route_runs_and_disables_button(): void
+    {
+        [$user, $friend] = $this->makeUserAndFriend();
+
+        $response = $this->actingAs($user)->post(route('settings.resync-friends'));
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertNotNull(Setting::getVal('friends_resynced_at'));
+
+        $settingsPage = $this->actingAs($user)->get(route('settings.index'));
+        $settingsPage->assertOk();
+        $settingsPage->assertSee('Friends Resynced');
+        $settingsPage->assertSee('disabled');
     }
 
     /**

@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -18,6 +18,7 @@ class AuthController extends Controller
         if (Auth::check()) {
             return redirect()->route('dashboard');
         }
+
         return view('auth.login');
     }
 
@@ -38,7 +39,7 @@ class AuthController extends Controller
         $user = User::where($field, $loginInput)->first();
 
         if ($user && Hash::check($password, $user->password)) {
-            if (!$user->is_active) {
+            if (! $user->is_active) {
                 return back()->withErrors(['login' => 'Your account has been deactivated. Please contact an administrator.'])->withInput();
             }
 
@@ -73,7 +74,7 @@ class AuthController extends Controller
         $request->validate(['email' => 'required|email']);
 
         $user = User::where('email', $request->email)->first();
-        if (!$user) {
+        if (! $user) {
             return back()->with('status', 'If an account exists with that email, a password reset link has been sent.');
         }
 
@@ -88,7 +89,7 @@ class AuthController extends Controller
 
         // Attempt sending email via configured mailer
         try {
-            \Illuminate\Support\Facades\Mail::raw("Reset your password by visiting: {$resetUrl}", function ($message) use ($user) {
+            Mail::raw("Reset your password by visiting: {$resetUrl}", function ($message) use ($user) {
                 $message->to($user->email)->subject('Password Reset Request - LifeTracker');
             });
         } catch (\Exception $e) {
@@ -116,7 +117,7 @@ class AuthController extends Controller
 
         $record = DB::table('password_reset_tokens')->where('email', $request->email)->first();
 
-        if (!$record || !Hash::check($request->token, $record->token)) {
+        if (! $record || ! Hash::check($request->token, $record->token)) {
             return back()->withErrors(['email' => 'Invalid or expired password reset token.']);
         }
 

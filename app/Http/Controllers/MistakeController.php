@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\DailyRecord;
 use App\Models\Mistake;
 use App\Models\MistakeCategory;
-use App\Models\DailyRecord;
 use App\Services\MistakeAnalyticsService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class MistakeController extends Controller
 {
@@ -37,6 +37,7 @@ class MistakeController extends Controller
     public function create()
     {
         $categories = MistakeCategory::all();
+
         return view('mistakes.create', compact('categories'));
     }
 
@@ -93,20 +94,28 @@ class MistakeController extends Controller
 
     public function show(Mistake $mistake)
     {
-        if ($mistake->user_id !== auth()->id()) abort(403);
+        if ($mistake->user_id !== auth()->id()) {
+            abort(403);
+        }
+
         return view('mistakes.show', compact('mistake'));
     }
 
     public function edit(Mistake $mistake)
     {
-        if ($mistake->user_id !== auth()->id()) abort(403);
+        if ($mistake->user_id !== auth()->id()) {
+            abort(403);
+        }
         $categories = MistakeCategory::all();
+
         return view('mistakes.edit', compact('mistake', 'categories'));
     }
 
     public function update(Request $request, Mistake $mistake)
     {
-        if ($mistake->user_id !== auth()->id()) abort(403);
+        if ($mistake->user_id !== auth()->id()) {
+            abort(403);
+        }
 
         $validated = $request->validate([
             'title' => 'required|string|max:200',
@@ -131,7 +140,9 @@ class MistakeController extends Controller
 
     public function destroy(Request $request, Mistake $mistake)
     {
-        if ($mistake->user_id !== auth()->id()) abort(403);
+        if ($mistake->user_id !== auth()->id()) {
+            abort(403);
+        }
         $mistake->delete();
 
         return redirect()->route('mistakes.index')->with('success', 'Mistake record archived.');

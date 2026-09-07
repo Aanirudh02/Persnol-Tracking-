@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Activity;
 use App\Models\ActivityCategory;
 use App\Models\DailyRecord;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class ActivityController extends Controller
 {
@@ -55,10 +55,12 @@ class ActivityController extends Controller
 
         // Auto calculate duration if start and end provided
         $duration = $validated['duration_minutes'] ?? null;
-        if (!$duration && !empty($validated['start_time']) && !empty($validated['end_time'])) {
-            $start = Carbon::parse($validated['date'] . ' ' . $validated['start_time']);
-            $end = Carbon::parse($validated['date'] . ' ' . $validated['end_time']);
-            if ($end->lt($start)) $end->addDay();
+        if (! $duration && ! empty($validated['start_time']) && ! empty($validated['end_time'])) {
+            $start = Carbon::parse($validated['date'].' '.$validated['start_time']);
+            $end = Carbon::parse($validated['date'].' '.$validated['end_time']);
+            if ($end->lt($start)) {
+                $end->addDay();
+            }
             $duration = $start->diffInMinutes($end);
         }
 
@@ -82,7 +84,9 @@ class ActivityController extends Controller
 
     public function destroy(Request $request, Activity $activity)
     {
-        if ($activity->user_id !== auth()->id()) abort(403);
+        if ($activity->user_id !== auth()->id()) {
+            abort(403);
+        }
         $activity->delete();
 
         return redirect()->route('activities.index')->with('success', 'Activity removed.');

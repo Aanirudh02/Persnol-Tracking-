@@ -1,10 +1,39 @@
 <x-app-layout title="Settings">
     <div class="space-y-8">
         <!-- Page Header -->
-        <div>
-            <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your profile, security, and system preferences.</p>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your profile, security, and system preferences.</p>
+            </div>
+            <div>
+                <form action="{{ route('settings.resync-friends') }}" method="POST" onsubmit="return confirm('Run one-time friend transaction & split resync now?');">
+                    @csrf
+                    @if(!empty($friendsResyncedAt))
+                        <button type="button" disabled class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-200 dark:border-slate-700 shadow-sm" title="Already resynced on {{ $friendsResyncedAt }}">
+                            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span>Friends Resynced</span>
+                            <span class="text-[10px] text-slate-400">({{ \Carbon\Carbon::parse($friendsResyncedAt)->diffForHumans() }})</span>
+                        </button>
+                    @else
+                        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-indigo-500/20 transition active:scale-95">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span>Resync Friends</span>
+                        </button>
+                    @endif
+                </form>
+            </div>
         </div>
+
+        @if(session('resync_output'))
+            <div class="p-4 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 text-xs font-mono overflow-x-auto shadow-inner">
+                <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-slate-400 font-sans text-xs">
+                    <span class="font-bold text-emerald-400">Resync Execution Report</span>
+                    <span>Just now</span>
+                </div>
+                <pre class="whitespace-pre-wrap">{{ session('resync_output') }}</pre>
+            </div>
+        @endif
 
         <!-- Profile Section -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">

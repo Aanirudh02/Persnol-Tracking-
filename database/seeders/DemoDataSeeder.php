@@ -2,33 +2,35 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\User;
-use App\Models\Friend;
+use App\Models\Activity;
+use App\Models\ActivityCategory;
 use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\FoodCategory;
+use App\Models\FoodEntry;
+use App\Models\Friend;
+use App\Models\FriendTransaction;
+use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\IncomeCategory;
-use App\Models\FoodEntry;
-use App\Models\FoodCategory;
-use App\Models\Activity;
-use App\Models\ActivityCategory;
-use App\Models\ScooterTrip;
-use App\Models\FuelEntry;
 use App\Models\Mistake;
 use App\Models\MistakeCategory;
-use App\Models\Payment;
-use App\Models\FriendTransaction;
 use App\Models\Note;
+use App\Models\Payment;
+use App\Models\ScooterTrip;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
         $user = User::where('email', env('ADMIN_EMAIL', 'aanirudhch@gmail.com'))->first();
-        if (!$user) return;
+        if (! $user) {
+            return;
+        }
 
         // Friends
         $rahul = Friend::updateOrCreate(
@@ -273,7 +275,7 @@ class DemoDataSeeder extends Seeder
                 'date' => $today,
                 'time' => '11:00:00',
                 'what_happened' => 'Remembered only after reaching college that deadline was 10 AM.',
-                'why_happened' => "Did not add the reminder to my daily task list the previous evening.",
+                'why_happened' => 'Did not add the reminder to my daily task list the previous evening.',
                 'what_should_have_done' => 'Record deadlines immediately when announced.',
                 'lesson_learned' => 'Always double check assignment submission portals before bed.',
                 'prevention_plan' => 'Set phone calendar alert 24 hours prior to deadline.',

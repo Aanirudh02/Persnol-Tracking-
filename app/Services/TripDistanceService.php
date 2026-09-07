@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\FuelEntry;
-use App\Models\Setting;
 use App\Models\Vehicle;
 use App\Services\Maps\MapProviderInterface;
 

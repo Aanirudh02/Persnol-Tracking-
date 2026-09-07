@@ -163,6 +163,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/profile', [SettingController::class, 'updateProfile'])->name('settings.profile');
         Route::post('/password', [SettingController::class, 'updatePassword'])->name('settings.password');
         Route::post('/system', [SettingController::class, 'updateSettings'])->name('settings.system');
+        Route::post('/resync-friends', [SettingController::class, 'resyncFriends'])->name('settings.resync-friends');
         Route::post('/custom-answer/{question}', [SettingController::class, 'saveCustomAnswer'])->name('settings.custom-answer');
         Route::post('/users', [SettingController::class, 'storeUser'])->name('settings.users')->middleware('role:Admin');
         Route::post('/roles', [SettingController::class, 'storeRole'])->name('settings.roles.store')->middleware('role:Admin');

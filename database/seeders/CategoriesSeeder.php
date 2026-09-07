@@ -2,13 +2,13 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\ExpenseCategory;
-use App\Models\IncomeCategory;
-use App\Models\FoodCategory;
 use App\Models\ActivityCategory;
-use App\Models\MistakeCategory;
 use App\Models\CustomQuestion;
+use App\Models\ExpenseCategory;
+use App\Models\FoodCategory;
+use App\Models\IncomeCategory;
+use App\Models\MistakeCategory;
+use Illuminate\Database\Seeder;
 
 class CategoriesSeeder extends Seeder
 {

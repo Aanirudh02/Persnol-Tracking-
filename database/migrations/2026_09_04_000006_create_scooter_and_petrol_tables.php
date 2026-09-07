@@ -14,19 +14,19 @@ return new class extends Migration
             $table->foreignId('daily_record_id')->nullable()->constrained()->nullOnDelete();
             $table->string('title')->nullable();
             $table->date('date');
-            
+
             // Start
             $table->time('start_time')->nullable();
             $table->decimal('start_latitude', 10, 7)->nullable();
             $table->decimal('start_longitude', 10, 7)->nullable();
             $table->string('start_address')->nullable();
-            
+
             // End
             $table->time('end_time')->nullable();
             $table->decimal('end_latitude', 10, 7)->nullable();
             $table->decimal('end_longitude', 10, 7)->nullable();
             $table->string('end_address')->nullable();
-            
+
             // Metrics
             $table->decimal('distance_km', 8, 2)->nullable();
             $table->integer('duration_minutes')->nullable();

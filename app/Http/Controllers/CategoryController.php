@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\ActivityCategory;
 use App\Models\ExpenseCategory;
 use App\Models\FoodCategory;
-use App\Models\ActivityCategory;
+use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
@@ -15,16 +15,16 @@ class CategoryController extends Controller
     public function storeExpense(Request $request)
     {
         $validated = $request->validate([
-            'name'  => 'required|string|max:80',
+            'name' => 'required|string|max:80',
             'color' => 'nullable|string|max:20',
-            'icon'  => 'nullable|string|max:20',
+            'icon' => 'nullable|string|max:20',
         ]);
 
         ExpenseCategory::create([
             'user_id' => $request->user()->id,
-            'name'    => $validated['name'],
-            'color'   => $validated['color'] ?? '#6366f1',
-            'icon'    => $validated['icon'] ?? '💸',
+            'name' => $validated['name'],
+            'color' => $validated['color'] ?? '#6366f1',
+            'icon' => $validated['icon'] ?? '💸',
         ]);
 
         return back()->with('success', "Category '{$validated['name']}' added!");
@@ -32,8 +32,11 @@ class CategoryController extends Controller
 
     public function destroyExpense(Request $request, ExpenseCategory $category)
     {
-        if ($category->user_id !== $request->user()->id) abort(403);
+        if ($category->user_id !== $request->user()->id) {
+            abort(403);
+        }
         $category->delete();
+
         return back()->with('success', 'Category deleted.');
     }
 
@@ -43,16 +46,16 @@ class CategoryController extends Controller
     public function storeFood(Request $request)
     {
         $validated = $request->validate([
-            'name'  => 'required|string|max:80',
+            'name' => 'required|string|max:80',
             'color' => 'nullable|string|max:20',
-            'icon'  => 'nullable|string|max:20',
+            'icon' => 'nullable|string|max:20',
         ]);
 
         FoodCategory::create([
             'user_id' => $request->user()->id,
-            'name'    => $validated['name'],
-            'color'   => $validated['color'] ?? '#f59e0b',
-            'icon'    => $validated['icon'] ?? '🍽️',
+            'name' => $validated['name'],
+            'color' => $validated['color'] ?? '#f59e0b',
+            'icon' => $validated['icon'] ?? '🍽️',
         ]);
 
         return back()->with('success', "Food category '{$validated['name']}' added!");
@@ -60,8 +63,11 @@ class CategoryController extends Controller
 
     public function destroyFood(Request $request, FoodCategory $category)
     {
-        if ($category->user_id !== $request->user()->id) abort(403);
+        if ($category->user_id !== $request->user()->id) {
+            abort(403);
+        }
         $category->delete();
+
         return back()->with('success', 'Food category deleted.');
     }
 
@@ -71,16 +77,16 @@ class CategoryController extends Controller
     public function storeActivity(Request $request)
     {
         $validated = $request->validate([
-            'name'  => 'required|string|max:80',
+            'name' => 'required|string|max:80',
             'color' => 'nullable|string|max:20',
-            'icon'  => 'nullable|string|max:20',
+            'icon' => 'nullable|string|max:20',
         ]);
 
         ActivityCategory::create([
             'user_id' => $request->user()->id,
-            'name'    => $validated['name'],
-            'color'   => $validated['color'] ?? '#8b5cf6',
-            'icon'    => $validated['icon'] ?? '🎯',
+            'name' => $validated['name'],
+            'color' => $validated['color'] ?? '#8b5cf6',
+            'icon' => $validated['icon'] ?? '🎯',
         ]);
 
         return back()->with('success', "Activity category '{$validated['name']}' added!");
@@ -88,8 +94,11 @@ class CategoryController extends Controller
 
     public function destroyActivity(Request $request, ActivityCategory $category)
     {
-        if ($category->user_id !== $request->user()->id) abort(403);
+        if ($category->user_id !== $request->user()->id) {
+            abort(403);
+        }
         $category->delete();
+
         return back()->with('success', 'Activity category deleted.');
     }
 }
