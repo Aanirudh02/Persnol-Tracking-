@@ -157,6 +157,73 @@
             </div>
         </div>
 
+        <!-- 2.7 WEEKLY & MONTHLY FINANCIAL OVERVIEW -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- Weekly Financial Overview -->
+            <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-sky-50 dark:bg-sky-950/60 border border-sky-200/60 dark:border-sky-800 flex items-center justify-center text-lg shrink-0">
+                        📊
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                            <span>Weekly Total</span>
+                            <span class="text-[10px] font-normal text-slate-400">({{ \Carbon\Carbon::parse($startOfWeek)->format('d M') }} – {{ \Carbon\Carbon::parse($endOfWeek)->format('d M') }})</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                            <span>Net:</span>
+                            <strong class="{{ ($weeklyIncomeTotal - $weeklyExpensesTotal) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                ₹{{ number_format($weeklyIncomeTotal - $weeklyExpensesTotal, 2) }}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 text-xs w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                    <div>
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Expenses</span>
+                        <span class="text-sm font-bold text-rose-600 dark:text-rose-400">₹{{ number_format($weeklyExpensesTotal, 2) }}</span>
+                    </div>
+                    <div class="w-px h-7 bg-slate-200 dark:bg-slate-800"></div>
+                    <div>
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Income</span>
+                        <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format($weeklyIncomeTotal, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Financial Overview -->
+            <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800 flex items-center justify-center text-lg shrink-0">
+                        🗓️
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                            <span>Monthly Total</span>
+                            <span class="text-[10px] font-normal text-slate-400">({{ \Carbon\Carbon::parse($startOfMonth)->format('F Y') }})</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                            <span>Net:</span>
+                            <strong class="{{ ($monthlyIncomeTotal - $monthlyExpensesTotal) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                ₹{{ number_format($monthlyIncomeTotal - $monthlyExpensesTotal, 2) }}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 text-xs w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                    <div>
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Expenses</span>
+                        <span class="text-sm font-bold text-rose-600 dark:text-rose-400">₹{{ number_format($monthlyExpensesTotal, 2) }}</span>
+                    </div>
+                    <div class="w-px h-7 bg-slate-200 dark:bg-slate-800"></div>
+                    <div>
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Income</span>
+                        <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format($monthlyIncomeTotal, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 3. PRIMARY METRIC CARDS -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             <!-- Wake Up -->
@@ -195,26 +262,50 @@
 
             <!-- Money Received -->
             <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                <div class="flex items-center justify-between text-emerald-500 mb-2">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Received</span>
-                    <span class="text-lg">💵</span>
+                <div>
+                    <div class="flex items-center justify-between text-emerald-500 mb-2">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Received</span>
+                        <span class="text-lg">💵</span>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                        ₹{{ number_format($moneyReceived, 0) }}
+                    </div>
+                    <span class="text-[11px] text-slate-500 mt-1 block">{{ ucfirst($period) }}'s Income</span>
                 </div>
-                <div class="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    ₹{{ number_format($moneyReceived, 0) }}
+                <div class="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] space-y-0.5 text-slate-500 dark:text-slate-400">
+                    <div class="flex items-center justify-between">
+                        <span>Wk:</span>
+                        <span class="font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format($weeklyIncomeTotal, 0) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Mo:</span>
+                        <span class="font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format($monthlyIncomeTotal, 0) }}</span>
+                    </div>
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">{{ ucfirst($period) }}'s Income</span>
             </div>
 
             <!-- Expenses -->
             <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
-                <div class="flex items-center justify-between text-rose-500 mb-2">
-                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Expenses</span>
-                    <span class="text-lg">💰</span>
+                <div>
+                    <div class="flex items-center justify-between text-rose-500 mb-2">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Expenses</span>
+                        <span class="text-lg">💰</span>
+                    </div>
+                    <div class="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">
+                        ₹{{ number_format($expensesTotal, 0) }}
+                    </div>
+                    <span class="text-[11px] text-slate-500 mt-1 block">Spent {{ $period === 'today' ? 'today' : ($period === 'week' ? 'this week' : 'this month') }}</span>
                 </div>
-                <div class="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">
-                    ₹{{ number_format($expensesTotal, 0) }}
+                <div class="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] space-y-0.5 text-slate-500 dark:text-slate-400">
+                    <div class="flex items-center justify-between">
+                        <span>Wk:</span>
+                        <span class="font-bold text-rose-600 dark:text-rose-400">₹{{ number_format($weeklyExpensesTotal, 0) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Mo:</span>
+                        <span class="font-bold text-rose-600 dark:text-rose-400">₹{{ number_format($monthlyExpensesTotal, 0) }}</span>
+                    </div>
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">Spent {{ $period === 'today' ? 'today' : ($period === 'week' ? 'this week' : 'this month') }}</span>
             </div>
 
             <!-- Snacks -->

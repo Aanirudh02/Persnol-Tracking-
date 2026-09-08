@@ -110,11 +110,45 @@ class DashboardController extends Controller
         $isToday = $date === $today;
         $todayRecord = $dayRecord;
 
+        // Weekly and Monthly Totals (always available on dashboard)
+        $startOfWeek = Carbon::parse($date)->startOfWeek()->toDateString();
+        $endOfWeek = Carbon::parse($date)->endOfWeek()->toDateString();
+        $startOfMonth = Carbon::parse($date)->startOfMonth()->toDateString();
+        $endOfMonth = Carbon::parse($date)->endOfMonth()->toDateString();
+
+        $weeklyExpensesTotal = (float) Expense::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('is_voluntary', false)
+            ->whereBetween('date', [$startOfWeek, $endOfWeek])
+            ->sum(DB::raw('amount + gst_amount'));
+
+        $monthlyExpensesTotal = (float) Expense::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('is_voluntary', false)
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum(DB::raw('amount + gst_amount'));
+
+        $weeklyIncomeTotal = (float) Income::where('user_id', $user->id)
+            ->whereBetween('date', [$startOfWeek, $endOfWeek])
+            ->sum('amount');
+
+        $monthlyIncomeTotal = (float) Income::where('user_id', $user->id)
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum('amount');
+
         return view('dashboard.index', compact(
             'todayRecord',
             'yesterdayRecord',
             'moneyReceived',
             'expensesTotal',
+            'weeklyExpensesTotal',
+            'monthlyExpensesTotal',
+            'weeklyIncomeTotal',
+            'monthlyIncomeTotal',
+            'startOfWeek',
+            'endOfWeek',
+            'startOfMonth',
+            'endOfMonth',
             'snacksCount',
             'activitiesCount',
             'scooterTripsCount',

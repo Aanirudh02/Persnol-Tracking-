@@ -76,12 +76,20 @@ class FinanceLinkService
             }
 
             $activeFriendIds[] = $friendId;
-            $friendShare = round((float) ($item['friend_share'] ?? 0), 2);
+            $hasExplicitShare = isset($item['friend_share']) && $item['friend_share'] !== null && (float) $item['friend_share'] > 0;
             $paidByFriend = round((float) ($item['paid_by_friend_amount'] ?? 0), 2);
+            $friendShare = $hasExplicitShare ? round((float) $item['friend_share'], 2) : 0.0;
 
-            $diff = round($friendShare - $paidByFriend, 2);
-            $paidByMeForFriend = $diff > 0 ? $diff : 0.0;
-            $myShareForFriend = $diff < 0 ? abs($diff) : 0.0;
+            if (! $hasExplicitShare) {
+                // When friend paid and no share is specified (who paid alone), neither party owes anything
+                $diff = 0.0;
+                $paidByMeForFriend = 0.0;
+                $myShareForFriend = 0.0;
+            } else {
+                $diff = round($friendShare - $paidByFriend, 2);
+                $paidByMeForFriend = $diff > 0 ? $diff : 0.0;
+                $myShareForFriend = $diff < 0 ? abs($diff) : 0.0;
+            }
 
             $payload = [
                 'user_id' => $expense->user_id,
@@ -172,13 +180,23 @@ class FinanceLinkService
             return null;
         }
 
-        $total = round((float) $expense->totalAmount(), 2);
-        $myShare = round((float) ($splitData['my_share'] ?? $expense->split_my_share ?? $total), 2);
-        $friendShare = round((float) ($splitData['friend_share'] ?? $expense->split_friend_share ?? max(0, $total - $myShare)), 2);
-        $paidByMode = (string) ($splitData['paid_by_mode'] ?? $this->legacyPaidByMode($expense));
+        $hasShares = ($splitData && ($splitData['my_share'] !== null || $splitData['friend_share'] !== null))
+            || ($expense->split_my_share !== null || $expense->split_friend_share !== null);
 
+        $total = round((float) $expense->totalAmount(), 2);
+        $paidByMode = (string) ($splitData['paid_by_mode'] ?? $this->legacyPaidByMode($expense));
         $paidByMe = round((float) ($splitData['paid_by_me_amount'] ?? $this->defaultPaidByMeAmount($paidByMode, $total)), 2);
         $paidByFriend = round((float) ($splitData['paid_by_friend_amount'] ?? $this->defaultPaidByFriendAmount($paidByMode, $total)), 2);
+
+        if (! $hasShares) {
+            $myShare = 0.0;
+            $friendShare = 0.0;
+            $paidByMeForSplit = 0.0;
+        } else {
+            $myShare = round((float) ($splitData['my_share'] ?? $expense->split_my_share ?? $total), 2);
+            $friendShare = round((float) ($splitData['friend_share'] ?? $expense->split_friend_share ?? max(0, $total - $myShare)), 2);
+            $paidByMeForSplit = $paidByMe;
+        }
 
         return [
             'user_id' => $expense->user_id,
@@ -189,7 +207,7 @@ class FinanceLinkService
             'total_amount' => $total,
             'my_share' => $myShare,
             'friend_share' => $friendShare,
-            'paid_by_me_amount' => $paidByMe,
+            'paid_by_me_amount' => $paidByMeForSplit,
             'paid_by_friend_amount' => $paidByFriend,
             'notes' => Arr::get($splitData, 'notes', $expense->notes),
         ];

@@ -16,24 +16,65 @@
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Month Income</span>
-                <div class="mt-2 text-2xl font-bold text-emerald-600">₹{{ number_format($stats['total_income'], 2) }}</div>
+            <div class="rounded-3xl border border-sky-100 bg-white p-5 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Week</span>
+                    <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">7 Days</span>
+                </div>
+                <div class="mt-2 flex items-baseline justify-between">
+                    <div>
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Expense</span>
+                        <div class="text-xl font-bold text-rose-600">₹{{ number_format($weeklyStats['total_expenses'] ?? 0, 2) }}</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Income</span>
+                        <div class="text-base font-bold text-emerald-600">₹{{ number_format($weeklyStats['total_income'] ?? 0, 2) }}</div>
+                    </div>
+                </div>
+                <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
+                    <span>Week Net:</span>
+                    <span class="font-semibold {{ (($weeklyStats['net_savings'] ?? 0) >= 0) ? 'text-emerald-600' : 'text-rose-600' }}">
+                        ₹{{ number_format($weeklyStats['net_savings'] ?? 0, 2) }}
+                    </span>
+                </div>
             </div>
+
             @if($sections['show_total_expense'])
                 <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Month Expense</span>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Month Expense</span>
+                        <span class="text-lg">💰</span>
+                    </div>
                     <div class="mt-2 text-2xl font-bold text-rose-600">₹{{ number_format($stats['total_expenses'], 2) }}</div>
+                    <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                        Voluntary: ₹{{ number_format($stats['voluntary_spend'] ?? 0, 2) }}
+                    </div>
                 </div>
             @endif
+
             <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Net Savings</span>
-                <div class="mt-2 text-2xl font-bold {{ $stats['net_savings'] >= 0 ? 'text-slate-900' : 'text-amber-600' }}">₹{{ number_format($stats['net_savings'], 2) }}</div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">This Month Income</span>
+                    <span class="text-lg">💵</span>
+                </div>
+                <div class="mt-2 text-2xl font-bold text-emerald-600">₹{{ number_format($stats['total_income'], 2) }}</div>
+                <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
+                    <span>Net Savings:</span>
+                    <span class="font-semibold {{ $stats['net_savings'] >= 0 ? 'text-slate-900' : 'text-amber-600' }}">₹{{ number_format($stats['net_savings'], 2) }}</span>
+                </div>
             </div>
+
             @if($sections['show_current_balance'])
                 <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Balance</span>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Balance</span>
+                        <span class="text-lg">🏦</span>
+                    </div>
                     <div class="mt-2 text-2xl font-bold {{ $currentBalance >= 0 ? 'text-slate-900' : 'text-rose-600' }}">₹{{ number_format($currentBalance, 2) }}</div>
+                    <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
+                        <span>Pending to Pay:</span>
+                        <span class="font-semibold text-amber-600">₹{{ number_format($stats['pending_payments'] ?? 0, 2) }}</span>
+                    </div>
                 </div>
             @endif
         </div>

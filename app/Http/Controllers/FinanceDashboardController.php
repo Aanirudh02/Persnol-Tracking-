@@ -24,6 +24,7 @@ class FinanceDashboardController extends Controller
     ): View {
         $user = $request->user();
         $stats = $financeService->getMonthlyStats($user->id);
+        $weeklyStats = $financeService->getWeeklyStats($user->id);
 
         $recentExpenses = Expense::query()
             ->where('user_id', $user->id)
@@ -90,6 +91,7 @@ class FinanceDashboardController extends Controller
 
         return view('finance.index', compact(
             'stats',
+            'weeklyStats',
             'recentExpenses',
             'recentIncomes',
             'pendingPayments',

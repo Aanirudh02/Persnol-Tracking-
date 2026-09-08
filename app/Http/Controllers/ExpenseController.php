@@ -17,7 +17,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ExpenseController extends Controller
@@ -60,9 +59,32 @@ class ExpenseController extends Controller
 
     public function create(OptionsService $options): View
     {
-        $categories = ExpenseCategory::query()->orderBy('name')->get();
+        $categories = ExpenseCategory::query()
+            ->where(function ($q) {
+                $q->whereNull('is_archived')->orWhere('is_archived', false);
+            })
+            ->orderBy('name')
+            ->get();
+
+        $hasSnacks = $categories->contains(fn ($c) => strcasecmp($c->name, 'Snacks') === 0);
+        if (! $hasSnacks) {
+            ExpenseCategory::firstOrCreate(
+                ['name' => 'Snacks', 'user_id' => null],
+                ['icon' => 'cookie', 'color' => '#eab308', 'is_archived' => false, 'is_voluntary' => false]
+            );
+            $categories = ExpenseCategory::query()
+                ->where(function ($q) {
+                    $q->whereNull('is_archived')->orWhere('is_archived', false);
+                })
+                ->orderBy('name')
+                ->get();
+        }
+
         $friends = Friend::query()->where('user_id', auth()->id())->orderBy('name')->get();
         $paymentMethods = $options->names('payment_method');
+        if (! in_array('Split', $paymentMethods, true)) {
+            $paymentMethods[] = 'Split';
+        }
         $parents = Expense::query()->where('user_id', auth()->id())->whereNull('parent_id')->latest()->take(30)->get();
 
         return view('finance.expenses.create', compact('categories', 'friends', 'paymentMethods', 'parents'));
@@ -77,7 +99,29 @@ class ExpenseController extends Controller
             ->filter(fn (array $line): bool => filled($line['amount'] ?? null) && filled($line['payment_method'] ?? null))
             ->values();
 
-        $splitData = $this->buildSplitData($validated, (float) $validated['amount'] + $gstAmount);
+        $totalBill = (float) $validated['amount'] + $gstAmount;
+        $splitData = $this->buildSplitData($validated, $totalBill);
+
+        // If friend paid a portion, register user's paid amount alone in their expenses
+        $paidByMe = $splitData ? (float) ($splitData['paid_by_me_amount'] ?? 0) : null;
+        $paidByFriends = $splitData ? (float) ($splitData['paid_by_friend_amount'] ?? 0) : 0;
+        $hasExplicitShare = $splitData && (($splitData['my_share'] !== null && (float) $splitData['my_share'] > 0) || ($splitData['friend_share'] !== null && (float) $splitData['friend_share'] > 0));
+
+        $registeredAmount = (float) $validated['amount'];
+        $registeredGst = $gstAmount;
+
+        if ($splitData !== null && $paidByFriends > 0) {
+            $targetUserSpend = $hasExplicitShare && (float) ($splitData['my_share'] ?? 0) > 0
+                ? (float) $splitData['my_share']
+                : ($paidByMe !== null ? $paidByMe : (float) $validated['amount']);
+
+            if ($targetUserSpend < $totalBill) {
+                $registeredAmount = round($targetUserSpend, 2);
+                $registeredGst = 0.0;
+                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', Friend(s) paid: ₹'.number_format($paidByFriends, 2).')';
+                $validated['notes'] = trim(($validated['notes'] ?? '')."\n".$payerNote);
+            }
+        }
 
         if ($isGrouped) {
             if ($groupLines->count() < 2) {
@@ -119,7 +163,7 @@ class ExpenseController extends Controller
         $isVoluntary = $request->boolean('is_voluntary') || ($category?->is_voluntary ?? false);
         [$paidByLabel, $paidByType, $paidByFriendId] = $this->displayPayerFields($splitData);
 
-        $expenses = DB::transaction(function () use ($request, $validated, $imagePath, $paidByLabel, $paidByType, $paidByFriendId, $parentId, $categoryId, $isVoluntary, $groupLines, $gstAmount, $isGrouped, $splitData) {
+        $expenses = DB::transaction(function () use ($request, $validated, $imagePath, $paidByLabel, $paidByType, $paidByFriendId, $parentId, $categoryId, $isVoluntary, $groupLines, $registeredGst, $isGrouped, $splitData, $registeredAmount) {
             $dailyRecord = DailyRecord::query()
                 ->where('user_id', $request->user()->id)
                 ->whereDate('record_date', $validated['date'])
@@ -144,8 +188,8 @@ class ExpenseController extends Controller
                     'category_id' => $categoryId,
                     'parent_id' => $parentId,
                     'expense_group_id' => null,
-                    'amount' => $validated['amount'],
-                    'gst_amount' => $gstAmount,
+                    'amount' => $registeredAmount,
+                    'gst_amount' => $registeredGst,
                     'date' => $validated['date'],
                     'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
                     'description' => $validated['description'],
@@ -176,15 +220,15 @@ class ExpenseController extends Controller
             $lines = ($isGrouped && $splitData === null)
                 ? $groupLines
                 : collect([[
-                    'amount' => $validated['amount'],
+                    'amount' => $registeredAmount,
                     'payment_method' => $validated['payment_method'],
                 ]]);
 
             $baseTotal = (float) $lines->sum(fn (array $line): float => (float) $line['amount']);
-            $allocatedGst = $lines->values()->map(function (array $line, int $index) use ($gstAmount, $baseTotal, $lines): array {
+            $allocatedGst = $lines->values()->map(function (array $line, int $index) use ($registeredGst, $baseTotal, $lines): array {
                 $gst = $index === $lines->count() - 1
-                    ? $gstAmount - (float) $lines->slice(0, $index)->sum('gst_amount')
-                    : ($baseTotal > 0 ? round($gstAmount * ((float) $line['amount'] / $baseTotal), 2) : 0);
+                    ? $registeredGst - (float) $lines->slice(0, $index)->sum('gst_amount')
+                    : ($baseTotal > 0 ? round($registeredGst * ((float) $line['amount'] / $baseTotal), 2) : 0);
 
                 $line['gst_amount'] = round($gst, 2);
 
@@ -381,9 +425,17 @@ class ExpenseController extends Controller
         }
 
         $expense->load(['friendSplits.friend', 'friendSplit.friend']);
-        $categories = ExpenseCategory::query()->orderBy('name')->get();
+        $categories = ExpenseCategory::query()
+            ->where(function ($q) {
+                $q->whereNull('is_archived')->orWhere('is_archived', false);
+            })
+            ->orderBy('name')
+            ->get();
         $friends = Friend::query()->where('user_id', auth()->id())->orderBy('name')->get();
         $paymentMethods = $options->names('payment_method');
+        if (! in_array('Split', $paymentMethods, true)) {
+            $paymentMethods[] = 'Split';
+        }
 
         return view('finance.expenses.edit', compact('expense', 'categories', 'friends', 'paymentMethods'));
     }
@@ -406,8 +458,33 @@ class ExpenseController extends Controller
         }
 
         $category = ! empty($validated['category_id']) ? ExpenseCategory::query()->find($validated['category_id']) : null;
-        $splitData = $this->buildSplitData($validated, round((float) $validated['amount'] + (float) ($validated['gst_amount'] ?? 0), 2));
+        $totalBill = round((float) $validated['amount'] + (float) ($validated['gst_amount'] ?? 0), 2);
+        $splitData = $this->buildSplitData($validated, $totalBill);
         [$paidByLabel, $paidByType, $paidByFriendId] = $this->displayPayerFields($splitData);
+
+        $paidByMe = $splitData ? (float) ($splitData['paid_by_me_amount'] ?? 0) : null;
+        $paidByFriends = $splitData ? (float) ($splitData['paid_by_friend_amount'] ?? 0) : 0;
+        $hasExplicitShare = $splitData && (($splitData['my_share'] !== null && (float) $splitData['my_share'] > 0) || ($splitData['friend_share'] !== null && (float) $splitData['friend_share'] > 0));
+
+        $registeredAmount = (float) $validated['amount'];
+        $registeredGst = (float) ($validated['gst_amount'] ?? 0);
+
+        if ($splitData !== null && $paidByFriends > 0) {
+            $targetUserSpend = $hasExplicitShare && (float) ($splitData['my_share'] ?? 0) > 0
+                ? (float) $splitData['my_share']
+                : ($paidByMe !== null ? $paidByMe : (float) $validated['amount']);
+
+            if ($targetUserSpend < $totalBill) {
+                $registeredAmount = round($targetUserSpend, 2);
+                $registeredGst = 0.0;
+                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', Friend(s) paid: ₹'.number_format($paidByFriends, 2).')';
+                if (! str_contains($validated['notes'] ?? '', 'Total bill:')) {
+                    $validated['notes'] = trim(($validated['notes'] ?? '')."\n".$payerNote);
+                }
+            }
+        }
+        $validated['amount'] = $registeredAmount;
+        $validated['gst_amount'] = $registeredGst;
 
         $expense->update([
             ...collect($validated)->except([
@@ -451,52 +528,56 @@ class ExpenseController extends Controller
             abort(403);
         }
 
+        if ($expense->subItems()->exists() || $expense->foodEntries()->exists()) {
+            return back()->with('error', 'Cannot delete expense with linked sub-items or food entries.');
+        }
+
+        $linkService->removeExpenseFriendLink($expense);
+
         AuditService::log(
             module: 'expense',
             recordId: $expense->id,
             action: 'deleted',
             oldValues: $expense->toArray(),
-            reason: $request->input('reason', 'Deleted by user')
+            reason: 'Deleted by user'
         );
 
-        $linkService->removeExpenseFriendLink($expense);
         $expense->delete();
 
-        return redirect()->route('expenses.index')->with('success', 'Expense moved to trash.');
+        return redirect()->route('expenses.index')->with('success', 'Expense deleted successfully!');
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function validateExpense(Request $request, bool $includeGrouping = true): array
+    private function validateExpense(Request $request, bool $isCreate = true): array
     {
         $rules = [
             'amount' => ['required', 'numeric', 'min:0.01'],
             'gst_amount' => ['nullable', 'numeric', 'min:0'],
-            'category_id' => ['nullable', 'exists:expense_categories,id'],
-            'parent_id' => ['nullable', 'exists:expenses,id'],
+            'category_id' => ['nullable', 'integer', 'exists:expense_categories,id'],
             'date' => ['required', 'date'],
-            'time' => ['nullable'],
+            'time' => ['nullable', 'date_format:H:i'],
             'description' => ['required', 'string', 'max:255'],
             'payment_method' => ['required', 'string', 'max:50'],
-            'split_with_friend_id' => ['nullable', 'exists:friends,id'],
+            'receipt_image' => ['nullable', 'image', 'max:5120'],
+            'notes' => ['nullable', 'string'],
+            'is_voluntary' => ['nullable', 'boolean'],
+            'record_as_combination' => ['nullable', 'boolean'],
+            'split_with_friend_id' => ['nullable', 'integer'],
             'split_my_share' => ['nullable', 'numeric', 'min:0'],
             'split_friend_share' => ['nullable', 'numeric', 'min:0'],
-            'split_paid_by_type' => ['nullable', Rule::in(['me', 'friend', 'split'])],
+            'split_paid_by_type' => ['nullable', 'in:me,friend,split'],
             'split_paid_by_me_amount' => ['nullable', 'numeric', 'min:0'],
             'split_paid_by_friend_amount' => ['nullable', 'numeric', 'min:0'],
             'splits' => ['nullable', 'array'],
-            'splits.*.friend_id' => ['nullable', 'exists:friends,id'],
+            'splits.*.friend_id' => ['nullable', 'integer'],
             'splits.*.friend_share' => ['nullable', 'numeric', 'min:0'],
             'splits.*.paid_by_friend_amount' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string'],
-            'receipt_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
-            'is_voluntary' => ['nullable', 'boolean'],
-            'reason' => ['nullable', 'string', 'max:255'],
-            'record_as_combination' => ['nullable', 'boolean'],
         ];
 
-        if ($includeGrouping) {
+        if ($isCreate) {
+            $rules['parent_id'] = ['nullable', 'integer', 'exists:expenses,id'];
             $rules['add_group_expense'] = ['nullable', 'boolean'];
             $rules['group_expenses'] = ['nullable', 'array', 'min:2'];
             $rules['group_expenses.*.amount'] = ['required_with:add_group_expense', 'numeric', 'min:0.01'];
@@ -540,8 +621,9 @@ class ExpenseController extends Controller
                 $paidByMe = round((float) $request->input('split_paid_by_me_amount', 0), 2);
 
                 $paidMatchesTotal = abs(($paidByMe + $friendsPaidTotal) - $total) <= 0.05;
+                $hasExplicitShares = ($myShare > 0 || $friendsSharesTotal > 0);
                 $isCombinationMode = $request->boolean('record_as_combination')
-                    || ($paidMatchesTotal && ($myShare + $friendsSharesTotal <= 0.05));
+                    || ($paidMatchesTotal && ! $hasExplicitShares);
 
                 if (! $isCombinationMode && abs(($myShare + $friendsSharesTotal) - $total) > 0.05) {
                     $validator->errors()->add('split_my_share', 'Total shares (your share ₹'.number_format($myShare, 2).' + friends ₹'.number_format($friendsSharesTotal, 2).') must equal total expense ₹'.number_format($total, 2).'.');
@@ -566,11 +648,11 @@ class ExpenseController extends Controller
                 $friendShare = round((float) $request->input('split_friend_share', 0), 2);
 
                 $mode = $request->input('split_paid_by_type', 'me');
-                $paidByMe = $mode === 'friend'
-                    ? 0.0
-                    : ($mode === 'split'
-                        ? round((float) $request->input('split_paid_by_me_amount', 0), 2)
-                        : $total);
+                $paidByMe = match ($mode) {
+                    'friend' => 0.0,
+                    'split' => round((float) $request->input('split_paid_by_me_amount', 0), 2),
+                    default => $total,
+                };
                 $paidByFriend = $mode === 'me'
                     ? 0.0
                     : ($mode === 'split'
@@ -578,8 +660,9 @@ class ExpenseController extends Controller
                         : $total);
 
                 $paidMatchesTotal = abs(($paidByMe + $paidByFriend) - $total) <= 0.05;
+                $hasExplicitShares = ($myShare > 0 || $friendShare > 0);
                 $isCombinationMode = $request->boolean('record_as_combination')
-                    || ($paidMatchesTotal && ($myShare + $friendShare <= 0.05));
+                    || ($paidMatchesTotal && ! $hasExplicitShares);
 
                 if (! $isCombinationMode) {
                     if ($myShare <= 0 && $friendShare <= 0) {
@@ -617,14 +700,15 @@ class ExpenseController extends Controller
             $paidByMe = round((float) ($validated['split_paid_by_me_amount'] ?? 0), 2);
 
             $paidMatchesTotal = abs(($paidByMe + $friendsPaidTotal) - $total) <= 0.05;
-            $isCombination = ! empty($validated['record_as_combination']) || ($paidMatchesTotal && ($myShare + $friendSharesTotal <= 0.05));
+            $hasExplicitShares = ($myShare > 0 || $friendSharesTotal > 0);
+            $isCombination = ! empty($validated['record_as_combination']) || ($paidMatchesTotal && ! $hasExplicitShares);
 
-            if ($isCombination) {
-                $myShare = $paidByMe;
-                $friendSharesTotal = $friendsPaidTotal;
+            if ($isCombination && ! $hasExplicitShares) {
+                $myShare = null;
+                $friendSharesTotal = null;
                 $multiSplits = $multiSplits->map(function ($s) {
                     $paid = round((float) ($s['paid_by_friend_amount'] ?? 0), 2);
-                    $s['friend_share'] = $paid;
+                    $s['friend_share'] = null;
                     $s['paid_by_friend_amount'] = $paid;
 
                     return $s;
@@ -643,7 +727,7 @@ class ExpenseController extends Controller
                 'paid_by_friend_amount' => $friendsPaidTotal,
                 'multi_splits' => $multiSplits->map(fn ($s) => [
                     'friend_id' => (int) $s['friend_id'],
-                    'friend_share' => round((float) ($s['friend_share'] ?? 0), 2),
+                    'friend_share' => $s['friend_share'] !== null ? round((float) $s['friend_share'], 2) : null,
                     'paid_by_friend_amount' => round((float) ($s['paid_by_friend_amount'] ?? 0), 2),
                 ])->all(),
                 'notes' => $validated['notes'] ?? null,
@@ -663,14 +747,16 @@ class ExpenseController extends Controller
         };
         $paidByFriend = round($total - $paidByMe, 2);
         $myShare = round((float) ($validated['split_my_share'] ?? 0), 2);
-        $friendShare = round((float) ($validated['split_friend_share'] ?? ($total - $myShare)), 2);
 
+        $hasExplicitShares = ($myShare > 0 || (isset($validated['split_friend_share']) && (float) $validated['split_friend_share'] > 0));
         $paidMatchesTotal = abs(($paidByMe + $paidByFriend) - $total) <= 0.05;
-        $isCombination = ! empty($validated['record_as_combination']) || ($paidMatchesTotal && ($myShare + $friendShare <= 0.05));
+        $isCombination = ! empty($validated['record_as_combination']) || ($paidMatchesTotal && ! $hasExplicitShares);
 
-        if ($isCombination) {
-            $myShare = $paidByMe;
-            $friendShare = $paidByFriend;
+        if ($isCombination && ! $hasExplicitShares) {
+            $myShare = null;
+            $friendShare = null;
+        } else {
+            $friendShare = round((float) ($validated['split_friend_share'] ?? ($total - $myShare)), 2);
         }
 
         return [

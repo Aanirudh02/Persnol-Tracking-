@@ -109,6 +109,50 @@ class FinanceService
     }
 
     /**
+     * @return array{total_income: float, total_expenses: float, voluntary_spend: float, net_savings: float, pending_payments: float, start: string, end: string}
+     */
+    public function getWeeklyStats(int $userId, ?string $date = null): array
+    {
+        $targetDate = $date ? Carbon::parse($date) : Carbon::today();
+        $start = $targetDate->copy()->startOfWeek();
+        $end = $targetDate->copy()->endOfWeek();
+
+        $totalExpenses = (float) $this->expenseBaseQuery($userId, $start->toDateString(), $end->toDateString())
+            ->sum(DB::raw('expenses.amount + expenses.gst_amount'));
+
+        $totalIncome = (float) Income::query()
+            ->where('incomes.user_id', $userId)
+            ->whereBetween('incomes.date', [$start->toDateString(), $end->toDateString()])
+            ->leftJoin('income_categories', 'incomes.category_id', '=', 'income_categories.id')
+            ->where(function ($query) {
+                $query->whereNull('income_categories.is_archived')
+                    ->orWhere('income_categories.is_archived', false);
+            })
+            ->sum('incomes.amount');
+
+        $voluntarySpend = (float) Expense::query()
+            ->where('user_id', $userId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->where('is_voluntary', true)
+            ->sum(DB::raw('amount + gst_amount'));
+
+        $pendingPayments = (float) Payment::query()
+            ->where('user_id', $userId)
+            ->where('status', 'Pending')
+            ->sum('amount');
+
+        return [
+            'total_income' => $totalIncome,
+            'total_expenses' => $totalExpenses,
+            'voluntary_spend' => $voluntarySpend,
+            'net_savings' => $totalIncome - $totalExpenses,
+            'pending_payments' => $pendingPayments,
+            'start' => $start->toDateString(),
+            'end' => $end->toDateString(),
+        ];
+    }
+
+    /**
      * @return array{total_income: float, total_expenses: float, voluntary_spend: float, net_savings: float, pending_payments: float}
      */
     public function getMonthlyStats(int $userId, ?int $year = null, ?int $month = null): array

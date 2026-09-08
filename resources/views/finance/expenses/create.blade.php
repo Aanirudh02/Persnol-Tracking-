@@ -42,18 +42,31 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block font-semibold text-slate-700">Category</label>
+                        @php
+                            $defaultCatId = old('category_id');
+                            if (! $defaultCatId) {
+                                $snacksCat = $categories->first(fn($c) => strcasecmp($c->name, 'Snacks') === 0);
+                                $defaultCatId = $snacksCat?->id ?? $categories->first()?->id;
+                            }
+                        @endphp
                         <select name="category_id" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
                             @foreach($categories as $category)
-                                <option value="{{ $category->id }}" @selected(old('category_id') == $category->id)>{{ $category->name }}{{ $category->is_voluntary ? ' (Voluntary)' : '' }}</option>
+                                <option value="{{ $category->id }}" @selected($defaultCatId == $category->id)>{{ $category->name }}{{ $category->is_voluntary ? ' (Voluntary)' : '' }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div>
                         <label class="mb-1 block font-semibold text-slate-700">Payment Method</label>
                         <select name="payment_method" id="main-payment-method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                            @php
+                                $hasSplitOption = in_array('Split', (array) $paymentMethods);
+                            @endphp
                             @foreach($paymentMethods as $method)
                                 <option value="{{ $method }}" @selected(old('payment_method') === $method)>{{ $method }}</option>
                             @endforeach
+                            @if(! $hasSplitOption)
+                                <option value="Split" @selected(old('payment_method') === 'Split')>Split</option>
+                            @endif
                         </select>
                     </div>
                 </div>
@@ -148,6 +161,10 @@
                             <div>Shares total: <span id="sum-shares" class="font-bold text-slate-900">₹0.00</span></div>
                             <div>Paid total: <span id="sum-paid" class="font-bold text-slate-900">₹0.00</span></div>
                         </div>
+                        <div class="pt-1 border-t border-slate-100 flex items-center justify-between font-semibold text-slate-700">
+                            <span>Your registered expense:</span>
+                            <span id="sum-my-registered" class="font-bold text-emerald-600">₹0.00</span>
+                        </div>
                         <div id="split-payer-hint" class="text-[11px] text-indigo-700 pt-1"></div>
                     </div>
                 </div>
@@ -212,11 +229,20 @@
         const sumTotalBill = document.getElementById('sum-total-bill');
         const sumShares = document.getElementById('sum-shares');
         const sumPaid = document.getElementById('sum-paid');
+        const sumMyRegistered = document.getElementById('sum-my-registered');
         const splitStatusBadge = document.getElementById('split-status-badge');
         const splitPayerHint = document.getElementById('split-payer-hint');
         const recordAsComboInput = document.getElementById('record-as-combination');
         const jumpToSplitsBtn = document.getElementById('jump-to-splits-btn');
         const friendSplitSection = document.getElementById('friend-split-section');
+        const mainMethodSelect = document.getElementById('main-payment-method');
+
+        let userManuallyChangedPaymentMethod = false;
+        if (mainMethodSelect) {
+            mainMethodSelect.addEventListener('change', () => {
+                userManuallyChangedPaymentMethod = true;
+            });
+        }
 
         let friendRowCount = 0;
 
@@ -228,6 +254,25 @@
             return Boolean(recordAsComboInput && recordAsComboInput.checked);
         }
 
+        function ensureSplitPaymentMethodOption() {
+            if (!mainMethodSelect) return;
+            let splitOpt = Array.from(mainMethodSelect.options).find(o => o.value.toLowerCase() === 'split');
+            if (!splitOpt) {
+                splitOpt = document.createElement('option');
+                splitOpt.value = 'Split';
+                splitOpt.textContent = 'Split';
+                mainMethodSelect.appendChild(splitOpt);
+            }
+            const activeFriends = getActiveFriendRows();
+            const myPaid = Number(myPaidInput.value) || 0;
+            const hasFriendPay = activeFriends.some(r => Number(r.querySelector('.friend-paid-input')?.value || 0) > 0);
+            if ((activeFriends.length > 0 && (hasFriendPay || activeFriends.length > 1)) || isCombinationMode()) {
+                if (!userManuallyChangedPaymentMethod) {
+                    mainMethodSelect.value = 'Split';
+                }
+            }
+        }
+
         function onCombinationToggle() {
             const active = isCombinationMode();
             document.querySelectorAll('.share-opt-badge').forEach(el => {
@@ -237,24 +282,9 @@
                 if (getActiveFriendRows().length === 0) {
                     addFriendRow();
                 }
-                syncPaidToSharesIfCombo();
             }
+            ensureSplitPaymentMethodOption();
             recalculateSplits();
-        }
-
-        function syncPaidToSharesIfCombo() {
-            if (!isCombinationMode()) return;
-            const rows = getActiveFriendRows();
-            rows.forEach(r => {
-                const paidVal = r.querySelector('.friend-paid-input').value;
-                const shareInp = r.querySelector('.friend-share-input');
-                if (paidVal && (!shareInp.value || Number(shareInp.value) === 0)) {
-                    shareInp.value = paidVal;
-                }
-            });
-            if (myPaidInput.value && (!myShareInput.value || Number(myShareInput.value) === 0)) {
-                myShareInput.value = myPaidInput.value;
-            }
         }
 
         if (recordAsComboInput) {
@@ -316,24 +346,22 @@
 
             card.querySelector('.remove-friend-btn').addEventListener('click', () => {
                 card.remove();
+                ensureSplitPaymentMethodOption();
                 recalculateSplits();
                 updateGroupHint();
             });
 
             card.querySelectorAll('input, select').forEach(el => {
                 el.addEventListener('input', () => {
-                    if (isCombinationMode() && el.classList.contains('friend-paid-input')) {
-                        const shareInput = card.querySelector('.friend-share-input');
-                        if (!shareInput.value || Number(shareInput.value) === 0) {
-                            shareInput.value = el.value;
-                        }
-                    }
+                    // Do NOT auto-prefill friend share when friend paid is entered (Error 1 & Error 4)
+                    ensureSplitPaymentMethodOption();
                     recalculateSplits();
                     updateGroupHint();
                 });
             });
 
             friendsContainer.appendChild(card);
+            ensureSplitPaymentMethodOption();
             recalculateSplits();
             updateGroupHint();
         }
@@ -359,6 +387,9 @@
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-slate-100 text-slate-600';
                 sumShares.textContent = `₹${(Number(myShareInput.value) || 0).toFixed(2)}`;
                 sumPaid.textContent = `₹${(Number(myPaidInput.value) || 0).toFixed(2)}`;
+                if (sumMyRegistered) {
+                    sumMyRegistered.textContent = `₹${bill.toFixed(2)}`;
+                }
                 splitPayerHint.textContent = '';
                 return;
             }
@@ -382,6 +413,18 @@
             const totalShares = myShare + friendsShareSum;
             const totalPaid = myPaid + friendsPaidSum;
 
+            // Registered expense for user alone
+            const hasExplicitShares = (myShare > 0 || friendsShareSum > 0);
+            let myRegistered = bill;
+            if (rows.length > 0 && friendsPaidSum > 0) {
+                myRegistered = (hasExplicitShares && myShare > 0) ? myShare : myPaid;
+            } else if (rows.length > 0 && myPaid > 0) {
+                myRegistered = myPaid;
+            }
+            if (sumMyRegistered) {
+                sumMyRegistered.textContent = `₹${myRegistered.toFixed(2)}`;
+            }
+
             sumShares.textContent = `₹${totalShares.toFixed(2)} of ₹${bill.toFixed(2)}`;
             sumPaid.textContent = `₹${totalPaid.toFixed(2)} of ₹${bill.toFixed(2)}`;
 
@@ -402,7 +445,7 @@
             }
 
             if (paidOk && (sharesLeftZero || comboMode)) {
-                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Recorded who paid alone (no debt created).`;
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Registered as ₹${myRegistered.toFixed(2)} in your expenses (no debt created).`;
             } else {
                 const hints = [];
                 hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
@@ -519,9 +562,7 @@
             updateGroupHint();
         });
         myPaidInput.addEventListener('input', () => {
-            if (isCombinationMode() && (!myShareInput.value || Number(myShareInput.value) === 0)) {
-                myShareInput.value = myPaidInput.value;
-            }
+            ensureSplitPaymentMethodOption();
             recalculateSplits();
             updateGroupHint();
         });
