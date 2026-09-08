@@ -58,6 +58,27 @@
                     </div>
                 </div>
 
+                <!-- OPTION AT TOP: Record as Combination Payment -->
+                <div class="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-white p-3.5 sm:p-4 transition shadow-xs">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <label class="flex items-start gap-3 cursor-pointer select-none">
+                            <input type="checkbox" id="record-as-combination" name="record_as_combination" value="1" @checked(old('record_as_combination')) class="mt-0.5 h-4.5 w-4.5 rounded border-purple-300 text-purple-600 focus:ring-purple-500">
+                            <div>
+                                <span class="text-sm font-bold text-purple-950 flex items-center gap-1.5">
+                                    <span>🤝</span> Record as Combination Payment
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-800">Who Paid Alone</span>
+                                </span>
+                                <p class="text-xs text-purple-700 mt-0.5 leading-relaxed">
+                                    Paid together with friend(s)? Just enter what you paid and what friend paid (e.g. You ₹20 + Sandeep ₹70 = ₹90). No share calculations needed — recording who paid alone is enough!
+                                </p>
+                            </div>
+                        </label>
+                        <button type="button" id="jump-to-splits-btn" class="self-start sm:self-auto inline-flex items-center gap-1 text-xs font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-100/60 border border-purple-200 px-3 py-1.5 rounded-xl shadow-2xs transition">
+                            <span>Set Payers</span> &darr;
+                        </button>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block font-semibold text-slate-700">Date</label>
@@ -70,13 +91,13 @@
                 </div>
 
                 <!-- FRIEND SPLIT SECTION -->
-                <div class="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 sm:p-5 space-y-4 shadow-sm">
+                <div id="friend-split-section" class="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 sm:p-5 space-y-4 shadow-sm">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
                             <h2 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                                <span class="text-base">👥</span> Friend Split (Single or Multiple Friends)
+                                <span class="text-base">👥</span> Friend Split / Payers (Single or Multiple Friends)
                             </h2>
-                            <p class="text-xs text-slate-500">Track each friend's share and who paid, counted only once in expenses.</p>
+                            <p class="text-xs text-slate-500">Track each friend's share and who paid, or record combination payments where paid alone is enough.</p>
                         </div>
                         <button type="button" id="add-friend-btn" class="self-start sm:self-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition active:scale-95">
                             <span>+</span> Add Friend
@@ -93,7 +114,10 @@
                         <div class="text-xs font-bold uppercase tracking-wider text-indigo-900">Your Share & Payment (Me)</div>
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label class="mb-1 block text-xs font-semibold text-slate-700">Your share (What you should pay)</label>
+                                <label class="mb-1 block text-xs font-semibold text-slate-700">
+                                    Your share (What you should pay)
+                                    <span class="share-opt-badge text-[10px] text-purple-600 font-normal hidden">(Optional in Combination)</span>
+                                </label>
                                 <input type="number" step="0.01" min="0" name="split_my_share" id="split_my_share" value="{{ old('split_my_share') }}" placeholder="0.00" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
                             </div>
                             <div>
@@ -111,6 +135,7 @@
                         <button type="button" onclick="window.quickPaidIPaidAll()" class="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 font-semibold text-indigo-800 hover:bg-indigo-100 shadow-xs">I paid all</button>
                         <button type="button" onclick="window.quickPaidFriendsPaidAll()" class="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 font-semibold text-indigo-800 hover:bg-indigo-100 shadow-xs">Friends paid all</button>
                         <button type="button" onclick="window.quickPaidEachOwnShare()" class="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 font-semibold text-emerald-800 hover:bg-emerald-100 shadow-xs">Each paid own share</button>
+                        <button type="button" onclick="window.quickCombinationPayerOnly()" class="rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 font-semibold text-purple-800 hover:bg-purple-100 shadow-xs">🤝 Combination (Set shares = paid)</button>
                     </div>
 
                     <!-- Split Live Balance Summary Box -->
@@ -189,11 +214,64 @@
         const sumPaid = document.getElementById('sum-paid');
         const splitStatusBadge = document.getElementById('split-status-badge');
         const splitPayerHint = document.getElementById('split-payer-hint');
+        const recordAsComboInput = document.getElementById('record-as-combination');
+        const jumpToSplitsBtn = document.getElementById('jump-to-splits-btn');
+        const friendSplitSection = document.getElementById('friend-split-section');
 
         let friendRowCount = 0;
 
         function getFullBillTotal() {
             return Number(totalInput.value || 0) + Number(gstInput.value || 0);
+        }
+
+        function isCombinationMode() {
+            return Boolean(recordAsComboInput && recordAsComboInput.checked);
+        }
+
+        function onCombinationToggle() {
+            const active = isCombinationMode();
+            document.querySelectorAll('.share-opt-badge').forEach(el => {
+                el.classList.toggle('hidden', !active);
+            });
+            if (active) {
+                if (getActiveFriendRows().length === 0) {
+                    addFriendRow();
+                }
+                syncPaidToSharesIfCombo();
+            }
+            recalculateSplits();
+        }
+
+        function syncPaidToSharesIfCombo() {
+            if (!isCombinationMode()) return;
+            const rows = getActiveFriendRows();
+            rows.forEach(r => {
+                const paidVal = r.querySelector('.friend-paid-input').value;
+                const shareInp = r.querySelector('.friend-share-input');
+                if (paidVal && (!shareInp.value || Number(shareInp.value) === 0)) {
+                    shareInp.value = paidVal;
+                }
+            });
+            if (myPaidInput.value && (!myShareInput.value || Number(myShareInput.value) === 0)) {
+                myShareInput.value = myPaidInput.value;
+            }
+        }
+
+        if (recordAsComboInput) {
+            recordAsComboInput.addEventListener('change', onCombinationToggle);
+        }
+
+        if (jumpToSplitsBtn) {
+            jumpToSplitsBtn.addEventListener('click', () => {
+                if (recordAsComboInput && !recordAsComboInput.checked) {
+                    recordAsComboInput.checked = true;
+                    onCombinationToggle();
+                }
+                if (getActiveFriendRows().length === 0) {
+                    addFriendRow();
+                }
+                friendSplitSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
         }
 
         function addFriendRow(friendId = '', share = '', paid = '') {
@@ -202,6 +280,7 @@
                 .concat(friendsList.map(f => `<option value="${f.id}">${f.name} (${f.role})</option>`))
                 .join('');
 
+            const comboActive = isCombinationMode();
             const card = document.createElement('div');
             card.className = 'friend-row rounded-xl border border-indigo-200 bg-white p-3 space-y-2.5 shadow-2xs';
             card.dataset.index = index;
@@ -218,7 +297,10 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Friend Share (₹)</label>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                            Friend Share (₹)
+                            <span class="share-opt-badge text-[10px] text-purple-600 font-normal ${comboActive ? '' : 'hidden'}">(Optional)</span>
+                        </label>
                         <input type="number" step="0.01" min="0" name="splits[${index}][friend_share]" value="${share}" placeholder="0.00" class="friend-share-input w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold">
                     </div>
                     <div>
@@ -240,6 +322,12 @@
 
             card.querySelectorAll('input, select').forEach(el => {
                 el.addEventListener('input', () => {
+                    if (isCombinationMode() && el.classList.contains('friend-paid-input')) {
+                        const shareInput = card.querySelector('.friend-share-input');
+                        if (!shareInput.value || Number(shareInput.value) === 0) {
+                            shareInput.value = el.value;
+                        }
+                    }
                     recalculateSplits();
                     updateGroupHint();
                 });
@@ -297,10 +385,15 @@
             sumShares.textContent = `₹${totalShares.toFixed(2)} of ₹${bill.toFixed(2)}`;
             sumPaid.textContent = `₹${totalPaid.toFixed(2)} of ₹${bill.toFixed(2)}`;
 
+            const comboMode = isCombinationMode();
             const sharesOk = Math.abs(totalShares - bill) < 0.05;
             const paidOk = Math.abs(totalPaid - bill) < 0.05;
+            const sharesLeftZero = (totalShares <= 0.05 && paidOk);
 
-            if (sharesOk && paidOk) {
+            if (paidOk && (sharesLeftZero || comboMode)) {
+                splitStatusBadge.textContent = '✓ Combination Paid (₹' + totalPaid.toFixed(2) + ')';
+                splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-purple-100 text-purple-800';
+            } else if (sharesOk && paidOk) {
                 splitStatusBadge.textContent = '✓ Split Balanced';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-emerald-100 text-emerald-800';
             } else {
@@ -308,15 +401,33 @@
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-amber-100 text-amber-800';
             }
 
-            const hints = [];
-            hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
-            friendDetails.forEach(f => {
-                hints.push(`${f.name} paid ₹${f.paid.toFixed(2)} (share ₹${f.share.toFixed(2)})`);
-            });
-            splitPayerHint.textContent = hints.join(' · ');
+            if (paidOk && (sharesLeftZero || comboMode)) {
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Recorded who paid alone (no debt created).`;
+            } else {
+                const hints = [];
+                hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
+                friendDetails.forEach(f => {
+                    hints.push(`${f.name} paid ₹${f.paid.toFixed(2)} (share ₹${f.share.toFixed(2)})`);
+                });
+                splitPayerHint.textContent = hints.join(' · ');
+            }
         }
 
         // Quick Split Calculation Buttons
+        window.quickCombinationPayerOnly = function() {
+            if (recordAsComboInput) {
+                recordAsComboInput.checked = true;
+            }
+            const rows = getActiveFriendRows();
+            myShareInput.value = myPaidInput.value;
+            rows.forEach(r => {
+                r.querySelector('.friend-share-input').value = r.querySelector('.friend-paid-input').value;
+            });
+            onCombinationToggle();
+            recalculateSplits();
+            updateGroupHint();
+        };
+
         window.quickSplitEqual = function() {
             const bill = getFullBillTotal();
             const rows = getActiveFriendRows();
@@ -408,6 +519,9 @@
             updateGroupHint();
         });
         myPaidInput.addEventListener('input', () => {
+            if (isCombinationMode() && (!myShareInput.value || Number(myShareInput.value) === 0)) {
+                myShareInput.value = myPaidInput.value;
+            }
             recalculateSplits();
             updateGroupHint();
         });

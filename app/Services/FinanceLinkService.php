@@ -79,6 +79,10 @@ class FinanceLinkService
             $friendShare = round((float) ($item['friend_share'] ?? 0), 2);
             $paidByFriend = round((float) ($item['paid_by_friend_amount'] ?? 0), 2);
 
+            $diff = round($friendShare - $paidByFriend, 2);
+            $paidByMeForFriend = $diff > 0 ? $diff : 0.0;
+            $myShareForFriend = $diff < 0 ? abs($diff) : 0.0;
+
             $payload = [
                 'user_id' => $expense->user_id,
                 'friend_id' => $friendId,
@@ -87,9 +91,9 @@ class FinanceLinkService
                 'date' => $expense->date,
                 'payment_method' => $expense->payment_method,
                 'total_amount' => round((float) $expense->totalAmount(), 2),
-                'my_share' => $paidByFriend,
+                'my_share' => $myShareForFriend,
                 'friend_share' => $friendShare,
-                'paid_by_me_amount' => $friendShare,
+                'paid_by_me_amount' => $paidByMeForFriend,
                 'paid_by_friend_amount' => $paidByFriend,
                 'notes' => Arr::get($splitData, 'notes', $expense->notes),
             ];

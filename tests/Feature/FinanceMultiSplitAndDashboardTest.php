@@ -158,6 +158,89 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
         $responseMonth->assertSee('This Month');
     }
 
+    public function test_combination_payment_can_record_paid_amounts_alone_without_entering_shares(): void
+    {
+        $user = $this->createUser();
+        $sandeep = Friend::query()->create(['user_id' => $user->id, 'name' => 'Sandeep', 'role' => 'Friend']);
+        $category = ExpenseCategory::query()->create(['user_id' => $user->id, 'name' => 'Snacks', 'is_archived' => false]);
+
+        // Exact user scenario: Total ₹90.00, Sandeep paid ₹70, User paid ₹20, shares left 0.00
+        $response = $this->actingAs($user)->post(route('expenses.store'), [
+            'amount' => 90,
+            'gst_amount' => 0,
+            'description' => 'Surya Bakery Co-pay',
+            'category_id' => $category->id,
+            'payment_method' => 'UPI',
+            'date' => '2026-09-08',
+            'record_as_combination' => '1',
+            'split_my_share' => 0,
+            'split_paid_by_me_amount' => 20,
+            'splits' => [
+                [
+                    'friend_id' => $sandeep->id,
+                    'friend_share' => 0,
+                    'paid_by_friend_amount' => 70,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('expenses.index'));
+
+        $expense = Expense::query()->where('description', 'Surya Bakery Co-pay')->firstOrFail();
+        $this->assertEquals(90.0, (float) $expense->amount);
+
+        $split = FriendSplit::query()->where('expense_id', $expense->id)->firstOrFail();
+        $this->assertEquals(70.0, (float) $split->paid_by_friend_amount);
+        $this->assertEquals(70.0, (float) $split->friend_share);
+        $this->assertEquals(0.0, $split->netAmount());
+    }
+
+    public function test_combination_payment_with_multiple_friends_where_paid_alone_is_enough(): void
+    {
+        $user = $this->createUser();
+        $sandeep = Friend::query()->create(['user_id' => $user->id, 'name' => 'Sandeep', 'role' => 'Friend']);
+        $rahul = Friend::query()->create(['user_id' => $user->id, 'name' => 'Rahul', 'role' => 'Friend']);
+        $category = ExpenseCategory::query()->create(['user_id' => $user->id, 'name' => 'Dinner', 'is_archived' => false]);
+
+        // Total ₹100: User paid ₹20, Sandeep paid ₹50, Rahul paid ₹30. Shares left at 0.
+        $response = $this->actingAs($user)->post(route('expenses.store'), [
+            'amount' => 100,
+            'gst_amount' => 0,
+            'description' => 'Group Dinner Party',
+            'category_id' => $category->id,
+            'payment_method' => 'UPI',
+            'date' => '2026-09-08',
+            'split_my_share' => 0,
+            'split_paid_by_me_amount' => 20,
+            'splits' => [
+                [
+                    'friend_id' => $sandeep->id,
+                    'friend_share' => 0,
+                    'paid_by_friend_amount' => 50,
+                ],
+                [
+                    'friend_id' => $rahul->id,
+                    'friend_share' => 0,
+                    'paid_by_friend_amount' => 30,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('expenses.index'));
+
+        $sandeepSplit = FriendSplit::query()->where('friend_id', $sandeep->id)->firstOrFail();
+        $this->assertEquals(50.0, (float) $sandeepSplit->paid_by_friend_amount);
+        $this->assertEquals(50.0, (float) $sandeepSplit->friend_share);
+        $this->assertEquals(0.0, $sandeepSplit->netAmount());
+
+        $rahulSplit = FriendSplit::query()->where('friend_id', $rahul->id)->firstOrFail();
+        $this->assertEquals(30.0, (float) $rahulSplit->paid_by_friend_amount);
+        $this->assertEquals(30.0, (float) $rahulSplit->friend_share);
+        $this->assertEquals(0.0, $rahulSplit->netAmount());
+    }
+
     private function createUser(): User
     {
         $user = User::factory()->create();

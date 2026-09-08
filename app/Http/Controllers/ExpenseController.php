@@ -416,6 +416,7 @@ class ExpenseController extends Controller
                 'split_paid_by_me_amount',
                 'split_paid_by_friend_amount',
                 'splits',
+                'record_as_combination',
             ])->all(),
             'paid_by' => $paidByLabel,
             'paid_by_type' => $paidByType,
@@ -492,6 +493,7 @@ class ExpenseController extends Controller
             'receipt_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
             'is_voluntary' => ['nullable', 'boolean'],
             'reason' => ['nullable', 'string', 'max:255'],
+            'record_as_combination' => ['nullable', 'boolean'],
         ];
 
         if ($includeGrouping) {
@@ -537,7 +539,11 @@ class ExpenseController extends Controller
                 $myShare = round((float) $request->input('split_my_share', 0), 2);
                 $paidByMe = round((float) $request->input('split_paid_by_me_amount', 0), 2);
 
-                if (abs(($myShare + $friendsSharesTotal) - $total) > 0.05) {
+                $paidMatchesTotal = abs(($paidByMe + $friendsPaidTotal) - $total) <= 0.05;
+                $isCombinationMode = $request->boolean('record_as_combination')
+                    || ($paidMatchesTotal && ($myShare + $friendsSharesTotal <= 0.05));
+
+                if (! $isCombinationMode && abs(($myShare + $friendsSharesTotal) - $total) > 0.05) {
                     $validator->errors()->add('split_my_share', 'Total shares (your share ₹'.number_format($myShare, 2).' + friends ₹'.number_format($friendsSharesTotal, 2).') must equal total expense ₹'.number_format($total, 2).'.');
                 }
 
@@ -559,14 +565,6 @@ class ExpenseController extends Controller
                 $myShare = round((float) $request->input('split_my_share', 0), 2);
                 $friendShare = round((float) $request->input('split_friend_share', 0), 2);
 
-                if ($myShare <= 0 && $friendShare <= 0) {
-                    $validator->errors()->add('split_my_share', 'Enter at least one split share.');
-                }
-
-                if (abs(($myShare + $friendShare) - $total) > 0.05) {
-                    $validator->errors()->add('split_my_share', 'Split shares must add up to the full expense total including GST.');
-                }
-
                 $mode = $request->input('split_paid_by_type', 'me');
                 $paidByMe = $mode === 'friend'
                     ? 0.0
@@ -578,6 +576,20 @@ class ExpenseController extends Controller
                     : ($mode === 'split'
                         ? round((float) $request->input('split_paid_by_friend_amount', 0), 2)
                         : $total);
+
+                $paidMatchesTotal = abs(($paidByMe + $paidByFriend) - $total) <= 0.05;
+                $isCombinationMode = $request->boolean('record_as_combination')
+                    || ($paidMatchesTotal && ($myShare + $friendShare <= 0.05));
+
+                if (! $isCombinationMode) {
+                    if ($myShare <= 0 && $friendShare <= 0) {
+                        $validator->errors()->add('split_my_share', 'Enter at least one split share.');
+                    }
+
+                    if (abs(($myShare + $friendShare) - $total) > 0.05) {
+                        $validator->errors()->add('split_my_share', 'Split shares must add up to the full expense total including GST.');
+                    }
+                }
 
                 if (abs(($paidByMe + $paidByFriend) - $total) > 0.05) {
                     $validator->errors()->add('split_paid_by_me_amount', 'Actual paid amounts must add up to the full expense total.');
@@ -601,8 +613,26 @@ class ExpenseController extends Controller
         if ($multiSplits->isNotEmpty()) {
             $friendSharesTotal = round((float) $multiSplits->sum(fn ($s) => (float) ($s['friend_share'] ?? 0)), 2);
             $friendsPaidTotal = round((float) $multiSplits->sum(fn ($s) => (float) ($s['paid_by_friend_amount'] ?? 0)), 2);
-            $myShare = round((float) ($validated['split_my_share'] ?? max(0, $total - $friendSharesTotal)), 2);
-            $paidByMe = round((float) ($validated['split_paid_by_me_amount'] ?? max(0, $total - $friendsPaidTotal)), 2);
+            $myShare = round((float) ($validated['split_my_share'] ?? 0), 2);
+            $paidByMe = round((float) ($validated['split_paid_by_me_amount'] ?? 0), 2);
+
+            $paidMatchesTotal = abs(($paidByMe + $friendsPaidTotal) - $total) <= 0.05;
+            $isCombination = ! empty($validated['record_as_combination']) || ($paidMatchesTotal && ($myShare + $friendSharesTotal <= 0.05));
+
+            if ($isCombination) {
+                $myShare = $paidByMe;
+                $friendSharesTotal = $friendsPaidTotal;
+                $multiSplits = $multiSplits->map(function ($s) {
+                    $paid = round((float) ($s['paid_by_friend_amount'] ?? 0), 2);
+                    $s['friend_share'] = $paid;
+                    $s['paid_by_friend_amount'] = $paid;
+
+                    return $s;
+                });
+            } else {
+                $myShare = round((float) ($validated['split_my_share'] ?? max(0, $total - $friendSharesTotal)), 2);
+                $paidByMe = round((float) ($validated['split_paid_by_me_amount'] ?? max(0, $total - $friendsPaidTotal)), 2);
+            }
 
             return [
                 'friend_id' => (int) $multiSplits->first()['friend_id'],
@@ -634,6 +664,14 @@ class ExpenseController extends Controller
         $paidByFriend = round($total - $paidByMe, 2);
         $myShare = round((float) ($validated['split_my_share'] ?? 0), 2);
         $friendShare = round((float) ($validated['split_friend_share'] ?? ($total - $myShare)), 2);
+
+        $paidMatchesTotal = abs(($paidByMe + $paidByFriend) - $total) <= 0.05;
+        $isCombination = ! empty($validated['record_as_combination']) || ($paidMatchesTotal && ($myShare + $friendShare <= 0.05));
+
+        if ($isCombination) {
+            $myShare = $paidByMe;
+            $friendShare = $paidByFriend;
+        }
 
         return [
             'friend_id' => $friendId,
