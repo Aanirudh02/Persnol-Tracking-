@@ -118,8 +118,14 @@
                                         @elseif($exp->receipt_image)
                                             <a href="{{ asset('storage/' . $exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px]">📷 receipt</a>
                                         @endif
-                                        @if(!$isGroup && $exp->friendSplit)
-                                            <span class="block text-[10px] font-normal text-indigo-600">Split with {{ $exp->friendSplit->friend?->name }} · net {{ $exp->friendSplit->netAmount() >= 0 ? '+' : '-' }}₹{{ number_format(abs($exp->friendSplit->netAmount()), 2) }}</span>
+                                        @if(!$isGroup && $exp->friendSplits->isNotEmpty())
+                                            <span class="block text-[10px] font-medium text-indigo-600">
+                                                👥 Split: {{ $exp->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ' (share ₹' . number_format($s->friend_share, 2) . ($s->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($s->paid_by_friend_amount, 2) : '') . ')')->implode(', ') }}
+                                            </span>
+                                        @elseif(!$isGroup && $exp->friendSplit)
+                                            <span class="block text-[10px] font-medium text-indigo-600">
+                                                👥 Split with {{ $exp->friendSplit->friend?->name }} (share ₹{{ number_format($exp->friendSplit->friend_share, 2) }}{{ $exp->friendSplit->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($exp->friendSplit->paid_by_friend_amount, 2) : '' }}) · net {{ $exp->friendSplit->netAmount() >= 0 ? '+' : '-' }}₹{{ number_format(abs($exp->friendSplit->netAmount()), 2) }}
+                                            </span>
                                         @endif
                                         @if(!$isGroup && $exp->notes)
                                             <span class="block text-[10px] text-slate-400 font-normal">{{ $exp->notes }}</span>

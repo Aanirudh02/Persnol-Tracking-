@@ -294,6 +294,15 @@
             document.addEventListener('DOMContentLoaded', () => window.showToast("{{ session('info') }}", 'info'));
         </script>
     @endif
+    @if ($errors->any())
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                @foreach ($errors->all() as $error)
+                    window.showToast("{{ addslashes($error) }}", 'error');
+                @endforeach
+            });
+        </script>
+    @endif
 
 </body>
 </html>

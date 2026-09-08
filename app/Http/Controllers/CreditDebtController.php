@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -126,6 +127,7 @@ class CreditDebtController extends Controller
 
             if (array_key_exists('amount_paid', $validated)) {
                 $targetPaid = round((float) $validated['amount_paid'], 2);
+                $method = filled($validated['payment_method'] ?? null) ? $validated['payment_method'] : null;
                 $existingPaymentsCount = $creditDebt->payments()->count();
 
                 if ($existingPaymentsCount === 0) {
@@ -134,7 +136,7 @@ class CreditDebtController extends Controller
                             'credit_debt_id' => $creditDebt->id,
                             'amount' => $targetPaid,
                             'paid_on' => $validated['date'],
-                            'payment_method' => $validated['payment_method'] ?? null,
+                            'payment_method' => $method,
                             'notes' => 'Direct paid update',
                         ]);
                     }
@@ -145,7 +147,7 @@ class CreditDebtController extends Controller
                     } else {
                         $singlePayment->update([
                             'amount' => $targetPaid,
-                            'payment_method' => $validated['payment_method'] ?? $singlePayment->payment_method,
+                            'payment_method' => $method ?: $singlePayment->payment_method,
                         ]);
                     }
                 } else {
@@ -153,15 +155,15 @@ class CreditDebtController extends Controller
                     $currentPaid = (float) $creditDebt->payments()->sum('amount');
                     $diff = round($targetPaid - $currentPaid, 2);
 
-                    if ($diff != 0) {
-                        // Delete existing payments and replace with a consolidated payment to accurately reflect the user-entered paid amount
+                    if (abs($diff) > 0.001) {
+                        // Consolidate payments to accurately reflect the user-entered paid amount
                         $creditDebt->payments()->delete();
                         if ($targetPaid > 0) {
                             CreditDebtPayment::create([
                                 'credit_debt_id' => $creditDebt->id,
                                 'amount' => $targetPaid,
                                 'paid_on' => $validated['date'],
-                                'payment_method' => $validated['payment_method'] ?? null,
+                                'payment_method' => $method,
                                 'notes' => 'Adjusted paid amount',
                             ]);
                         }
@@ -317,12 +319,17 @@ class CreditDebtController extends Controller
             $rules['amount_paid'] = ['nullable', 'numeric', 'min:0'];
         }
 
-        $validated = $request->validate($rules);
+        $validator = Validator::make($request->all(), $rules);
+        $validator->after(function ($validator) use ($request, $allowInitialPaid): void {
+            if ($allowInitialPaid) {
+                $amount = (float) $request->input('amount', 0);
+                $paid = (float) $request->input('amount_paid', 0);
+                if ($paid - $amount > 0.01) {
+                    $validator->errors()->add('amount_paid', 'Paid amount (₹'.number_format($paid, 2).') cannot exceed the total amount (₹'.number_format($amount, 2).').');
+                }
+            }
+        });
 
-        if ($allowInitialPaid && (float) ($validated['amount_paid'] ?? 0) - (float) $validated['amount'] > 0.01) {
-            abort(422, 'Initial paid amount cannot exceed the original amount.');
-        }
-
-        return $validated;
+        return $validator->validate();
     }
 }

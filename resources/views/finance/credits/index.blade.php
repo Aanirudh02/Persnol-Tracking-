@@ -17,6 +17,21 @@
         <form action="{{ route('credits.store') }}" method="POST" class="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm shadow-sm sm:grid-cols-2">
             @csrf
             <input type="hidden" name="type" value="{{ $type }}">
+
+            @if ($errors->any())
+                <div class="sm:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800 space-y-1">
+                    <p class="font-bold flex items-center gap-1.5 text-sm">
+                        <svg class="w-4 h-4 text-rose-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        Please check the following:
+                    </p>
+                    <ul class="list-disc pl-5 space-y-0.5">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 @if($type === 'credit')
                     Credit means <strong>you owe the friend</strong>.

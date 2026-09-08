@@ -22,6 +22,10 @@ class FinanceLinkService
     public function syncExpenseFriendLink(Expense $expense, ?array $splitData = null): ?FriendTransaction
     {
         return DB::transaction(function () use ($expense, $splitData): ?FriendTransaction {
+            if (! empty($splitData['multi_splits']) && is_array($splitData['multi_splits']) && count($splitData['multi_splits']) > 1) {
+                return $this->syncMultiExpenseFriendSplits($expense, $splitData['multi_splits'], $splitData);
+            }
+
             $payload = $this->expenseSplitPayload($expense, $splitData);
 
             if ($payload === null) {
@@ -31,9 +35,22 @@ class FinanceLinkService
             }
 
             $split = FriendSplit::query()->updateOrCreate(
-                ['expense_id' => $expense->id],
+                [
+                    'expense_id' => $expense->id,
+                    'friend_id' => $payload['friend_id'],
+                ],
                 $payload
             );
+
+            // Clean up any stale friend splits for other friends on this expense
+            $staleSplits = FriendSplit::query()
+                ->where('expense_id', $expense->id)
+                ->where('id', '!=', $split->id)
+                ->get();
+            foreach ($staleSplits as $stale) {
+                $this->projector->deleteBySource('friend_split', $stale->id);
+                $stale->delete();
+            }
 
             $transaction = $this->projector->syncFriendSplit($split);
             $expense->friend_transaction_id = $transaction->id;
@@ -43,11 +60,76 @@ class FinanceLinkService
         });
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $multiSplits
+     * @param  array<string, mixed>  $splitData
+     */
+    public function syncMultiExpenseFriendSplits(Expense $expense, array $multiSplits, array $splitData = []): ?FriendTransaction
+    {
+        $activeFriendIds = [];
+        $firstTransaction = null;
+
+        foreach ($multiSplits as $item) {
+            $friendId = (int) ($item['friend_id'] ?? 0);
+            if ($friendId <= 0) {
+                continue;
+            }
+
+            $activeFriendIds[] = $friendId;
+            $friendShare = round((float) ($item['friend_share'] ?? 0), 2);
+            $paidByFriend = round((float) ($item['paid_by_friend_amount'] ?? 0), 2);
+
+            $payload = [
+                'user_id' => $expense->user_id,
+                'friend_id' => $friendId,
+                'expense_id' => $expense->id,
+                'description' => $expense->description,
+                'date' => $expense->date,
+                'payment_method' => $expense->payment_method,
+                'total_amount' => round((float) $expense->totalAmount(), 2),
+                'my_share' => $paidByFriend,
+                'friend_share' => $friendShare,
+                'paid_by_me_amount' => $friendShare,
+                'paid_by_friend_amount' => $paidByFriend,
+                'notes' => Arr::get($splitData, 'notes', $expense->notes),
+            ];
+
+            $split = FriendSplit::query()->updateOrCreate(
+                [
+                    'expense_id' => $expense->id,
+                    'friend_id' => $friendId,
+                ],
+                $payload
+            );
+
+            $tx = $this->projector->syncFriendSplit($split);
+            if ($firstTransaction === null) {
+                $firstTransaction = $tx;
+            }
+        }
+
+        $staleSplits = FriendSplit::query()
+            ->where('expense_id', $expense->id)
+            ->whereNotIn('friend_id', $activeFriendIds)
+            ->get();
+        foreach ($staleSplits as $stale) {
+            $this->projector->deleteBySource('friend_split', $stale->id);
+            $stale->delete();
+        }
+
+        if ($firstTransaction) {
+            $expense->friend_transaction_id = $firstTransaction->id;
+            $expense->saveQuietly();
+        }
+
+        return $firstTransaction;
+    }
+
     public function removeExpenseFriendLink(Expense $expense): void
     {
         DB::transaction(function () use ($expense): void {
-            $split = FriendSplit::query()->where('expense_id', $expense->id)->first();
-            if ($split) {
+            $splits = FriendSplit::query()->where('expense_id', $expense->id)->get();
+            foreach ($splits as $split) {
                 $this->projector->deleteBySource('friend_split', $split->id);
                 $split->delete();
             }

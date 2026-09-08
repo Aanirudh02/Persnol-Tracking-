@@ -84,7 +84,80 @@
             </div>
         @endif
 
-        <!-- 3. PRIMARY METRIC CARDS (TODAY) -->
+        <!-- 2.5 PERIOD APPROACH & WALLET CURRENT BALANCES -->
+        <div class="space-y-3.5">
+            <!-- Period Toggle Switcher -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                <div class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'today']) }}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'today' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
+                        📅 Today
+                    </a>
+                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'week']) }}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'week' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
+                        📊 This Week
+                    </a>
+                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'month']) }}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'month' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
+                        🗓️ This Month
+                    </a>
+                </div>
+                <div class="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2">
+                    <span>Range:</span>
+                    <strong class="text-slate-800 dark:text-slate-200">
+                        @if($period === 'today')
+                            {{ \Carbon\Carbon::parse($date)->format('D, d M Y') }}
+                        @elseif($period === 'week')
+                            {{ \Carbon\Carbon::parse($startDate)->format('d M') }} &ndash; {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}
+                        @else
+                            {{ \Carbon\Carbon::parse($startDate)->format('F Y') }}
+                        @endif
+                    </strong>
+                </div>
+            </div>
+
+            <!-- Current Balance & Mode Breakdown Card -->
+            <div class="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-md border border-slate-700/60 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-700/60 pb-3">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Current Balance (All Modes)</div>
+                        <div class="text-2xl sm:text-3xl font-extrabold text-white mt-0.5">
+                            ₹{{ number_format($currentBalance, 2) }}
+                        </div>
+                    </div>
+                    <a href="{{ route('finance.index') }}" class="self-start sm:self-auto text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition">
+                        <span>Finance Hub & Wallets</span> &rarr;
+                    </a>
+                </div>
+
+                @if($wallets->isNotEmpty())
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                        @foreach($wallets as $wallet)
+                            @php
+                                $modeIcons = ['Cash' => '💵', 'UPI' => '📱', 'Card' => '💳', 'Bank Transfer' => '🏦', 'Other' => '💰'];
+                                $icon = $modeIcons[$wallet->payment_method] ?? '💳';
+                            @endphp
+                            <div class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-between">
+                                <div class="flex items-center justify-between text-xs text-slate-300 font-semibold mb-1">
+                                    <span class="truncate">{{ $wallet->payment_method }}</span>
+                                    <span>{{ $icon }}</span>
+                                </div>
+                                <div class="mt-1">
+                                    <div class="text-sm sm:text-base font-bold text-white">
+                                        ₹{{ number_format($wallet->current_balance, 2) }}
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 flex items-center justify-between mt-0.5">
+                                        <span>Open: ₹{{ number_format($wallet->opening_balance, 0) }}</span>
+                                        @if($wallet->is_enabled)
+                                            <span class="text-emerald-400 font-bold" title="Wallet Enabled">●</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        <!-- 3. PRIMARY METRIC CARDS -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             <!-- Wake Up -->
             <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
@@ -129,7 +202,7 @@
                 <div class="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                     ₹{{ number_format($moneyReceived, 0) }}
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">Today's Income</span>
+                <span class="text-[11px] text-slate-500 mt-1">{{ ucfirst($period) }}'s Income</span>
             </div>
 
             <!-- Expenses -->
@@ -141,7 +214,7 @@
                 <div class="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">
                     ₹{{ number_format($expensesTotal, 0) }}
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">Spent today</span>
+                <span class="text-[11px] text-slate-500 mt-1">Spent {{ $period === 'today' ? 'today' : ($period === 'week' ? 'this week' : 'this month') }}</span>
             </div>
 
             <!-- Snacks -->
@@ -153,7 +226,7 @@
                 <div class="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400">
                     {{ $snacksCount }}
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">Today count</span>
+                <span class="text-[11px] text-slate-500 mt-1">{{ ucfirst($period) }} count</span>
             </div>
 
             <!-- Activities -->
@@ -189,7 +262,7 @@
                 <div class="text-xl sm:text-2xl font-bold text-teal-600 dark:text-teal-400">
                     ₹{{ number_format($petrolSpent, 0) }}
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">Filled today</span>
+                <span class="text-[11px] text-slate-500 mt-1">Filled {{ $period === 'today' ? 'today' : ($period === 'week' ? 'this week' : 'this month') }}</span>
             </div>
 
             <!-- Mistakes -->
@@ -201,7 +274,7 @@
                 <div class="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400">
                     {{ $mistakesCount }}
                 </div>
-                <span class="text-[11px] text-slate-500 mt-1">Recorded today</span>
+                <span class="text-[11px] text-slate-500 mt-1">Recorded {{ $period === 'today' ? 'today' : ($period === 'week' ? 'this week' : 'this month') }}</span>
             </div>
 
             <!-- Quick Add Tile -->

@@ -94,6 +94,34 @@ class Expense extends Model
         return $this->hasOne(FriendSplit::class);
     }
 
+    public function friendSplits(): HasMany
+    {
+        return $this->hasMany(FriendSplit::class);
+    }
+
+    public function isSplit(): bool
+    {
+        return $this->split_with_friend_id !== null || $this->friendSplits->isNotEmpty() || $this->friendSplit !== null;
+    }
+
+    public function totalFriendShare(): float
+    {
+        if ($this->relationLoaded('friendSplits') && $this->friendSplits->isNotEmpty()) {
+            return (float) $this->friendSplits->sum('friend_share');
+        }
+
+        return (float) ($this->split_friend_share ?? $this->friendSplit?->friend_share ?? 0);
+    }
+
+    public function totalPaidByFriends(): float
+    {
+        if ($this->relationLoaded('friendSplits') && $this->friendSplits->isNotEmpty()) {
+            return (float) $this->friendSplits->sum('paid_by_friend_amount');
+        }
+
+        return (float) ($this->friendSplit?->paid_by_friend_amount ?? ($this->paid_by_type === 'friend' ? $this->totalAmount() : 0));
+    }
+
     public function foodEntries(): HasMany
     {
         return $this->hasMany(FoodEntry::class);

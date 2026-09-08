@@ -28,7 +28,7 @@ class ExpenseController extends Controller
         $query = Expense::query()
             ->where('user_id', $user->id)
             ->whereNull('parent_id')
-            ->with(['category', 'subItems', 'paidByFriend', 'expenseGroup.expenses.category', 'friendSplit.friend']);
+            ->with(['category', 'subItems', 'paidByFriend', 'expenseGroup.expenses.category', 'friendSplit.friend', 'friendSplits.friend']);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->integer('category_id'));
@@ -77,17 +77,23 @@ class ExpenseController extends Controller
             ->filter(fn (array $line): bool => filled($line['amount'] ?? null) && filled($line['payment_method'] ?? null))
             ->values();
 
+        $splitData = $this->buildSplitData($validated, (float) $validated['amount'] + $gstAmount);
+
         if ($isGrouped) {
             if ($groupLines->count() < 2) {
-                return back()->withInput()->withErrors(['group_expenses' => 'Add at least two payment lines for a grouped expense.']);
+                return back()->withInput()->withErrors(['group_expenses' => 'Add at least two payment lines for a payment breakdown.']);
             }
 
             $groupTotal = round((float) $groupLines->sum(fn (array $line): float => (float) $line['amount']), 2);
-            if (abs($groupTotal - (float) $validated['amount']) > 0.01) {
-                return back()->withInput()->withErrors(['group_expenses' => 'Payment lines must add up to the total expense amount.']);
-            }
-            if (! empty($validated['split_with_friend_id'])) {
-                return back()->withInput()->withErrors(['split_with_friend_id' => 'Grouped expense payments cannot also create a friend split. Record the split on a single expense row instead.']);
+            // If friend split is active, payment lines break down what the user paid
+            $expectedBreakdown = $splitData ? (float) ($splitData['paid_by_me_amount'] ?? 0) : (float) $validated['amount'];
+
+            if ($splitData && $expectedBreakdown <= 0) {
+                // Friend paid entire bill; breakdown of user payment is not needed
+            } elseif (abs($groupTotal - $expectedBreakdown) > 0.05) {
+                $targetLabel = $splitData ? 'your payment share' : 'the total expense amount';
+
+                return back()->withInput()->withErrors(['group_expenses' => "Payment breakdown must add up to {$targetLabel} (₹".number_format($expectedBreakdown, 2).').']);
             }
         }
 
@@ -104,17 +110,16 @@ class ExpenseController extends Controller
             if ((float) $validated['amount'] + $gstAmount > $parent->remainingAmount()) {
                 return back()->withInput()->withErrors(['amount' => 'This sub-item exceeds the remaining amount of the parent expense.']);
             }
-            if (! empty($validated['split_with_friend_id'])) {
+            if ($splitData !== null) {
                 return back()->withInput()->withErrors(['split_with_friend_id' => 'Friend split tracking is only supported on top-level expenses.']);
             }
         }
 
         $category = $categoryId ? ExpenseCategory::query()->find($categoryId) : null;
         $isVoluntary = $request->boolean('is_voluntary') || ($category?->is_voluntary ?? false);
-        $splitData = $this->buildSplitData($validated, (float) $validated['amount'] + $gstAmount);
         [$paidByLabel, $paidByType, $paidByFriendId] = $this->displayPayerFields($splitData);
 
-        $expenses = DB::transaction(function () use ($request, $validated, $imagePath, $paidByLabel, $paidByType, $paidByFriendId, $parentId, $categoryId, $isVoluntary, $groupLines, $gstAmount, $isGrouped) {
+        $expenses = DB::transaction(function () use ($request, $validated, $imagePath, $paidByLabel, $paidByType, $paidByFriendId, $parentId, $categoryId, $isVoluntary, $groupLines, $gstAmount, $isGrouped, $splitData) {
             $dailyRecord = DailyRecord::query()
                 ->where('user_id', $request->user()->id)
                 ->whereDate('record_date', $validated['date'])
@@ -127,14 +132,48 @@ class ExpenseController extends Controller
                 ]);
             }
 
-            $group = $isGrouped
+            // If friend split is active with grouped lines, record as a single top-level expense with payment breakdown in notes
+            if ($splitData !== null && $isGrouped) {
+                $breakdownText = 'Payment breakdown: '.$groupLines->map(fn (array $line) => ($line['payment_method'] ?? 'Other').' ₹'.number_format((float) $line['amount'], 2))->implode(', ');
+                $combinedNotes = trim(($validated['notes'] ?? '')."\n".$breakdownText);
+                $combinedMethod = $groupLines->pluck('payment_method')->unique()->implode(' + ');
+
+                $expense = Expense::create([
+                    'user_id' => $request->user()->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $categoryId,
+                    'parent_id' => $parentId,
+                    'expense_group_id' => null,
+                    'amount' => $validated['amount'],
+                    'gst_amount' => $gstAmount,
+                    'date' => $validated['date'],
+                    'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
+                    'description' => $validated['description'],
+                    'payment_method' => $combinedMethod ?: $validated['payment_method'],
+                    'paid_by' => $paidByLabel,
+                    'paid_by_type' => $paidByType,
+                    'paid_by_friend_id' => $paidByFriendId,
+                    'split_with_friend_id' => $splitData['friend_id'] ?? null,
+                    'split_my_share' => $splitData['my_share'] ?? null,
+                    'split_friend_share' => $splitData['friend_share'] ?? null,
+                    'notes' => $combinedNotes,
+                    'receipt_image' => $imagePath,
+                    'is_voluntary' => $isVoluntary,
+                ]);
+
+                AuditService::log('expense', $expense->id, 'created', null, $expense->toArray(), 'Expense created with friend split');
+
+                return collect([$expense]);
+            }
+
+            $group = ($isGrouped && $splitData === null)
                 ? ExpenseGroup::create([
                     'user_id' => $request->user()->id,
                     'name' => $validated['description'],
                 ])
                 : null;
 
-            $lines = $isGrouped
+            $lines = ($isGrouped && $splitData === null)
                 ? $groupLines
                 : collect([[
                     'amount' => $validated['amount'],
@@ -152,7 +191,7 @@ class ExpenseController extends Controller
                 return $line;
             });
 
-            return $allocatedGst->map(function (array $line) use ($request, $validated, $imagePath, $paidByLabel, $paidByType, $paidByFriendId, $parentId, $categoryId, $isVoluntary, $dailyRecord, $group): Expense {
+            return $allocatedGst->map(function (array $line) use ($request, $validated, $imagePath, $paidByLabel, $paidByType, $paidByFriendId, $parentId, $categoryId, $isVoluntary, $dailyRecord, $group, $splitData): Expense {
                 $expense = Expense::create([
                     'user_id' => $request->user()->id,
                     'daily_record_id' => $dailyRecord->id,
@@ -168,9 +207,9 @@ class ExpenseController extends Controller
                     'paid_by' => $paidByLabel,
                     'paid_by_type' => $paidByType,
                     'paid_by_friend_id' => $paidByFriendId,
-                    'split_with_friend_id' => $validated['split_with_friend_id'] ?? null,
-                    'split_my_share' => $validated['split_my_share'] ?? null,
-                    'split_friend_share' => $validated['split_friend_share'] ?? null,
+                    'split_with_friend_id' => $splitData['friend_id'] ?? null,
+                    'split_my_share' => $splitData['my_share'] ?? null,
+                    'split_friend_share' => $splitData['friend_share'] ?? null,
                     'notes' => $validated['notes'] ?? null,
                     'receipt_image' => $imagePath,
                     'is_voluntary' => $isVoluntary,
@@ -278,7 +317,7 @@ class ExpenseController extends Controller
             abort(403);
         }
 
-        $expense->load(['category', 'subItems.category', 'foodEntries.category', 'paidByFriend', 'splitWithFriend', 'expenseGroup.expenses', 'friendSplit.friend']);
+        $expense->load(['category', 'subItems.category', 'foodEntries.category', 'paidByFriend', 'splitWithFriend', 'expenseGroup.expenses', 'friendSplit.friend', 'friendSplits.friend']);
         $unlinkableFoods = FoodEntry::query()
             ->where('user_id', auth()->id())
             ->whereDate('date', $expense->date)
@@ -341,7 +380,7 @@ class ExpenseController extends Controller
             return redirect()->route('expenses.index')->with('error', 'This expense is locked and can no longer be edited.');
         }
 
-        $expense->load('friendSplit.friend');
+        $expense->load(['friendSplits.friend', 'friendSplit.friend']);
         $categories = ExpenseCategory::query()->orderBy('name')->get();
         $friends = Friend::query()->where('user_id', auth()->id())->orderBy('name')->get();
         $paymentMethods = $options->names('payment_method');
@@ -376,6 +415,7 @@ class ExpenseController extends Controller
                 'split_paid_by_type',
                 'split_paid_by_me_amount',
                 'split_paid_by_friend_amount',
+                'splits',
             ])->all(),
             'paid_by' => $paidByLabel,
             'paid_by_type' => $paidByType,
@@ -444,6 +484,10 @@ class ExpenseController extends Controller
             'split_paid_by_type' => ['nullable', Rule::in(['me', 'friend', 'split'])],
             'split_paid_by_me_amount' => ['nullable', 'numeric', 'min:0'],
             'split_paid_by_friend_amount' => ['nullable', 'numeric', 'min:0'],
+            'splits' => ['nullable', 'array'],
+            'splits.*.friend_id' => ['nullable', 'exists:friends,id'],
+            'splits.*.friend_share' => ['nullable', 'numeric', 'min:0'],
+            'splits.*.paid_by_friend_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'receipt_image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:5120'],
             'is_voluntary' => ['nullable', 'boolean'],
@@ -463,48 +507,81 @@ class ExpenseController extends Controller
                 return;
             }
 
-            $friendId = $request->integer('split_with_friend_id');
-            if (! $friendId) {
-                return;
-            }
+            $rawSplits = collect($request->input('splits', []))
+                ->filter(fn ($s) => ! empty($s['friend_id']) && (int) $s['friend_id'] > 0)
+                ->values();
 
-            $friendExists = Friend::query()
-                ->where('user_id', $request->user()->id)
-                ->whereKey($friendId)
-                ->exists();
+            $singleFriendId = $request->integer('split_with_friend_id');
 
-            if (! $friendExists) {
-                $validator->errors()->add('split_with_friend_id', 'Choose one of your own friends.');
-
+            if ($rawSplits->isEmpty() && ! $singleFriendId) {
                 return;
             }
 
             $total = round((float) $request->input('amount') + (float) $request->input('gst_amount', 0), 2);
-            $myShare = round((float) $request->input('split_my_share', 0), 2);
-            $friendShare = round((float) $request->input('split_friend_share', 0), 2);
 
-            if ($myShare <= 0 && $friendShare <= 0) {
-                $validator->errors()->add('split_my_share', 'Enter at least one split share.');
-            }
+            if ($rawSplits->isNotEmpty()) {
+                $friendIds = $rawSplits->pluck('friend_id')->all();
+                $userFriendsCount = Friend::query()
+                    ->where('user_id', $request->user()->id)
+                    ->whereIn('id', $friendIds)
+                    ->count();
 
-            if (abs(($myShare + $friendShare) - $total) > 0.01) {
-                $validator->errors()->add('split_my_share', 'Split shares must add up to the full expense total including GST.');
-            }
+                if ($userFriendsCount !== count(array_unique($friendIds))) {
+                    $validator->errors()->add('splits', 'Choose friends from your own friends list.');
 
-            $mode = $request->input('split_paid_by_type', 'me');
-            $paidByMe = $mode === 'friend'
-                ? 0.0
-                : ($mode === 'split'
-                    ? round((float) $request->input('split_paid_by_me_amount', 0), 2)
-                    : $total);
-            $paidByFriend = $mode === 'me'
-                ? 0.0
-                : ($mode === 'split'
-                    ? round((float) $request->input('split_paid_by_friend_amount', 0), 2)
-                    : $total);
+                    return;
+                }
 
-            if (abs(($paidByMe + $paidByFriend) - $total) > 0.01) {
-                $validator->errors()->add('split_paid_by_me_amount', 'Actual paid amounts must add up to the full expense total.');
+                $friendsSharesTotal = round((float) $rawSplits->sum(fn ($s) => (float) ($s['friend_share'] ?? 0)), 2);
+                $friendsPaidTotal = round((float) $rawSplits->sum(fn ($s) => (float) ($s['paid_by_friend_amount'] ?? 0)), 2);
+                $myShare = round((float) $request->input('split_my_share', 0), 2);
+                $paidByMe = round((float) $request->input('split_paid_by_me_amount', 0), 2);
+
+                if (abs(($myShare + $friendsSharesTotal) - $total) > 0.05) {
+                    $validator->errors()->add('split_my_share', 'Total shares (your share ₹'.number_format($myShare, 2).' + friends ₹'.number_format($friendsSharesTotal, 2).') must equal total expense ₹'.number_format($total, 2).'.');
+                }
+
+                if (abs(($paidByMe + $friendsPaidTotal) - $total) > 0.05) {
+                    $validator->errors()->add('split_paid_by_me_amount', 'Total paid amounts (you ₹'.number_format($paidByMe, 2).' + friends ₹'.number_format($friendsPaidTotal, 2).') must equal total expense ₹'.number_format($total, 2).'.');
+                }
+            } else {
+                $friendExists = Friend::query()
+                    ->where('user_id', $request->user()->id)
+                    ->whereKey($singleFriendId)
+                    ->exists();
+
+                if (! $friendExists) {
+                    $validator->errors()->add('split_with_friend_id', 'Choose one of your own friends.');
+
+                    return;
+                }
+
+                $myShare = round((float) $request->input('split_my_share', 0), 2);
+                $friendShare = round((float) $request->input('split_friend_share', 0), 2);
+
+                if ($myShare <= 0 && $friendShare <= 0) {
+                    $validator->errors()->add('split_my_share', 'Enter at least one split share.');
+                }
+
+                if (abs(($myShare + $friendShare) - $total) > 0.05) {
+                    $validator->errors()->add('split_my_share', 'Split shares must add up to the full expense total including GST.');
+                }
+
+                $mode = $request->input('split_paid_by_type', 'me');
+                $paidByMe = $mode === 'friend'
+                    ? 0.0
+                    : ($mode === 'split'
+                        ? round((float) $request->input('split_paid_by_me_amount', 0), 2)
+                        : $total);
+                $paidByFriend = $mode === 'me'
+                    ? 0.0
+                    : ($mode === 'split'
+                        ? round((float) $request->input('split_paid_by_friend_amount', 0), 2)
+                        : $total);
+
+                if (abs(($paidByMe + $paidByFriend) - $total) > 0.05) {
+                    $validator->errors()->add('split_paid_by_me_amount', 'Actual paid amounts must add up to the full expense total.');
+                }
             }
         });
 
@@ -517,6 +594,32 @@ class ExpenseController extends Controller
      */
     private function buildSplitData(array $validated, float $total): ?array
     {
+        $multiSplits = collect($validated['splits'] ?? [])
+            ->filter(fn ($s) => ! empty($s['friend_id']) && (int) $s['friend_id'] > 0)
+            ->values();
+
+        if ($multiSplits->isNotEmpty()) {
+            $friendSharesTotal = round((float) $multiSplits->sum(fn ($s) => (float) ($s['friend_share'] ?? 0)), 2);
+            $friendsPaidTotal = round((float) $multiSplits->sum(fn ($s) => (float) ($s['paid_by_friend_amount'] ?? 0)), 2);
+            $myShare = round((float) ($validated['split_my_share'] ?? max(0, $total - $friendSharesTotal)), 2);
+            $paidByMe = round((float) ($validated['split_paid_by_me_amount'] ?? max(0, $total - $friendsPaidTotal)), 2);
+
+            return [
+                'friend_id' => (int) $multiSplits->first()['friend_id'],
+                'my_share' => $myShare,
+                'friend_share' => $friendSharesTotal,
+                'paid_by_mode' => ($paidByMe > 0 && $friendsPaidTotal > 0) ? 'split' : ($paidByMe > 0 ? 'me' : 'friend'),
+                'paid_by_me_amount' => $paidByMe,
+                'paid_by_friend_amount' => $friendsPaidTotal,
+                'multi_splits' => $multiSplits->map(fn ($s) => [
+                    'friend_id' => (int) $s['friend_id'],
+                    'friend_share' => round((float) ($s['friend_share'] ?? 0), 2),
+                    'paid_by_friend_amount' => round((float) ($s['paid_by_friend_amount'] ?? 0), 2),
+                ])->all(),
+                'notes' => $validated['notes'] ?? null,
+            ];
+        }
+
         $friendId = (int) ($validated['split_with_friend_id'] ?? 0);
         if ($friendId <= 0) {
             return null;
@@ -528,14 +631,24 @@ class ExpenseController extends Controller
             'split' => round((float) ($validated['split_paid_by_me_amount'] ?? 0), 2),
             default => $total,
         };
+        $paidByFriend = round($total - $paidByMe, 2);
+        $myShare = round((float) ($validated['split_my_share'] ?? 0), 2);
+        $friendShare = round((float) ($validated['split_friend_share'] ?? ($total - $myShare)), 2);
 
         return [
             'friend_id' => $friendId,
-            'my_share' => round((float) ($validated['split_my_share'] ?? 0), 2),
-            'friend_share' => round((float) ($validated['split_friend_share'] ?? 0), 2),
+            'my_share' => $myShare,
+            'friend_share' => $friendShare,
             'paid_by_mode' => $mode,
             'paid_by_me_amount' => $paidByMe,
-            'paid_by_friend_amount' => round($total - $paidByMe, 2),
+            'paid_by_friend_amount' => $paidByFriend,
+            'multi_splits' => [
+                [
+                    'friend_id' => $friendId,
+                    'friend_share' => $friendShare,
+                    'paid_by_friend_amount' => $paidByFriend,
+                ],
+            ],
             'notes' => $validated['notes'] ?? null,
         ];
     }
@@ -548,6 +661,24 @@ class ExpenseController extends Controller
     {
         if ($splitData === null) {
             return ['Me', 'me', null];
+        }
+
+        if (! empty($splitData['multi_splits']) && count($splitData['multi_splits']) > 1) {
+            $friendNames = Friend::query()
+                ->whereIn('id', collect($splitData['multi_splits'])->pluck('friend_id'))
+                ->pluck('name')
+                ->implode(', ');
+
+            $paidByMe = (float) ($splitData['paid_by_me_amount'] ?? 0);
+            $paidByFriends = (float) ($splitData['paid_by_friend_amount'] ?? 0);
+
+            if ($paidByMe > 0 && $paidByFriends > 0) {
+                return ["Split: You & {$friendNames}", 'split', (int) $splitData['friend_id']];
+            } elseif ($paidByFriends > 0) {
+                return [$friendNames, 'friend', (int) $splitData['friend_id']];
+            } else {
+                return ['Me', 'me', (int) $splitData['friend_id']];
+            }
         }
 
         $friend = Friend::query()->find($splitData['friend_id']);

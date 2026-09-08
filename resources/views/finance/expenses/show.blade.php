@@ -9,11 +9,32 @@
 
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-sm space-y-2">
             <p>Paid by: <strong>{{ $expense->paid_by }}</strong> · {{ $expense->payment_method }}</p>
-            @if($expense->friendSplit)
-                <div class="rounded-2xl border border-indigo-100 bg-indigo-50 p-3 text-xs text-slate-700">
-                    <p class="font-semibold text-slate-900">Friend split with {{ $expense->friendSplit->friend?->name }}</p>
-                    <p class="mt-1">Shares: you ₹{{ number_format($expense->friendSplit->my_share, 2) }} · friend ₹{{ number_format($expense->friendSplit->friend_share, 2) }}</p>
-                    <p>Paid: you ₹{{ number_format($expense->friendSplit->paid_by_me_amount, 2) }} · friend ₹{{ number_format($expense->friendSplit->paid_by_friend_amount, 2) }}</p>
+            @php
+                $allSplits = $expense->friendSplits->isNotEmpty() ? $expense->friendSplits : ($expense->friendSplit ? collect([$expense->friendSplit]) : collect());
+            @endphp
+            @if($allSplits->isNotEmpty())
+                <div class="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 text-xs text-slate-700 space-y-2.5">
+                    <p class="font-bold text-sm text-indigo-950 flex items-center gap-1.5">
+                        <span>👥</span> Friend Split Breakdown
+                    </p>
+                    <div class="divide-y divide-indigo-100/80">
+                        @foreach($allSplits as $s)
+                            <div class="py-2 flex items-center justify-between">
+                                <div>
+                                    <span class="font-bold text-slate-900">{{ $s->friend?->name ?? 'Friend' }}</span>
+                                    <span class="text-slate-500">· Share: ₹{{ number_format($s->friend_share, 2) }}</span>
+                                    <span class="text-slate-500">· Paid: ₹{{ number_format($s->paid_by_friend_amount, 2) }}</span>
+                                </div>
+                                <div class="font-semibold {{ $s->netAmount() >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">
+                                    {{ $s->netAmount() >= 0 ? 'Owes you ₹' . number_format($s->netAmount(), 2) : 'You owe ₹' . number_format(abs($s->netAmount()), 2) }}
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="pt-2 border-t border-indigo-200 font-semibold text-slate-800 flex justify-between">
+                        <span>Your Share: ₹{{ number_format($expense->split_my_share ?? $allSplits->first()?->my_share ?? 0, 2) }}</span>
+                        <span>You Paid: ₹{{ number_format($allSplits->first()?->paid_by_me_amount ?? 0, 2) }}</span>
+                    </div>
                 </div>
             @endif
             @if($expense->expenseGroup)
