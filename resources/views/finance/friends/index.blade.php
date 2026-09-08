@@ -1,5 +1,18 @@
 <x-app-layout title="Friends & Splits">
     <div class="space-y-6">
+        @if($errors->any())
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 shadow-sm dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
+                <div class="flex items-center gap-2 font-bold mb-1">
+                    <span>⚠️ Please correct the following errors:</span>
+                </div>
+                <ul class="list-disc pl-5 space-y-0.5">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Friends & Splits</h1>
@@ -162,176 +175,190 @@
                 <div class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
                     No friends added yet.
                 </div>
-            @endforelse
-        </div>
-    </div>
-
-    <div id="add-friend-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
-        <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="text-lg font-bold text-slate-900">Add Friend</h3>
-                <button type="button" onclick="document.getElementById('add-friend-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400">&times;</button>
-            </div>
-
-            <form action="{{ route('friends.store') }}" method="POST" class="space-y-4 text-sm">
-                @csrf
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Name</label>
-                    <input type="text" name="name" value="{{ old('name') }}" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Phone</label>
-                        <input type="text" name="phone" value="{{ old('phone') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                    </div>
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Email</label>
-                        <input type="email" name="email" value="{{ old('email') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                    </div>
-                </div>
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Role</label>
-                    <select name="user_type" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                        <option value="Friend">Friend</option>
-                        <option value="Not a Friend">Not a Friend</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Date of birth</label>
-                    <input type="date" name="date_of_birth" value="{{ old('date_of_birth') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                </div>
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Notes</label>
-                    <textarea name="notes" rows="3" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">{{ old('notes') }}</textarea>
-                </div>
-                <button type="submit" class="w-full rounded-xl bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-500">Save Friend</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="add-split-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
-        <div class="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                    <h3 class="text-lg font-bold text-slate-900">Add Split Record</h3>
-                    <p class="text-xs text-slate-500">Store shares and actual amounts separately. This does not create a normal expense row.</p>
-                </div>
-                <button type="button" onclick="document.getElementById('add-split-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400">&times;</button>
-            </div>
-
-            <form action="{{ route('friend-splits.store') }}" method="POST" class="space-y-4 text-sm" id="split-form">
-                @csrf
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Friend</label>
-                        <select name="friend_id" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                            @foreach($friendData as $fd)
-                                <option value="{{ $fd['friend']->id }}">{{ $fd['friend']->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Date</label>
-                        <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                    </div>
+            @e    <div id="add-friend-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="flex min-h-full items-center justify-center py-4">
+            <div class="w-full max-w-md max-h-[92vh] flex flex-col rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl overflow-hidden my-auto" onclick="event.stopPropagation()">
+                <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+                    <h3 class="text-lg font-bold text-slate-900">Add Friend</h3>
+                    <button type="button" onclick="document.getElementById('add-friend-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-slate-600 transition p-1">&times;</button>
                 </div>
 
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Description</label>
-                    <input type="text" name="description" required placeholder="Dinner, cab fare, tickets..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                </div>
-
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Total amount</label>
-                        <input type="number" step="0.01" name="total_amount" id="split-total-amount" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                    </div>
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Your share</label>
-                        <input type="number" step="0.01" name="my_share" id="split-my-share" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                    </div>
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Friend share</label>
-                        <input type="number" step="0.01" name="friend_share" id="split-friend-share" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                    </div>
-                </div>
-
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div class="overflow-y-auto pr-1 flex-1">
+                    <form action="{{ route('friends.store') }}" method="POST" class="space-y-4 text-sm">
+                        @csrf
                         <div>
-                            <label class="mb-1 block font-semibold text-slate-700">Who paid?</label>
-                            <select name="paid_by_mode" id="split-paid-mode" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
-                                <option value="me">I paid</option>
-                                <option value="friend">Friend paid</option>
-                                <option value="split">Split payment</option>
+                            <label class="mb-1 block font-semibold text-slate-700">Name</label>
+                            <input type="text" name="name" value="{{ old('name') }}" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Phone</label>
+                                <input type="text" name="phone" value="{{ old('phone') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            </div>
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Email</label>
+                                <input type="email" name="email" value="{{ old('email') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Role</label>
+                            <select name="user_type" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                                <option value="Friend">Friend</option>
+                                <option value="Not a Friend">Not a Friend</option>
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1 block font-semibold text-slate-700">Paid by me</label>
-                            <input type="number" step="0.01" name="paid_by_me_amount" id="split-paid-by-me" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                            <label class="mb-1 block font-semibold text-slate-700">Date of birth</label>
+                            <input type="date" name="date_of_birth" value="{{ old('date_of_birth') }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
                         </div>
                         <div>
-                            <label class="mb-1 block font-semibold text-slate-700">Paid by friend</label>
-                            <input type="number" step="0.01" name="paid_by_friend_amount" id="split-paid-by-friend" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                            <label class="mb-1 block font-semibold text-slate-700">Notes</label>
+                            <textarea name="notes" rows="3" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">{{ old('notes') }}</textarea>
                         </div>
-                    </div>
-                    <div class="mt-3 flex gap-2 text-xs">
-                        <button type="button" onclick="window.fillEqualSplit()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">Equal split</button>
-                        <button type="button" onclick="window.fillFullMine()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">All mine</button>
-                        <button type="button" onclick="window.fillFullFriend()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700">All friend</button>
-                    </div>
+                        <div class="pt-2 sticky bottom-0 bg-white pb-1">
+                            <button type="submit" class="w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-500 text-sm">Save Friend</button>
+                        </div>
+                    </form>
                 </div>
-
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Payment method</label>
-                    <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-                        @foreach($paymentMethods as $method)
-                            <option value="{{ $method }}">{{ $method }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Notes</label>
-                    <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5"></textarea>
-                </div>
-
-                <button type="submit" class="w-full rounded-xl bg-indigo-600 py-2.5 font-semibold text-white transition hover:bg-indigo-500">Save Split Record</button>
-            </form>
+            </div>
         </div>
     </div>
 
-    <div id="settle-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-        <div class="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="text-base font-bold text-slate-900">Record Settlement</h3>
-                <button type="button" onclick="document.getElementById('settle-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400">&times;</button>
+    <div id="add-split-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="flex min-h-full items-center justify-center py-2 sm:py-6">
+            <div class="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden my-auto" onclick="event.stopPropagation()">
+                <div class="p-4 sm:p-6 pb-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Add Split Record</h3>
+                        <p class="text-xs text-slate-500">Store shares and actual amounts separately. This does not create a normal expense row.</p>
+                    </div>
+                    <button type="button" onclick="document.getElementById('add-split-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-slate-600 transition p-1">&times;</button>
+                </div>
+
+                <div class="overflow-y-auto p-4 sm:p-6 pt-3 flex-1 space-y-4">
+                    <form action="{{ route('friend-splits.store') }}" method="POST" class="space-y-4 text-sm" id="split-form">
+                        @csrf
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Friend</label>
+                                <select name="friend_id" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                                    @foreach($friendData as $fd)
+                                        <option value="{{ $fd['friend']->id }}">{{ $fd['friend']->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Date</label>
+                                <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Description</label>
+                            <input type="text" name="description" required placeholder="Dinner, cab fare, tickets..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Total amount</label>
+                                <input type="number" step="0.01" name="total_amount" id="split-total-amount" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            </div>
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Your share</label>
+                                <input type="number" step="0.01" name="my_share" id="split-my-share" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            </div>
+                            <div>
+                                <label class="mb-1 block font-semibold text-slate-700">Friend share</label>
+                                <input type="number" step="0.01" name="friend_share" id="split-friend-share" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div>
+                                    <label class="mb-1 block font-semibold text-slate-700">Who paid?</label>
+                                    <select name="paid_by_mode" id="split-paid-mode" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                                        <option value="me">I paid</option>
+                                        <option value="friend">Friend paid</option>
+                                        <option value="split">Split payment</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block font-semibold text-slate-700">Paid by me</label>
+                                    <input type="number" step="0.01" name="paid_by_me_amount" id="split-paid-by-me" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block font-semibold text-slate-700">Paid by friend</label>
+                                    <input type="number" step="0.01" name="paid_by_friend_amount" id="split-paid-by-friend" class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5">
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                                <button type="button" onclick="window.fillEqualSplit()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 transition">Equal split</button>
+                                <button type="button" onclick="window.fillFullMine()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 transition">All mine</button>
+                                <button type="button" onclick="window.fillFullFriend()" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 transition">All friend</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Payment method</label>
+                            <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
+                                @foreach($paymentMethods as $method)
+                                    <option value="{{ $method }}">{{ $method }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block font-semibold text-slate-700">Notes</label>
+                            <textarea name="notes" rows="2" placeholder="Any optional notes or context..." class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5"></textarea>
+                        </div>
+
+                        <div class="pt-2 sticky bottom-0 bg-white pb-1">
+                            <button type="submit" class="w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white shadow-md shadow-indigo-600/20 transition hover:bg-indigo-500 text-sm">Save Split Record</button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <form id="settle-form" action="" method="POST" class="space-y-3 text-sm">
-                @csrf
-                <div>
-                    <label class="mb-1 block text-slate-500">Friend</label>
-                    <input type="text" id="settle-name" readonly class="w-full rounded-xl bg-slate-100 px-3 py-2.5 font-semibold">
+        </div>
+    </div>
+
+    <div id="settle-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="flex min-h-full items-center justify-center py-4">
+            <div class="w-full max-w-sm max-h-[92vh] flex flex-col rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl overflow-hidden my-auto" onclick="event.stopPropagation()">
+                <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+                    <h3 class="text-base font-bold text-slate-900">Record Settlement</h3>
+                    <button type="button" onclick="document.getElementById('settle-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-slate-600 transition p-1">&times;</button>
                 </div>
-                <div>
-                    <label class="mb-1 block text-slate-500">Amount</label>
-                    <input type="number" step="0.01" name="amount" id="settle-amount" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold">
+                <div class="overflow-y-auto pr-1 flex-1">
+                    <form id="settle-form" action="" method="POST" class="space-y-3 text-sm">
+                        @csrf
+                        <div>
+                            <label class="mb-1 block text-slate-500">Friend</label>
+                            <input type="text" id="settle-name" readonly class="w-full rounded-xl bg-slate-100 px-3 py-2.5 font-semibold">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-slate-500">Amount</label>
+                            <input type="number" step="0.01" name="amount" id="settle-amount" required class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold">
+                        </div>
+                        <input type="hidden" name="direction" id="settle-direction">
+                        <div>
+                            <label class="mb-1 block text-slate-500">Payment method</label>
+                            <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                                @foreach($paymentMethods as $method)
+                                    <option value="{{ $method }}">{{ $method }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-slate-500">Notes</label>
+                            <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5"></textarea>
+                        </div>
+                        <div class="pt-2 sticky bottom-0 bg-white pb-1">
+                            <button type="submit" class="w-full rounded-xl bg-emerald-600 py-3 font-semibold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500 text-sm">Save Settlement</button>
+                        </div>
+                    </form>
                 </div>
-                <input type="hidden" name="direction" id="settle-direction">
-                <div>
-                    <label class="mb-1 block text-slate-500">Payment method</label>
-                    <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
-                        @foreach($paymentMethods as $method)
-                            <option value="{{ $method }}">{{ $method }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-slate-500">Notes</label>
-                    <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5"></textarea>
-                </div>
-                <button type="submit" class="w-full rounded-xl bg-emerald-600 py-2.5 font-semibold text-white transition hover:bg-emerald-500">Save Settlement</button>
-            </form>
+            </div>
         </div>
     </div>
 

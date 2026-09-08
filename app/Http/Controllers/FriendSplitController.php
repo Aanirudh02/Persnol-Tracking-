@@ -105,15 +105,23 @@ class FriendSplitController extends Controller
             if ($friendSplit?->expense_id) {
                 $validator->errors()->add('friend_id', 'Expense-linked split records are edited from the expense itself.');
             }
+
+            $paidByMe = match ($request->input('paid_by_mode', 'me')) {
+                'friend' => 0.0,
+                'split' => round((float) ($request->input('paid_by_me_amount') ?? 0), 2),
+                default => $total,
+            };
+            if ($request->input('paid_by_mode') === 'split') {
+                $enteredFriendPaid = round((float) ($request->input('paid_by_friend_amount') ?? 0), 2);
+                if (abs(($paidByMe + $enteredFriendPaid) - $total) > 0.01) {
+                    $validator->errors()->add('paid_by_me_amount', 'Actual paid amounts must add up to the total amount.');
+                }
+            }
         });
 
         $validated = $validator->validate();
         $validated['paid_by_me_amount'] = $this->resolvePaidByMeAmount($validated);
         $validated['paid_by_friend_amount'] = round((float) $validated['total_amount'] - (float) $validated['paid_by_me_amount'], 2);
-
-        if (abs(((float) $validated['paid_by_me_amount'] + (float) $validated['paid_by_friend_amount']) - (float) $validated['total_amount']) > 0.01) {
-            abort(422, 'Actual paid amounts must add up to the total amount.');
-        }
 
         return $validated;
     }
