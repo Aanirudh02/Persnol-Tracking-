@@ -1,5 +1,5 @@
 <x-app-layout title="Expenses">
-    <div class="space-y-6">
+    <div class="expense-page space-y-6">
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -250,6 +250,27 @@
             </div>
         </div>
     </div>
+    <style>
+        .expense-page {
+            font-size: 1.04rem;
+        }
+
+        .expense-page .text-xs,
+        .expense-page .text-[10px],
+        .expense-page .text-[11px],
+        .expense-page .text-sm,
+        .expense-page .text-base,
+        .expense-page .text-2xl {
+            transition: font-size 0.15s ease;
+        }
+
+        .expense-page .text-xs { font-size: 0.82rem !important; }
+        .expense-page .text-[10px] { font-size: 0.7rem !important; }
+        .expense-page .text-[11px] { font-size: 0.76rem !important; }
+        .expense-page .text-sm { font-size: 0.95rem !important; }
+        .expense-page .text-base { font-size: 1.04rem !important; }
+        .expense-page .text-2xl { font-size: 1.9rem !important; }
+    </style>
     <script>
         function toggleExpenseGroup(groupId, button) {
             const details = document.getElementById(`expense-group-details-${groupId}`);
