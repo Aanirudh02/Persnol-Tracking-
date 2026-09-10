@@ -162,6 +162,8 @@ Route::middleware('auth')->group(function () {
     // Settings
     Route::prefix('settings')->group(function () {
         Route::get('/', [SettingController::class, 'index'])->name('settings.index')->middleware('permission:settings.view');
+        Route::get('/export/json', [SettingController::class, 'exportJson'])->name('settings.export.json');
+        Route::get('/export/csv', [SettingController::class, 'exportCsv'])->name('settings.export.csv');
         Route::post('/profile', [SettingController::class, 'updateProfile'])->name('settings.profile');
         Route::post('/password', [SettingController::class, 'updatePassword'])->name('settings.password');
         Route::post('/system', [SettingController::class, 'updateSettings'])->name('settings.system');

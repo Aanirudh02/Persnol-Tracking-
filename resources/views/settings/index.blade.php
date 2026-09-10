@@ -35,6 +35,31 @@
             </div>
         @endif
 
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-bold text-emerald-950">Full data backup</h2>
+                        <p class="mt-1 text-xs leading-5 text-emerald-800">Download your personal records as portable JSON. Passwords, sessions, and secrets are excluded.</p>
+                    </div>
+                    <span class="text-xl">↓</span>
+                </div>
+                <a href="{{ route('settings.export.json') }}" class="mt-4 inline-flex rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">Download JSON backup</a>
+            </div>
+
+            <div class="rounded-2xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
+                <div>
+                    <h2 class="text-base font-bold text-sky-950">Excel-friendly exports</h2>
+                    <p class="mt-1 text-xs leading-5 text-sky-800">CSV files open directly in Excel and contain one module at a time.</p>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @foreach(['expenses' => 'Expenses', 'income' => 'Income', 'petrol' => 'Petrol', 'friends' => 'Friends', 'notes' => 'Notes', 'trips' => 'Trips'] as $module => $label)
+                        <a href="{{ route('settings.export.csv', ['module' => $module]) }}" class="rounded-xl border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-800 transition hover:bg-sky-100">{{ $label }} CSV</a>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
         <!-- Profile Section -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">

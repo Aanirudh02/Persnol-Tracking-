@@ -42,6 +42,29 @@ class PhaseOneReliabilityTest extends TestCase
             ->assertSee('No friends added yet.');
     }
 
+    public function test_settings_can_export_sanitized_json_and_csv_data(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'export@example.com',
+            'password' => Hash::make('secret-password'),
+            'is_active' => true,
+        ]);
+        Friend::query()->create(['user_id' => $user->id, 'name' => 'Export Friend', 'role' => 'Friend']);
+
+        $jsonResponse = $this->actingAs($user)->get(route('settings.export.json'));
+        $jsonResponse->assertDownload();
+        $json = json_decode($jsonResponse->streamedContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame('lifetracker-json-backup', $json['format']);
+        $this->assertSame('export@example.com', $json['user']['email']);
+        $this->assertArrayNotHasKey('password', $json['user']);
+        $this->assertArrayHasKey('friends', $json['tables']);
+
+        $csvResponse = $this->actingAs($user)->get(route('settings.export.csv', ['module' => 'friends']));
+        $csvResponse->assertDownload();
+        $this->assertStringContainsString('Export Friend', $csvResponse->streamedContent());
+    }
+
     public function test_petrol_can_create_and_update_a_linked_expense(): void
     {
         $user = User::factory()->create(['is_active' => true]);

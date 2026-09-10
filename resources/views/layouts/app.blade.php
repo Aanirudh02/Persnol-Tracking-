@@ -114,7 +114,7 @@
     </aside>
 
     <!-- MAIN CONTENT WRAPPER -->
-    <div class="md:pl-64 flex flex-col flex-1 min-h-screen">
+    <div class="md:pl-64 flex flex-col flex-1 min-h-screen min-w-0">
         <!-- TOP APP BAR -->
         <header class="sticky top-0 z-20 h-16 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border-b border-sky-100 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6">
             <!-- Mobile Brand & Title -->
@@ -185,7 +185,7 @@
         </header>
 
         <!-- PAGE BODY CONTENT -->
-        <main class="flex-1 pb-24 md:pb-12 px-3 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
+        <main class="flex-1 min-h-0 overflow-y-auto pb-24 md:pb-12 px-3 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
             {{ $slot }}
         </main>
     </div>

@@ -58,7 +58,7 @@
         </div>
     </aside>
 
-    <div class="md:pl-64 flex flex-col flex-1 min-h-screen">
+    <div class="md:pl-64 flex flex-col flex-1 min-h-screen min-w-0">
         <header class="sticky top-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6">
             <div class="flex items-center gap-3 md:w-80">
                 <div class="md:hidden flex items-center gap-2">
@@ -95,7 +95,7 @@
             </div>
         </header>
 
-        <main class="flex-1 pb-24 md:pb-12 px-3 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
+        <main class="flex-1 min-h-0 overflow-y-auto pb-24 md:pb-12 px-3 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
             @if(!empty($globalPrompts ?? []))
                 <div class="space-y-3 mb-6">
                     @foreach($globalPrompts as $prompt)

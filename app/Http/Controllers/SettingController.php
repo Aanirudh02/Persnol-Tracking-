@@ -16,13 +16,102 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Services\OptionsService;
 use App\Services\WalletService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SettingController extends Controller
 {
+    /**
+     * Download the authenticated user's application data as a portable JSON backup.
+     */
+    public function exportJson(Request $request): StreamedResponse
+    {
+        $user = $request->user();
+        $excludedTables = [
+            'cache',
+            'cache_locks',
+            'failed_jobs',
+            'job_batches',
+            'jobs',
+            'password_reset_tokens',
+            'sessions',
+        ];
+        $tables = [];
+
+        foreach (Schema::getTables() as $tableInfo) {
+            $table = $tableInfo['name'] ?? $tableInfo['tablename'] ?? null;
+            if (! $table || in_array($table, $excludedTables, true)) {
+                continue;
+            }
+
+            $columns = Schema::getColumnListing($table);
+            if (in_array('user_id', $columns, true)) {
+                $tables[$table] = DB::table($table)
+                    ->where('user_id', $user->id)
+                    ->get()
+                    ->map(fn ($row): array => (array) $row)
+                    ->all();
+            }
+        }
+
+        $payload = [
+            'format' => 'lifetracker-json-backup',
+            'version' => 1,
+            'exported_at' => Carbon::now()->toIso8601String(),
+            'database_driver' => DB::connection()->getDriverName(),
+            'user' => collect($user->toArray())->except([
+                'password',
+                'remember_token',
+            ])->all(),
+            'tables' => $tables,
+        ];
+
+        return response()->streamDownload(function () use ($payload): void {
+            echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }, 'lifetracker-backup-'.now()->format('Y-m-d-His').'.json', [
+            'Content-Type' => 'application/json; charset=utf-8',
+        ]);
+    }
+
+    /**
+     * Download a spreadsheet-friendly CSV for a selected personal data module.
+     */
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'module' => ['required', 'in:expenses,income,petrol,friends,notes,trips'],
+        ]);
+
+        $table = match ($validated['module']) {
+            'expenses' => 'expenses',
+            'income' => 'incomes',
+            'petrol' => 'fuel_entries',
+            'friends' => 'friends',
+            'notes' => 'notes',
+            'trips' => 'scooter_trips',
+        };
+        $rows = DB::table($table)->where('user_id', $request->user()->id)->get()->map(fn ($row): array => (array) $row);
+
+        return response()->streamDownload(function () use ($rows): void {
+            $handle = fopen('php://output', 'w');
+            if ($rows->isNotEmpty()) {
+                fputcsv($handle, array_keys($rows->first()));
+                foreach ($rows as $row) {
+                    fputcsv($handle, array_map(static fn ($value): string => is_scalar($value) || $value === null ? (string) $value : json_encode($value), $row));
+                }
+            }
+            fclose($handle);
+        }, 'lifetracker-'.$validated['module'].'-'.now()->format('Y-m-d-His').'.csv', [
+            'Content-Type' => 'text/csv; charset=utf-8',
+        ]);
+    }
+
     public function index(Request $request, WalletService $walletService, OptionsService $options)
     {
         $user = $request->user();
