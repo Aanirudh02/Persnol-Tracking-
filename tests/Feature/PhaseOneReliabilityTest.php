@@ -102,6 +102,51 @@ class PhaseOneReliabilityTest extends TestCase
         $this->assertNotNull($parent->fresh()->expense_group_id);
     }
 
+    public function test_ungrouped_friend_split_expense_can_be_grouped(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $friend = Friend::query()->create(['user_id' => $user->id, 'name' => 'Group Friend', 'role' => 'Friend']);
+        $first = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 80,
+            'gst_amount' => 0,
+            'date' => '2026-09-10',
+            'description' => 'Shared dinner',
+            'payment_method' => 'UPI',
+            'paid_by' => 'Me',
+            'paid_by_type' => 'me',
+        ]);
+        $second = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 20,
+            'gst_amount' => 0,
+            'date' => '2026-09-10',
+            'description' => 'Shared dessert',
+            'payment_method' => 'Cash',
+            'paid_by' => 'Me',
+            'paid_by_type' => 'me',
+        ]);
+        $first->friendSplits()->create([
+            'user_id' => $user->id,
+            'friend_id' => $friend->id,
+            'description' => $first->description,
+            'date' => $first->date,
+            'total_amount' => 80,
+            'my_share' => 40,
+            'friend_share' => 40,
+            'paid_by_me_amount' => 80,
+            'paid_by_friend_amount' => 0,
+        ]);
+
+        $this->actingAs($user)->post(route('expenses.group'), [
+            'expense_ids' => [$first->id, $second->id],
+            'name' => 'Dinner group',
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->assertSame($first->fresh()->expense_group_id, $second->fresh()->expense_group_id);
+        $this->assertNotNull($first->fresh()->expense_group_id);
+    }
+
     public function test_petrol_can_create_and_update_a_linked_expense(): void
     {
         $user = User::factory()->create(['is_active' => true]);

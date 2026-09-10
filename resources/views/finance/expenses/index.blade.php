@@ -48,7 +48,7 @@
             <form id="group-expenses-form" action="{{ route('expenses.group') }}" method="POST" class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4 text-xs">
                 @csrf
                 <button type="submit" class="px-3 py-2 rounded-xl bg-sky-600 text-white font-semibold">Group selected expenses</button>
-                <span class="text-slate-400">Select any two or more ungrouped expenses, including sub-expenses. Friend-split expenses stay separate.</span>
+                <span class="text-slate-400">Select any two or more expenses that are not already in a group. Parent, sub-expense, and friend-split expenses are supported.</span>
             </form>
             @if($expenses->isEmpty())
                 <div class="text-center py-16 text-slate-400 text-xs">

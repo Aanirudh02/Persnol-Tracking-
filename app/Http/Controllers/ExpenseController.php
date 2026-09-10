@@ -286,13 +286,11 @@ class ExpenseController extends Controller
         $expenses = Expense::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('expense_group_id')
-            ->whereDoesntHave('friendSplit')
-            ->whereDoesntHave('friendSplits')
             ->whereIn('id', $validated['expense_ids'])
             ->get();
 
         if ($expenses->count() !== count(array_unique($validated['expense_ids']))) {
-            return back()->withInput()->with('error', 'Select at least two of your own ungrouped expenses without friend splits. Parent and sub-expenses can both be grouped.');
+            return back()->withInput()->with('error', 'Select at least two of your own expenses that are not already in a group. Parent, sub-expense, and friend-split expenses can be grouped.');
         }
 
         $group = DB::transaction(function () use ($request, $validated, $expenses): ExpenseGroup {
