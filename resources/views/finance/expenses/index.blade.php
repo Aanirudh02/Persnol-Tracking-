@@ -104,8 +104,8 @@
                                         @endif
                                     </td>
                                     <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                                        {{ $displayDate->format('d M Y') }}
-                                        <span class="block text-[10px] text-slate-400">{{ $displayExpense->time }}</span>
+                                        <span class="block text-sm sm:text-[15px] font-medium leading-snug">{{ $displayDate->format('d M Y') }}</span>
+                                        <span class="block text-[11px] sm:text-xs text-slate-400 leading-snug">{{ $displayExpense->time }}</span>
                                     </td>
                                     <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">
                                         <a href="{{ route('expenses.show', $displayExpense) }}" class="font-semibold text-slate-900 hover:underline">{{ $isGroup ? $exp->expenseGroup->name : $exp->description }}</a>
