@@ -87,6 +87,8 @@
                                     $displayAmount = $groupExpenses->sum(fn ($item) => $item->totalAmount());
                                     $displayMethods = $groupExpenses->pluck('payment_method')->unique()->implode(' + ');
                                     $displayPaidBy = $groupExpenses->pluck('paid_by')->unique()->implode(' + ');
+                                    $friendsPaid = $groupExpenses->sum(fn ($item) => $item->totalPaidByFriends());
+                                    $myPaid = max(0, $displayAmount - $friendsPaid);
                                     $displayBreakdown = $isGroup
                                         ? $groupExpenses->groupBy('payment_method')->map(fn ($items, $method) => $method.' ₹'.number_format($items->sum(fn ($item) => $item->totalAmount()), 2))->implode(' · ')
                                         : null;
@@ -96,7 +98,7 @@
                                     <td class="py-3 px-4">
                                         @if($isGroup)
                                             <button type="button" class="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sm font-bold leading-none text-sky-700 transition hover:bg-sky-100" aria-label="Show individual expenses" aria-expanded="false" onclick="toggleExpenseGroup('{{ $exp->expenseGroup->id }}', this)">›</button>
-                                            <span class="text-[10px] font-semibold text-sky-700">Group · {{ $groupExpenses->count() }}</span>
+                                            <span class="text-xs font-bold text-sky-700">{{ $groupExpenses->count() }} entries</span>
                                         @else
                                             <input type="checkbox" name="expense_ids[]" value="{{ $exp->id }}" form="group-expenses-form" class="rounded border-slate-300">
                                         @endif
@@ -111,13 +113,7 @@
                                             <span class="block text-[10px] font-normal text-slate-400">Sub-expense under: {{ $exp->parent->description }}</span>
                                         @endif
                                         @if($isGroup)
-                                            <form action="{{ route('expense-groups.update', $exp->expenseGroup) }}" method="POST" class="mt-1 flex items-center gap-1">
-                                                @csrf
-                                                @method('PUT')
-                                                <input type="text" name="name" value="{{ $exp->expenseGroup->name }}" class="w-40 px-2 py-1 text-[10px] font-normal bg-slate-50 border border-slate-200 rounded-lg">
-                                                <button type="submit" class="text-[10px] text-sky-700 hover:underline">Save name</button>
-                                            </form>
-                                            <span class="block text-[10px] font-normal text-slate-500">{{ $displayBreakdown }}</span>
+                                            <span class="mt-1 block text-xs font-normal text-slate-500">{{ $groupExpenses->count() }} transactions · {{ $displayMethods }}</span>
                                         @elseif($exp->receipt_image)
                                             <a href="{{ asset('storage/' . $exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px]">📷 receipt</a>
                                         @endif
@@ -140,13 +136,31 @@
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 font-bold text-rose-600 dark:text-rose-400 text-sm whitespace-nowrap">
-                                        ₹{{ number_format($displayAmount, 2) }}
+                                        @if($isGroup)
+                                            ₹{{ number_format($myPaid, 2) }} <span class="block text-[10px] font-normal text-slate-400">your spend</span>
+                                        @else
+                                            ₹{{ number_format($displayAmount, 2) }}
+                                        @endif
                                     </td>
-                                    <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $displayMethods }}</td>
-                                    <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $displayPaidBy }}</td>
+                                    <td class="py-3 px-4 text-slate-600 dark:text-slate-400">
+                                        @if($isGroup)
+                                            <div class="flex flex-wrap gap-1.5">@foreach(explode(' + ', $displayMethods) as $method)<span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold">{{ $method }}</span>@endforeach</div>
+                                        @else
+                                            {{ $displayMethods }}
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-4 text-slate-600 dark:text-slate-400">
+                                        @if($isGroup)
+                                            <span class="block font-semibold text-emerald-700">You ₹{{ number_format($myPaid, 2) }}</span>
+                                            @if($friendsPaid > 0)<span class="block text-[10px] text-indigo-600">Friends ₹{{ number_format($friendsPaid, 2) }}</span>@else<span class="block text-[10px] text-slate-400">You paid alone</span>@endif
+                                        @else
+                                            {{ $displayPaidBy }}
+                                        @endif
+                                    </td>
                                     <td class="py-3 px-4 text-right whitespace-nowrap">
                                         @if($isGroup)
-                                            <a href="{{ route('expenses.show', $displayExpense) }}" class="text-sky-700 hover:text-sky-600 font-semibold">Open details</a>
+                                            <button type="button" onclick="openGroupNameModal('{{ $exp->expenseGroup->id }}', @js($exp->expenseGroup->name))" class="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-sky-300 hover:text-sky-700" title="Edit group name" aria-label="Edit group name">✎</button>
+                                            <button type="button" class="font-semibold text-sky-700 hover:text-sky-600" aria-expanded="false" onclick="toggleExpenseGroup('{{ $exp->expenseGroup->id }}', this)">Open details</button>
                                         @elseif($isEditable)
                                             <a href="{{ route('expenses.edit', $exp) }}" class="text-indigo-600 hover:text-indigo-500 font-semibold mr-2">Edit</a>
                                             <form action="{{ route('expenses.destroy', $exp) }}" method="POST" class="inline" onsubmit="return confirm('Archive this expense?');">
@@ -161,24 +175,49 @@
                                 </tr>
                                 @if($isGroup)
                                     <tr id="expense-group-details-{{ $exp->expenseGroup->id }}" class="hidden">
-                                        <td colspan="8" class="bg-slate-50 px-4 py-3 sm:px-8">
-                                            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                                <table class="w-full text-left text-xs">
-                                                    <thead class="bg-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                                        <tr>
-                                                            <th class="px-4 py-2">Individual expense</th>
-                                                            <th class="px-4 py-2">Method</th>
-                                                            <th class="px-4 py-2 text-right">Amount</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody class="divide-y divide-slate-100">
+                                        <td colspan="8" class="bg-slate-50 p-0">
+                                            <div class="grid grid-cols-2 gap-3 border-b border-slate-200 bg-sky-50/70 p-4 text-xs sm:grid-cols-4">
+                                                <div><span class="block text-slate-500">Group total</span><strong class="text-base text-slate-900">₹{{ number_format($displayAmount, 2) }}</strong></div>
+                                                <div><span class="block text-slate-500">Your spend</span><strong class="text-base text-emerald-700">₹{{ number_format($myPaid, 2) }}</strong></div>
+                                                <div><span class="block text-slate-500">Friends paid</span><strong class="text-base text-indigo-700">₹{{ number_format($friendsPaid, 2) }}</strong></div>
+                                                <div><span class="block text-slate-500">Payment breakdown</span><strong class="text-slate-800">{{ $displayBreakdown }}</strong></div>
+                                            </div>
+                                            <div class="overflow-x-auto">
+                                                <table class="w-full min-w-[900px] text-left text-xs">
+                                                    <tbody class="divide-y divide-slate-200 border-y border-slate-200 bg-white">
                                                         @foreach($groupExpenses as $member)
+                                                            @php $memberEditable = $member->isEditableByUser(); @endphp
                                                             <tr class="hover:bg-sky-50/50">
-                                                                <td class="px-4 py-2.5 font-medium text-slate-700">
-                                                                    <a href="{{ route('expenses.show', $member) }}" class="text-sky-700 hover:underline">{{ $member->description }}</a>
+                                                                <td class="w-24 px-4 py-3 text-[10px] font-semibold text-sky-700">Grouped</td>
+                                                                <td class="px-4 py-3 font-mono text-slate-600 whitespace-nowrap">
+                                                                    {{ $member->date->format('d M Y') }}
+                                                                    <span class="block text-[10px] text-slate-400">{{ $member->time }}</span>
                                                                 </td>
-                                                                <td class="px-4 py-2.5 text-slate-600">{{ $member->payment_method }}</td>
-                                                                <td class="px-4 py-2.5 text-right font-semibold text-rose-600">₹{{ number_format($member->totalAmount(), 2) }}</td>
+                                                                <td class="px-4 py-3 font-semibold text-slate-900">
+                                                                    <a href="{{ route('expenses.show', $member) }}" class="hover:underline">{{ $member->description }}</a>
+                                                                    @if($member->parent)
+                                                                        <span class="block text-[10px] font-normal text-slate-400">Sub-expense under: {{ $member->parent->description }}</span>
+                                                                    @endif
+                                                                    @if($member->notes)
+                                                                        <span class="block text-[10px] font-normal text-slate-400">{{ $member->notes }}</span>
+                                                                    @endif
+                                                                </td>
+                                                                <td class="px-4 py-3"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700">{{ $member->category?->name ?? 'Other' }}</span></td>
+                                                                <td class="px-4 py-3 font-bold text-rose-600 whitespace-nowrap">₹{{ number_format($member->totalAmount(), 2) }}</td>
+                                                                <td class="px-4 py-3 text-slate-600">{{ $member->payment_method }}</td>
+                                                                <td class="px-4 py-3 text-slate-600">{{ $member->paid_by }}</td>
+                                                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                                                    @if($memberEditable)
+                                                                        <a href="{{ route('expenses.edit', $member) }}" class="mr-2 font-semibold text-indigo-600 hover:text-indigo-500">Edit</a>
+                                                                        <form action="{{ route('expenses.destroy', $member) }}" method="POST" class="inline" onsubmit="return confirm('Archive this expense?');">
+                                                                            @csrf
+                                                                            @method('DELETE')
+                                                                            <button type="submit" class="font-semibold text-rose-600 hover:text-rose-500">Delete</button>
+                                                                        </form>
+                                                                    @else
+                                                                        <span class="text-[11px] font-medium text-slate-400">Locked</span>
+                                                                    @endif
+                                                                </td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
@@ -196,13 +235,43 @@
                 </div>
             @endif
         </div>
+        <div id="group-name-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4" onclick="if(event.target === this) closeGroupNameModal()">
+            <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-base font-bold text-slate-900">Edit group name</h2>
+                    <button type="button" onclick="closeGroupNameModal()" class="text-xl text-slate-400" aria-label="Close">&times;</button>
+                </div>
+                <form id="group-name-form" action="" method="POST" class="mt-4 space-y-3">
+                    @csrf
+                    @method('PUT')
+                    <input id="group-name-input" type="text" name="name" required maxlength="255" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm">
+                    <button type="submit" class="w-full rounded-xl bg-sky-600 py-2.5 text-sm font-semibold text-white hover:bg-sky-700">Save group name</button>
+                </form>
+            </div>
+        </div>
     </div>
     <script>
         function toggleExpenseGroup(groupId, button) {
             const details = document.getElementById(`expense-group-details-${groupId}`);
             const isHidden = details.classList.toggle('hidden');
-            button.textContent = isHidden ? '›' : '⌄';
+            const toggleButton = button.matches('button[aria-label]') ? button : button.closest('tr')?.querySelector('button[aria-label]');
+            if (toggleButton) toggleButton.textContent = isHidden ? '›' : '⌄';
             button.setAttribute('aria-expanded', String(!isHidden));
+        }
+
+        function openGroupNameModal(groupId, groupName) {
+            document.getElementById('group-name-form').action = `/finance/expense-groups/${groupId}`;
+            document.getElementById('group-name-input').value = groupName;
+            const modal = document.getElementById('group-name-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('group-name-input').focus();
+        }
+
+        function closeGroupNameModal() {
+            const modal = document.getElementById('group-name-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
     </script>
 </x-app-layout>

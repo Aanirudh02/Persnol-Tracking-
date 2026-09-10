@@ -26,7 +26,18 @@ class ExpenseController extends Controller
         $user = $request->user();
         $query = Expense::query()
             ->where('user_id', $user->id)
-            ->with(['category', 'parent', 'subItems', 'paidByFriend', 'expenseGroup.expenses.category', 'friendSplit.friend', 'friendSplits.friend']);
+            ->with([
+                'category',
+                'parent',
+                'subItems',
+                'paidByFriend',
+                'expenseGroup.expenses.category',
+                'expenseGroup.expenses.parent',
+                'expenseGroup.expenses.friendSplits.friend',
+                'expenseGroup.expenses.friendSplit.friend',
+                'friendSplit.friend',
+                'friendSplits.friend',
+            ]);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->integer('category_id'));
