@@ -1,5 +1,5 @@
 <x-app-layout title="Expenses">
-    <div class="expense-page space-y-6">
+    <div class="space-y-6">
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -57,7 +57,7 @@
                 </div>
             @else
                 <div class="overflow-x-auto">
-                    <table class="expense-table w-full text-left text-xs">
+                    <table class="w-full text-left text-xs">
                         <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-200/80 dark:border-slate-800">
                             <tr>
                                 <th class="py-3.5 px-4">Group</th>
@@ -94,7 +94,7 @@
                                         : null;
                                     $isEditable = $displayExpense->isEditableByUser();
                                 @endphp
-                                <tr class="expense-row hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
                                     <td class="py-3 px-4">
                                         @if($isGroup)
                                             <button type="button" class="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sm font-bold leading-none text-sky-700 transition hover:bg-sky-100" aria-label="Show individual expenses" aria-expanded="false" onclick="toggleExpenseGroup('{{ $exp->expenseGroup->id }}', this)">›</button>
@@ -104,34 +104,34 @@
                                         @endif
                                     </td>
                                     <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                                        <span class="block text-sm sm:text-[15px] font-medium leading-snug">{{ $displayDate->format('d M Y') }}</span>
-                                        <span class="block text-[11px] sm:text-xs text-slate-400 leading-snug">{{ $displayExpense->time }}</span>
+                                        {{ $displayDate->format('d M Y') }}
+                                        <span class="block text-[10px] text-slate-400">{{ $displayExpense->time }}</span>
                                     </td>
                                     <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">
-                                        <a href="{{ route('expenses.show', $displayExpense) }}" class="font-semibold text-slate-900 hover:underline text-[15px] sm:text-base">{{ $isGroup ? $exp->expenseGroup->name : $exp->description }}</a>
+                                        <a href="{{ route('expenses.show', $displayExpense) }}" class="font-semibold text-slate-900 hover:underline">{{ $isGroup ? $exp->expenseGroup->name : $exp->description }}</a>
                                         @if(!$isGroup && $exp->parent)
-                                            <span class="block text-[11px] sm:text-xs font-normal text-slate-400">Sub-expense under: {{ $exp->parent->description }}</span>
+                                            <span class="block text-[10px] font-normal text-slate-400">Sub-expense under: {{ $exp->parent->description }}</span>
                                         @endif
                                         @if($isGroup)
-                                            <span class="mt-1 block text-[11px] sm:text-xs font-normal text-slate-500">{{ $groupExpenses->count() }} transactions · {{ $displayMethods }}</span>
+                                            <span class="mt-1 block text-xs font-normal text-slate-500">{{ $groupExpenses->count() }} transactions · {{ $displayMethods }}</span>
                                         @elseif($exp->receipt_image)
-                                            <a href="{{ asset('storage/' . $exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[11px] sm:text-xs">📷 receipt</a>
+                                            <a href="{{ asset('storage/' . $exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px]">📷 receipt</a>
                                         @endif
                                         @if(!$isGroup && $exp->friendSplits->isNotEmpty())
-                                            <span class="block text-[11px] sm:text-xs font-medium text-indigo-600">
+                                            <span class="block text-[10px] font-medium text-indigo-600">
                                                 👥 Split: {{ $exp->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ' (share ₹' . number_format($s->friend_share, 2) . ($s->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($s->paid_by_friend_amount, 2) : '') . ')')->implode(', ') }}
                                             </span>
                                         @elseif(!$isGroup && $exp->friendSplit)
-                                            <span class="block text-[11px] sm:text-xs font-medium text-indigo-600">
+                                            <span class="block text-[10px] font-medium text-indigo-600">
                                                 👥 Split with {{ $exp->friendSplit->friend?->name }} (share ₹{{ number_format($exp->friendSplit->friend_share, 2) }}{{ $exp->friendSplit->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($exp->friendSplit->paid_by_friend_amount, 2) : '' }}) · net {{ $exp->friendSplit->netAmount() >= 0 ? '+' : '-' }}₹{{ number_format(abs($exp->friendSplit->netAmount()), 2) }}
                                             </span>
                                         @endif
                                         @if(!$isGroup && $exp->notes)
-                                            <span class="block text-[11px] sm:text-xs text-slate-400 font-normal">{{ $exp->notes }}</span>
+                                            <span class="block text-[10px] text-slate-400 font-normal">{{ $exp->notes }}</span>
                                         @endif
                                     </td>
                                     <td class="py-3 px-4">
-                                        <span class="px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                             {{ $displayExpense->category?->name ?? 'Other' }}
                                         </span>
                                     </td>
@@ -152,7 +152,7 @@
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">
                                         @if($isGroup)
                                             <span class="block font-semibold text-emerald-700">You ₹{{ number_format($myPaid, 2) }}</span>
-                                            @if($friendsPaid > 0)<span class="block text-[11px] sm:text-xs text-indigo-600">Friends ₹{{ number_format($friendsPaid, 2) }}</span>@else<span class="block text-[11px] sm:text-xs text-slate-400">You paid alone</span>@endif
+                                            @if($friendsPaid > 0)<span class="block text-[10px] text-indigo-600">Friends ₹{{ number_format($friendsPaid, 2) }}</span>@else<span class="block text-[10px] text-slate-400">You paid alone</span>@endif
                                         @else
                                             {{ $displayPaidBy }}
                                         @endif
@@ -174,7 +174,7 @@
                                     </td>
                                 </tr>
                                 @if($isGroup)
-                                    <tr id="expense-group-details-{{ $exp->expenseGroup->id }}" class="expense-group-details hidden">
+                                    <tr id="expense-group-details-{{ $exp->expenseGroup->id }}" class="hidden">
                                         <td colspan="8" class="bg-slate-50 p-0">
                                             <div class="grid grid-cols-2 gap-3 border-b border-slate-200 bg-sky-50/70 p-4 text-xs sm:grid-cols-4">
                                                 <div><span class="block text-slate-500">Group total</span><strong class="text-base text-slate-900">₹{{ number_format($displayAmount, 2) }}</strong></div>
