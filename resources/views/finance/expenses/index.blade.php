@@ -3,7 +3,7 @@
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Expenses</h1>
+                <h1 class="expense-page-title text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Expenses</h1>
                 <p class="text-xs text-slate-500">Total recorded: <span class="font-bold text-rose-600">₹{{ number_format($totalAmount, 2) }}</span></p>
             </div>
             <a href="{{ route('expenses.create') }}" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs shadow-md shadow-sky-600/20 flex items-center gap-1.5 self-start transition active:scale-95">
@@ -118,11 +118,11 @@
                                             <a href="{{ asset('storage/' . $exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px]">📷 receipt</a>
                                         @endif
                                         @if(!$isGroup && $exp->friendSplits->isNotEmpty())
-                                            <span class="block text-[10px] font-medium text-indigo-600">
+                                            <span class="block text-[11px] sm:text-xs font-medium text-indigo-600">
                                                 👥 Split: {{ $exp->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ' (share ₹' . number_format($s->friend_share, 2) . ($s->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($s->paid_by_friend_amount, 2) : '') . ')')->implode(', ') }}
                                             </span>
                                         @elseif(!$isGroup && $exp->friendSplit)
-                                            <span class="block text-[10px] font-medium text-indigo-600">
+                                            <span class="block text-[11px] sm:text-xs font-medium text-indigo-600">
                                                 👥 Split with {{ $exp->friendSplit->friend?->name }} (share ₹{{ number_format($exp->friendSplit->friend_share, 2) }}{{ $exp->friendSplit->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($exp->friendSplit->paid_by_friend_amount, 2) : '' }}) · net {{ $exp->friendSplit->netAmount() >= 0 ? '+' : '-' }}₹{{ number_format(abs($exp->friendSplit->netAmount()), 2) }}
                                             </span>
                                         @endif
@@ -252,9 +252,15 @@
     </div>
     <style>
         .expense-page {
-            font-size: 1.04rem;
+            font-size: 1.12rem;
         }
 
+        .expense-page .expense-page-title {
+            font-size: 2.2rem !important;
+        }
+
+        .expense-page th,
+        .expense-page td,
         .expense-page .text-xs,
         .expense-page .text-[10px],
         .expense-page .text-[11px],
@@ -264,12 +270,17 @@
             transition: font-size 0.15s ease;
         }
 
-        .expense-page .text-xs { font-size: 0.82rem !important; }
-        .expense-page .text-[10px] { font-size: 0.7rem !important; }
-        .expense-page .text-[11px] { font-size: 0.76rem !important; }
-        .expense-page .text-sm { font-size: 0.95rem !important; }
-        .expense-page .text-base { font-size: 1.04rem !important; }
-        .expense-page .text-2xl { font-size: 1.9rem !important; }
+        .expense-page th,
+        .expense-page td {
+            font-size: 0.98rem;
+        }
+
+        .expense-page .text-xs { font-size: 0.9rem !important; }
+        .expense-page .text-[10px] { font-size: 0.78rem !important; }
+        .expense-page .text-[11px] { font-size: 0.84rem !important; }
+        .expense-page .text-sm { font-size: 1.04rem !important; }
+        .expense-page .text-base { font-size: 1.14rem !important; }
+        .expense-page .text-2xl { font-size: 1.98rem !important; }
     </style>
     <script>
         function toggleExpenseGroup(groupId, button) {
