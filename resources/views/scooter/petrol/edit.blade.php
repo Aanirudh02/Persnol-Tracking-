@@ -134,6 +134,15 @@
                     >{{ old('notes', $petrol->notes) }}</textarea>
                 </div>
 
+                @if(!$petrol->expense_id)
+                    <label class="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs text-slate-700">
+                        <input type="checkbox" name="add_as_expense" value="1" class="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+                        <span><strong>Add this record as an expense</strong><span class="block text-[11px] text-slate-500">Creates an expense using the updated petrol details.</span></span>
+                    </label>
+                @else
+                    <p class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">This petrol record is linked to an expense. Updating it will update that expense too.</p>
+                @endif
+
                 <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                     <a href="{{ route('petrol.index') }}" class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">
                         Cancel

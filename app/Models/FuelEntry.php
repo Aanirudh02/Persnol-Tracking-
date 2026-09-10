@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FuelEntry extends Model
@@ -15,6 +16,7 @@ class FuelEntry extends Model
         'user_id',
         'vehicle_id',
         'daily_record_id',
+        'expense_id',
         'date',
         'time',
         'amount',
@@ -45,6 +47,11 @@ class FuelEntry extends Model
     public function dailyRecord(): BelongsTo
     {
         return $this->belongsTo(DailyRecord::class);
+    }
+
+    public function expense(): HasOne
+    {
+        return $this->hasOne(Expense::class, 'id', 'expense_id');
     }
 
     public function vehicle(): BelongsTo

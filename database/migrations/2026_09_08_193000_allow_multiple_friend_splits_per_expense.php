@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('friend_splits', function (Blueprint $table) {
-            // Drop the single unique constraint on expense_id so an expense can have multiple friend splits
+            $table->dropForeign(['expense_id']);
             $table->dropUnique(['expense_id']);
-            // Allow multiple splits per expense, uniquely identifying per (expense, friend) pair
+            $table->foreign('expense_id')->references('id')->on('expenses')->nullOnDelete();
             $table->unique(['expense_id', 'friend_id']);
         });
     }
@@ -19,8 +19,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('friend_splits', function (Blueprint $table) {
+            $table->dropForeign(['expense_id']);
             $table->dropUnique(['expense_id', 'friend_id']);
             $table->unique('expense_id');
+            $table->foreign('expense_id')->references('id')->on('expenses')->nullOnDelete();
         });
     }
 };

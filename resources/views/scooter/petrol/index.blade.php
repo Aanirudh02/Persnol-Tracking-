@@ -59,9 +59,11 @@
                                 <td class="py-3 px-4 font-mono text-slate-500">{{ $fuel->odometer ? number_format($fuel->odometer) . ' km' : '--' }}</td>
                                 <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $fuel->petrol_station ?? '--' }}</td>
                                 <td class="py-3 px-4 text-right">
-                                    <form action="{{ route('petrol.destroy', $fuel) }}" method="POST" class="inline" onsubmit="return confirm('Delete petrol record?');">
+                                    <a href="{{ route('petrol.edit', $fuel) }}" class="mr-3 text-slate-600 hover:underline">Edit</a>
+                                    <form action="{{ route('petrol.destroy', $fuel) }}" method="POST" class="inline petrol-delete-form" data-has-expense="{{ $fuel->expense ? '1' : '0' }}">
                                         @csrf
                                         @method('DELETE')
+                                        <input type="hidden" name="delete_linked_expense" value="0">
                                         <button type="submit" class="text-rose-600 hover:underline">Delete</button>
                                     </form>
                                 </td>
@@ -128,12 +130,36 @@
                     </select>
                 </div>
 
+                <label class="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-slate-700">
+                    <input type="checkbox" name="add_as_expense" value="1" class="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+                    <span><strong>Add this as an expense</strong><span class="block text-[11px] text-slate-500">Uses the amount, date, station, payment method, and notes above.</span></span>
+                </label>
+
+                <div>
+                    <label class="block text-slate-500 mb-1">Notes</label>
+                    <textarea name="notes" rows="2" placeholder="Optional details" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
+                </div>
+
                 <button type="submit" class="w-full py-2.5 rounded-xl bg-teal-600 text-white font-semibold shadow-md transition">Save Petrol Entry</button>
             </form>
         </div>
     </div>
 
     <script>
+        document.querySelectorAll('.petrol-delete-form').forEach((form) => {
+            form.addEventListener('submit', (event) => {
+                if (!window.confirm('Delete this petrol record?')) {
+                    event.preventDefault();
+                    return;
+                }
+
+                if (form.dataset.hasExpense !== '1') return;
+
+                const deleteExpense = window.confirm('This petrol record has a linked expense. Press OK to delete the expense too, or Cancel to preserve and detach it.');
+                form.querySelector('[name="delete_linked_expense"]').value = deleteExpense ? '1' : '0';
+            });
+        });
+
         window.calcFuelPrice = function() {
             const amt = parseFloat(document.getElementById('petrol-amt').value) || 0;
             const lit = parseFloat(document.getElementById('petrol-litres').value) || 0;

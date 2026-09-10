@@ -16,10 +16,15 @@ window.showToast = function (message, type = 'success') {
     };
 
     toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-2 opacity-0 ${colors[type] || colors.info}`;
-    toast.innerHTML = `
-        <span>${message}</span>
-        <button onclick="this.parentElement.remove()" class="ml-auto opacity-75 hover:opacity-100">&times;</button>
-    `;
+    const text = document.createElement('span');
+    text.textContent = message;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'ml-auto opacity-75 hover:opacity-100';
+    close.setAttribute('aria-label', 'Dismiss notification');
+    close.textContent = '×';
+    close.addEventListener('click', () => toast.remove());
+    toast.append(text, close);
 
     container.appendChild(toast);
     requestAnimationFrame(() => {
@@ -72,6 +77,26 @@ window.toggleTheme = function() {
     localStorage.setItem('theme', 'light');
 };
 window.initTheme();
+
+// Keep inline modal implementations consistent across the legacy Blade views.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+
+    document.querySelectorAll('.fixed:not(.hidden)').forEach((element) => {
+        if (element.id === 'toast-container') return;
+        if (element.classList.contains('z-50')) element.classList.add('hidden');
+    });
+});
+
+const syncModalScrollLock = () => {
+    const hasOpenModal = [...document.querySelectorAll('.fixed.z-50')]
+        .some((element) => !element.classList.contains('hidden'));
+    document.body.classList.toggle('overflow-hidden', hasOpenModal);
+};
+
+const modalObserver = new MutationObserver(syncModalScrollLock);
+modalObserver.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ['class'] });
+document.addEventListener('DOMContentLoaded', syncModalScrollLock);
 
 function debounce(fn, ms) {
     let t;

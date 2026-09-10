@@ -127,6 +127,11 @@ class Expense extends Model
         return $this->hasMany(FoodEntry::class);
     }
 
+    public function fuelEntry(): HasOne
+    {
+        return $this->hasOne(FuelEntry::class, 'expense_id');
+    }
+
     public function totalWithChildren(): float
     {
         return $this->totalAmount();

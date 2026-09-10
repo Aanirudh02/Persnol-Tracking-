@@ -28,6 +28,8 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
+
 // Authentication (Private App: Strictly NO Public Registration)
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');

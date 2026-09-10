@@ -91,8 +91,20 @@
                             autocomplete="current-password"
                             required
                             placeholder="••••••••"
-                            class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 transition placeholder-slate-400"
+                            class="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-900 transition placeholder-slate-400"
                         />
+                        <button
+                            type="button"
+                            id="toggle-password"
+                            aria-label="Show password"
+                            aria-pressed="false"
+                            class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-sky-600 transition"
+                        >
+                            <svg id="password-eye" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -103,6 +115,8 @@
                             type="checkbox"
                             name="remember"
                             id="remember"
+                            value="1"
+                            @checked(old('remember'))
                             class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 bg-slate-50"
                         />
                         <span class="text-xs text-slate-600">Remember Me</span>
@@ -145,4 +159,18 @@
             LifeTracker &copy; {{ date('Y') }} &bull; Private & Encrypted
         </p>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const password = document.getElementById('password');
+            const toggle = document.getElementById('toggle-password');
+
+            toggle?.addEventListener('click', () => {
+                const showing = password.type === 'text';
+                password.type = showing ? 'password' : 'text';
+                toggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+                toggle.setAttribute('aria-pressed', String(!showing));
+            });
+        });
+    </script>
 </x-guest-layout>
