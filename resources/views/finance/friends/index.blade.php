@@ -177,15 +177,15 @@
                 </div>
             @endforelse
 
-            <div id="add-friend-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
-        <div class="flex min-h-full items-center justify-center py-4">
-            <div class="w-full max-w-md max-h-[92vh] flex flex-col rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl overflow-hidden my-auto" onclick="event.stopPropagation()">
+            <div id="add-friend-modal" class="fixed inset-0 z-50 hidden overflow-y-auto overscroll-contain bg-black/60 p-2 sm:p-6 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="flex min-h-full items-center justify-center py-2 sm:py-4">
+            <div class="w-full max-w-md max-h-[calc(100dvh-1rem)] sm:max-h-[92vh] flex flex-col rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl overflow-hidden my-auto" onclick="event.stopPropagation()">
                 <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
                     <h3 class="text-lg font-bold text-slate-900">Add Friend</h3>
                     <button type="button" onclick="document.getElementById('add-friend-modal').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-slate-600 transition p-1">&times;</button>
                 </div>
 
-                <div class="overflow-y-auto pr-1 flex-1">
+                <div class="min-h-0 overflow-y-auto overscroll-contain pr-1 flex-1">
                     <form action="{{ route('friends.store') }}" method="POST" class="space-y-4 text-sm">
                         @csrf
                         <div>

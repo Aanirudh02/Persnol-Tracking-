@@ -1,6 +1,6 @@
 @props(['title' => 'Dashboard'])
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -8,7 +8,7 @@
     <title>{{ $title }} - {{ config('app.name', 'LifeTracker') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full bg-canvas text-slate-900 antialiased font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-slate-900 selection:text-white">
+<body class="min-h-screen bg-canvas text-slate-900 antialiased font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-slate-900 selection:text-white">
 
     <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white border-r border-slate-200">
         <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-200">
@@ -95,7 +95,7 @@
             </div>
         </header>
 
-        <main class="flex-1 min-h-0 overflow-y-auto pb-24 md:pb-12 px-3 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
+        <main class="flex-1 pb-24 md:pb-12 px-3 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
             @if(!empty($globalPrompts ?? []))
                 <div class="space-y-3 mb-6">
                     @foreach($globalPrompts as $prompt)
