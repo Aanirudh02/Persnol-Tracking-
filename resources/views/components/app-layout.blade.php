@@ -8,7 +8,7 @@
     <title>{{ $title }} - {{ config('app.name', 'LifeTracker') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-canvas text-slate-900 antialiased font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-slate-900 selection:text-white">
+<body class="app-body min-h-screen bg-canvas text-slate-900 antialiased font-sans overflow-x-hidden selection:bg-slate-900 selection:text-white">
 
     <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white border-r border-slate-200">
         <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-200">
@@ -58,7 +58,7 @@
         </div>
     </aside>
 
-    <div class="md:pl-64 flex flex-col flex-1 min-h-screen min-w-0">
+    <div class="app-main md:pl-64 min-h-screen min-w-0">
         <header class="sticky top-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6">
             <div class="flex items-center gap-3 md:w-80">
                 <div class="md:hidden flex items-center gap-2">

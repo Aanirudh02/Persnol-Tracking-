@@ -91,7 +91,7 @@ document.addEventListener('keydown', (event) => {
 const syncModalScrollLock = () => {
     const hasOpenModal = [...document.querySelectorAll('.fixed.z-50')]
         .some((element) => !element.classList.contains('hidden'));
-    document.body.classList.toggle('overflow-hidden', hasOpenModal);
+    document.body.classList.toggle('modal-open', hasOpenModal);
 };
 
 const modalObserver = new MutationObserver(syncModalScrollLock);

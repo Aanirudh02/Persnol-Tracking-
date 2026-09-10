@@ -17,7 +17,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-[#f4f8fc] text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased font-sans flex flex-col md:flex-row overflow-x-hidden selection:bg-sky-500 selection:text-white">
+<body class="app-body min-h-screen bg-[#f4f8fc] text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased font-sans overflow-x-hidden selection:bg-sky-500 selection:text-white">
 
     <!-- DESKTOP SIDEBAR -->
     <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white dark:bg-slate-900 border-r border-sky-100 dark:border-slate-800 transition-colors duration-200">
@@ -114,7 +114,7 @@
     </aside>
 
     <!-- MAIN CONTENT WRAPPER -->
-    <div class="md:pl-64 flex flex-col flex-1 min-h-screen min-w-0">
+    <div class="app-main md:pl-64 min-h-screen min-w-0">
         <!-- TOP APP BAR -->
         <header class="sticky top-0 z-20 h-16 bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border-b border-sky-100 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6">
             <!-- Mobile Brand & Title -->
