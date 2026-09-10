@@ -48,7 +48,7 @@
             <form id="group-expenses-form" action="{{ route('expenses.group') }}" method="POST" class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4 text-xs">
                 @csrf
                 <button type="submit" class="px-3 py-2 rounded-xl bg-sky-600 text-white font-semibold">Group selected expenses</button>
-                <span class="text-slate-400">The group name will use the selected expense description.</span>
+                <span class="text-slate-400">Select any two or more ungrouped expenses, including sub-expenses. Friend-split expenses stay separate.</span>
             </form>
             @if($expenses->isEmpty())
                 <div class="text-center py-16 text-slate-400 text-xs">
@@ -107,6 +107,9 @@
                                     </td>
                                     <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">
                                         <a href="{{ route('expenses.show', $displayExpense) }}" class="font-semibold text-slate-900 hover:underline">{{ $isGroup ? $exp->expenseGroup->name : $exp->description }}</a>
+                                        @if(!$isGroup && $exp->parent)
+                                            <span class="block text-[10px] font-normal text-slate-400">Sub-expense under: {{ $exp->parent->description }}</span>
+                                        @endif
                                         @if($isGroup)
                                             <form action="{{ route('expense-groups.update', $exp->expenseGroup) }}" method="POST" class="mt-1 flex items-center gap-1">
                                                 @csrf

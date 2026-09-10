@@ -26,8 +26,7 @@ class ExpenseController extends Controller
         $user = $request->user();
         $query = Expense::query()
             ->where('user_id', $user->id)
-            ->whereNull('parent_id')
-            ->with(['category', 'subItems', 'paidByFriend', 'expenseGroup.expenses.category', 'friendSplit.friend', 'friendSplits.friend']);
+            ->with(['category', 'parent', 'subItems', 'paidByFriend', 'expenseGroup.expenses.category', 'friendSplit.friend', 'friendSplits.friend']);
 
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->integer('category_id'));
@@ -286,14 +285,14 @@ class ExpenseController extends Controller
 
         $expenses = Expense::query()
             ->where('user_id', $request->user()->id)
-            ->whereNull('parent_id')
             ->whereNull('expense_group_id')
             ->whereDoesntHave('friendSplit')
+            ->whereDoesntHave('friendSplits')
             ->whereIn('id', $validated['expense_ids'])
             ->get();
 
         if ($expenses->count() !== count(array_unique($validated['expense_ids']))) {
-            return back()->withInput()->with('error', 'Only your ungrouped top-level expenses without friend splits can be grouped.');
+            return back()->withInput()->with('error', 'Select at least two of your own ungrouped expenses without friend splits. Parent and sub-expenses can both be grouped.');
         }
 
         $group = DB::transaction(function () use ($request, $validated, $expenses): ExpenseGroup {

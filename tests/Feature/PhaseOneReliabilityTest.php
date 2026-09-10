@@ -65,6 +65,43 @@ class PhaseOneReliabilityTest extends TestCase
         $this->assertStringContainsString('Export Friend', $csvResponse->streamedContent());
     }
 
+    public function test_ungrouped_parent_and_sub_expenses_can_be_grouped_together(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $parent = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 100,
+            'gst_amount' => 0,
+            'date' => '2026-09-10',
+            'description' => 'Household bill',
+            'payment_method' => 'UPI',
+            'paid_by' => 'Me',
+            'paid_by_type' => 'me',
+        ]);
+        $child = Expense::query()->create([
+            'user_id' => $user->id,
+            'parent_id' => $parent->id,
+            'amount' => 40,
+            'gst_amount' => 0,
+            'date' => '2026-09-10',
+            'description' => 'Electricity line',
+            'payment_method' => 'UPI',
+            'paid_by' => 'Me',
+            'paid_by_type' => 'me',
+        ]);
+
+        $this->actingAs($user)->post(route('expenses.group'), [
+            'expense_ids' => [$parent->id, $child->id],
+            'name' => 'Household grouped',
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->assertSame(
+            $parent->fresh()->expense_group_id,
+            $child->fresh()->expense_group_id
+        );
+        $this->assertNotNull($parent->fresh()->expense_group_id);
+    }
+
     public function test_petrol_can_create_and_update_a_linked_expense(): void
     {
         $user = User::factory()->create(['is_active' => true]);
