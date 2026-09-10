@@ -152,7 +152,7 @@
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">
                                         @if($isGroup)
                                             <span class="block font-semibold text-emerald-700">You ₹{{ number_format($myPaid, 2) }}</span>
-                                            @if($friendsPaid > 0)<span class="block text-[10px] text-indigo-600">Friends ₹{{ number_format($friendsPaid, 2) }}</span>@else<span class="block text-[10px] text-slate-400">You paid alone</span>@endif
+                                            @if($friendsPaid > 0)<span class="block text-[11px] sm:text-xs text-indigo-600">Friends ₹{{ number_format($friendsPaid, 2) }}</span>@else<span class="block text-[11px] sm:text-xs text-slate-400">You paid alone</span>@endif
                                         @else
                                             {{ $displayPaidBy }}
                                         @endif
