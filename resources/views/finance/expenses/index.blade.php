@@ -57,7 +57,7 @@
                 </div>
             @else
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
+                    <table class="expense-table w-full text-left text-xs">
                         <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-200/80 dark:border-slate-800">
                             <tr>
                                 <th class="py-3.5 px-4">Group</th>
@@ -94,7 +94,7 @@
                                         : null;
                                     $isEditable = $displayExpense->isEditableByUser();
                                 @endphp
-                                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                                <tr class="expense-row hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
                                     <td class="py-3 px-4">
                                         @if($isGroup)
                                             <button type="button" class="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sm font-bold leading-none text-sky-700 transition hover:bg-sky-100" aria-label="Show individual expenses" aria-expanded="false" onclick="toggleExpenseGroup('{{ $exp->expenseGroup->id }}', this)">›</button>
@@ -174,7 +174,7 @@
                                     </td>
                                 </tr>
                                 @if($isGroup)
-                                    <tr id="expense-group-details-{{ $exp->expenseGroup->id }}" class="hidden">
+                                    <tr id="expense-group-details-{{ $exp->expenseGroup->id }}" class="expense-group-details hidden">
                                         <td colspan="8" class="bg-slate-50 p-0">
                                             <div class="grid grid-cols-2 gap-3 border-b border-slate-200 bg-sky-50/70 p-4 text-xs sm:grid-cols-4">
                                                 <div><span class="block text-slate-500">Group total</span><strong class="text-base text-slate-900">₹{{ number_format($displayAmount, 2) }}</strong></div>
@@ -251,36 +251,146 @@
         </div>
     </div>
     <style>
-        .expense-page {
-            font-size: 1.12rem;
+        .expense-page .expense-table {
+            table-layout: fixed;
+        }
+
+        .expense-page .expense-table th,
+        .expense-page .expense-table td {
+            font-size: 0.875rem;
+            vertical-align: top;
+        }
+
+        .expense-page .expense-table th:nth-child(1),
+        .expense-page .expense-table td:nth-child(1) { width: 8%; }
+
+        .expense-page .expense-table th:nth-child(2),
+        .expense-page .expense-table td:nth-child(2) { width: 12%; }
+
+        .expense-page .expense-table th:nth-child(3),
+        .expense-page .expense-table td:nth-child(3) {
+            width: 34%;
+            overflow-wrap: anywhere;
+        }
+
+        .expense-page .expense-table th:nth-child(4),
+        .expense-page .expense-table td:nth-child(4) { width: 10%; }
+
+        .expense-page .expense-table th:nth-child(5),
+        .expense-page .expense-table td:nth-child(5) { width: 9%; }
+
+        .expense-page .expense-table th:nth-child(6),
+        .expense-page .expense-table td:nth-child(6) { width: 9%; }
+
+        .expense-page .expense-table th:nth-child(7),
+        .expense-page .expense-table td:nth-child(7) { width: 9%; }
+
+        .expense-page .expense-table th:nth-child(8),
+        .expense-page .expense-table td:nth-child(8) {
+            width: 9%;
+            white-space: nowrap;
+        }
+
+        .expense-page .expense-table td:nth-child(3) > a {
+            font-size: 0.95rem;
         }
 
         .expense-page .expense-page-title {
-            font-size: 2.2rem !important;
+            font-size: 1.625rem;
         }
 
-        .expense-page th,
-        .expense-page td,
-        .expense-page .text-xs,
-        .expense-page .text-[10px],
-        .expense-page .text-[11px],
-        .expense-page .text-sm,
-        .expense-page .text-base,
-        .expense-page .text-2xl {
-            transition: font-size 0.15s ease;
-        }
+        @media (max-width: 639px) {
+            .expense-page .expense-table {
+                display: block;
+            }
 
-        .expense-page th,
-        .expense-page td {
-            font-size: 0.98rem;
-        }
+            .expense-page .expense-table thead {
+                display: none;
+            }
 
-        .expense-page .text-xs { font-size: 0.9rem !important; }
-        .expense-page .text-[10px] { font-size: 0.78rem !important; }
-        .expense-page .text-[11px] { font-size: 0.84rem !important; }
-        .expense-page .text-sm { font-size: 1.04rem !important; }
-        .expense-page .text-base { font-size: 1.14rem !important; }
-        .expense-page .text-2xl { font-size: 1.98rem !important; }
+            .expense-page .expense-table tbody,
+            .expense-page .expense-table .expense-row {
+                display: block;
+            }
+
+            .expense-page .expense-table .expense-row {
+                display: grid;
+                grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+                gap: 0.25rem 0.5rem;
+                padding: 0.75rem 0.5rem;
+            }
+
+            .expense-page .expense-table .expense-row > td {
+                display: none;
+                min-width: 0;
+                padding: 0.25rem 0.25rem;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(1) {
+                display: block;
+                grid-column: 1;
+                grid-row: 1 / span 3;
+                padding-left: 0;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(2) {
+                display: block;
+                grid-column: 2;
+                grid-row: 1;
+                padding-top: 0;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(3) {
+                display: block;
+                grid-column: 2;
+                grid-row: 2;
+                overflow-wrap: anywhere;
+                padding-top: 0;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(4) {
+                display: block;
+                grid-column: 2;
+                grid-row: 3;
+                padding-top: 0.15rem;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(5) {
+                display: block;
+                grid-column: 3;
+                grid-row: 1 / span 2;
+                padding-right: 0;
+                text-align: right;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(8) {
+                display: block;
+                grid-column: 3;
+                grid-row: 3;
+                padding-right: 0;
+                text-align: right;
+            }
+
+            .expense-page .expense-table .expense-row > td:nth-child(8) a,
+            .expense-page .expense-table .expense-row > td:nth-child(8) button {
+                margin-right: 0;
+            }
+
+            .expense-page .expense-table .expense-group-details {
+                display: block;
+            }
+
+            .expense-page .expense-table .expense-group-details > td {
+                display: block;
+                width: 100%;
+            }
+
+            .expense-page .expense-table .expense-group-details table { min-width: 42rem; }
+
+            .expense-page .expense-table .expense-row > td:nth-child(3) > a {
+                font-size: 1rem;
+            }
+        }
     </style>
     <script>
         function toggleExpenseGroup(groupId, button) {
