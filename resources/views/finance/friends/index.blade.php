@@ -175,10 +175,6 @@
                 <div class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
                     No friends added yet.
                 </div>
-            @empty
-                <div class="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
-                    No friends added yet.
-                </div>
             @endforelse
 
             <div id="add-friend-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/60 p-3 sm:p-6 backdrop-blur-sm" onclick="if(event.target === this) this.classList.add('hidden')">
