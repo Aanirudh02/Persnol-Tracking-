@@ -9,6 +9,7 @@ use App\Models\FoodEntry;
 use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\Mistake;
+use App\Models\PersonalExpense;
 use App\Models\ScooterTrip;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,16 +21,65 @@ class AnalyticsController extends Controller
     {
         $user = $request->user();
         $days = (int) $request->get('days', 30);
+        $expenseType = $request->get('expense_type', 'normal');
+        if (! in_array($expenseType, ['normal', 'personal'], true)) {
+            $expenseType = 'normal';
+        }
         $startDate = Carbon::today()->subDays($days)->toDateString();
 
         // 1. Finance Analytics
-        $expensesByDay = Expense::where('user_id', $user->id)
-            ->where('date', '>=', $startDate)
-            ->selectRaw('date, sum(amount + gst_amount) as total')
-            ->groupBy('date')
-            ->orderBy('date')
-            ->pluck('total', 'date')
-            ->toArray();
+        if ($expenseType === 'personal') {
+            $expensesByDay = PersonalExpense::where('user_id', $user->id)
+                ->where('date', '>=', $startDate)
+                ->selectRaw('date, sum(amount) as total')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->pluck('total', 'date')
+                ->toArray();
+
+            $categorySpending = PersonalExpense::where('personal_expenses.user_id', $user->id)
+                ->where('personal_expenses.date', '>=', $startDate)
+                ->join('personal_expense_categories', 'personal_expenses.category_id', '=', 'personal_expense_categories.id')
+                ->selectRaw('personal_expense_categories.name, sum(personal_expenses.amount) as total, personal_expense_categories.color')
+                ->groupBy('personal_expense_categories.name', 'personal_expense_categories.color')
+                ->orderByDesc('total')
+                ->get();
+
+            $paymentMethods = PersonalExpense::where('user_id', $user->id)
+                ->where('date', '>=', $startDate)
+                ->selectRaw('payment_method, sum(amount) as total')
+                ->groupBy('payment_method')
+                ->orderByDesc('total')
+                ->pluck('total', 'payment_method')
+                ->toArray();
+        } else {
+            $expensesByDay = Expense::where('user_id', $user->id)
+                ->where('date', '>=', $startDate)
+                ->whereNull('parent_id')
+                ->selectRaw('date, sum(amount + gst_amount) as total')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->pluck('total', 'date')
+                ->toArray();
+
+            $categorySpending = Expense::where('expenses.user_id', $user->id)
+                ->where('expenses.date', '>=', $startDate)
+                ->whereNull('expenses.parent_id')
+                ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
+                ->selectRaw('expense_categories.name, sum(expenses.amount + expenses.gst_amount) as total, expense_categories.color')
+                ->groupBy('expense_categories.name', 'expense_categories.color')
+                ->orderByDesc('total')
+                ->get();
+
+            $paymentMethods = Expense::where('user_id', $user->id)
+                ->where('date', '>=', $startDate)
+                ->whereNull('parent_id')
+                ->selectRaw('payment_method, sum(amount + gst_amount) as total')
+                ->groupBy('payment_method')
+                ->orderByDesc('total')
+                ->pluck('total', 'payment_method')
+                ->toArray();
+        }
 
         $incomeByDay = Income::where('user_id', $user->id)
             ->where('date', '>=', $startDate)
@@ -37,22 +87,6 @@ class AnalyticsController extends Controller
             ->groupBy('date')
             ->orderBy('date')
             ->pluck('total', 'date')
-            ->toArray();
-
-        $categorySpending = Expense::where('expenses.user_id', $user->id)
-            ->where('expenses.date', '>=', $startDate)
-            ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
-            ->selectRaw('expense_categories.name, sum(expenses.amount + expenses.gst_amount) as total, expense_categories.color')
-            ->groupBy('expense_categories.name', 'expense_categories.color')
-            ->orderByDesc('total')
-            ->get();
-
-        $paymentMethods = Expense::where('user_id', $user->id)
-            ->where('date', '>=', $startDate)
-            ->selectRaw('payment_method, sum(amount + gst_amount) as total')
-            ->groupBy('payment_method')
-            ->orderByDesc('total')
-            ->pluck('total', 'payment_method')
             ->toArray();
 
         // 2. Food & Snacks Analytics
@@ -118,6 +152,7 @@ class AnalyticsController extends Controller
 
         return view('analytics.index', compact(
             'days',
+            'expenseType',
             'expensesByDay',
             'incomeByDay',
             'categorySpending',

@@ -13,6 +13,7 @@ use App\Services\FinanceLinkService;
 use App\Services\FinanceService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -820,5 +821,63 @@ class ExpenseController extends Controller
             'split' => ['Split Payment', 'split', $friend?->id],
             default => ['Me', 'me', $friend?->id],
         };
+    }
+
+    public function calculateByCategory(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $period = $request->get('period', 'month');
+        $fromDate = $request->get('from_date');
+        $toDate = $request->get('to_date');
+        $categoryId = $request->get('category_id');
+
+        $today = Carbon::today();
+        [$startDate, $endDate] = match ($period) {
+            'day' => [$today->toDateString(), $today->toDateString()],
+            'week' => [$today->copy()->startOfWeek()->toDateString(), $today->copy()->endOfWeek()->toDateString()],
+            'month' => [$today->copy()->startOfMonth()->toDateString(), $today->copy()->endOfMonth()->toDateString()],
+            'year' => [$today->copy()->startOfYear()->toDateString(), $today->copy()->endOfYear()->toDateString()],
+            'custom' => [$fromDate ?: $today->copy()->startOfMonth()->toDateString(), $toDate ?: $today->toDateString()],
+            default => [null, null],
+        };
+
+        $query = Expense::query()
+            ->where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->with('category');
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('date', [$startDate, $endDate]);
+        }
+
+        if (! empty($categoryId) && $categoryId !== 'all') {
+            $query->where('category_id', (int) $categoryId);
+        }
+
+        $expenses = $query->get();
+        $overallTotal = round($expenses->sum(fn ($e) => $e->totalAmount()), 2);
+
+        $breakdown = $expenses->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')
+            ->map(function ($group, $name) use ($overallTotal) {
+                $sum = round($group->sum(fn ($e) => $e->totalAmount()), 2);
+                $pct = $overallTotal > 0 ? round(($sum / $overallTotal) * 100, 1) : 0;
+
+                return [
+                    'category' => $name,
+                    'count' => $group->count(),
+                    'total' => $sum,
+                    'percentage' => $pct,
+                ];
+            })->values();
+
+        return response()->json([
+            'status' => 'success',
+            'period' => $period,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'overall_total' => $overallTotal,
+            'transaction_count' => $expenses->count(),
+            'breakdown' => $breakdown,
+        ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\Mistake;
 use App\Models\Payment;
+use App\Models\PersonalExpense;
 use App\Models\ScooterTrip;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -18,15 +19,29 @@ class ReportController extends Controller
     {
         $user = $request->user();
         $filter = $request->get('preset', 'this_month');
+        $expenseType = $request->get('expense_type', 'normal');
+        if (! in_array($expenseType, ['normal', 'personal'], true)) {
+            $expenseType = 'normal';
+        }
 
         [$startDate, $endDate] = $this->resolveDateRange($filter, $request->from_date, $request->to_date);
 
-        $expenses = Expense::where('user_id', $user->id)
-            ->whereBetween('date', [$startDate, $endDate])
-            ->whereNull('parent_id')
-            ->with('category')
-            ->orderBy('date')
-            ->get();
+        if ($expenseType === 'personal') {
+            $expenses = PersonalExpense::where('user_id', $user->id)
+                ->whereBetween('date', [$startDate, $endDate])
+                ->with('category')
+                ->orderBy('date')
+                ->get();
+            $totalExpenses = (float) $expenses->sum('amount');
+        } else {
+            $expenses = Expense::where('user_id', $user->id)
+                ->whereBetween('date', [$startDate, $endDate])
+                ->whereNull('parent_id')
+                ->with('category')
+                ->orderBy('date')
+                ->get();
+            $totalExpenses = (float) $expenses->sum(fn (Expense $expense): float => $expense->totalAmount());
+        }
 
         $incomes = Income::where('user_id', $user->id)
             ->whereBetween('date', [$startDate, $endDate])
@@ -55,13 +70,13 @@ class ReportController extends Controller
             ->orderBy('date')
             ->get();
 
-        $totalExpenses = $expenses->sum(fn (Expense $expense): float => $expense->totalAmount());
         $totalIncome = $incomes->sum('amount');
         $totalDistance = $trips->sum('distance_km');
         $totalPetrol = $fuelEntries->sum('amount');
 
         return view('reports.index', compact(
             'filter',
+            'expenseType',
             'startDate',
             'endDate',
             'expenses',
@@ -81,6 +96,10 @@ class ReportController extends Controller
     {
         $user = $request->user();
         $module = $request->get('module', 'expenses');
+        $expenseType = $request->get('expense_type', 'normal');
+        if ($module === 'expenses' && $expenseType === 'personal') {
+            $module = 'personal_expenses';
+        }
         $filter = $request->get('preset', 'this_month');
         [$startDate, $endDate] = $this->resolveDateRange($filter, $request->from_date, $request->to_date);
 
@@ -94,6 +113,12 @@ class ReportController extends Controller
                 $records = Expense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->whereNull('parent_id')->with('category')->get();
                 foreach ($records as $r) {
                     fputcsv($handle, [$r->id, $r->date->toDateString(), $r->time, $r->category?->name ?? 'Other', $r->description, $r->amount, $r->gst_amount, $r->totalAmount(), $r->payment_method, $r->paid_by, $r->notes]);
+                }
+            } elseif ($module === 'personal_expenses') {
+                fputcsv($handle, ['ID', 'Date', 'Time', 'Category', 'Description', 'Amount', 'Payment Method', 'Notes']);
+                $records = PersonalExpense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->with('category')->get();
+                foreach ($records as $r) {
+                    fputcsv($handle, [$r->id, $r->date->toDateString(), $r->time, $r->category?->name ?? 'Other', $r->description, $r->amount, $r->payment_method, $r->notes]);
                 }
             } elseif ($module === 'income') {
                 fputcsv($handle, ['ID', 'Date', 'Source', 'Description', 'Amount', 'Payment Method', 'Notes']);

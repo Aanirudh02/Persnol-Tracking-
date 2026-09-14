@@ -26,6 +26,9 @@
             <div class="pt-2 pb-1"><p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Finance</p></div>
             <x-nav-link href="{{ route('finance.index') }}" :active="request()->routeIs('finance.index')" icon="credit-card">Finance Hub</x-nav-link>
             <x-nav-link href="{{ route('expenses.index') }}" :active="request()->routeIs('expenses.*')" icon="trending-down">Expenses</x-nav-link>
+            <x-nav-link href="{{ route('personal-expenses.index') }}" :active="request()->routeIs('personal-expenses.*')" icon="user">Personal Expenses</x-nav-link>
+            <x-nav-link href="{{ route('all-expenses.index') }}" :active="request()->routeIs('all-expenses.*')" icon="layers">All Expenses</x-nav-link>
+            <x-nav-link href="{{ route('statements.index') }}" :active="request()->routeIs('statements.*')" icon="file-text">Statements</x-nav-link>
             <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">Money Received</x-nav-link>
             <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">Payments</x-nav-link>
             <x-nav-link href="{{ route('friends.index') }}" :active="request()->routeIs('friends.*')" icon="users">Friends & Splits</x-nav-link>
@@ -178,6 +181,9 @@
             </div>
             <div class="grid grid-cols-3 gap-3 text-center">
                 @foreach([
+                    ['personal-expenses.index', 'Personal Expenses', []],
+                    ['all-expenses.index', 'All Expenses', []],
+                    ['statements.index', 'Statements', []],
                     ['food.index', 'Food', []],
                     ['food.index', 'Snacks', ['is_snack' => 1]],
                     ['sleep.index', 'Sleep', []],

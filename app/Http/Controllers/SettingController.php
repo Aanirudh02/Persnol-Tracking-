@@ -11,6 +11,7 @@ use App\Models\FoodCategory;
 use App\Models\IncomeCategory;
 use App\Models\PaymentWallet;
 use App\Models\Permission;
+use App\Models\PersonalExpenseCategory;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
@@ -130,6 +131,9 @@ class SettingController extends Controller
         $expenseCategories = ExpenseCategory::where(function ($q) use ($user) {
             $q->whereNull('user_id')->orWhere('user_id', $user->id);
         })->orderBy('name')->get();
+        $personalExpenseCategories = PersonalExpenseCategory::where(function ($q) use ($user) {
+            $q->whereNull('user_id')->orWhere('user_id', $user->id);
+        })->orderBy('name')->get();
         $incomeCategories = IncomeCategory::where(function ($q) use ($user) {
             $q->whereNull('user_id')->orWhere('user_id', $user->id);
         })->orderBy('name')->get();
@@ -151,12 +155,13 @@ class SettingController extends Controller
         $foodDefaultExpenseCategoryId = Setting::getVal('food_default_expense_category_id');
         $snackDefaultExpenseCategoryId = Setting::getVal('snack_default_expense_category_id');
         $friendsResyncedAt = Setting::getVal('friends_resynced_at');
+        $showPersonalInDashboard = (bool) Setting::getVal('show_personal_expenses_in_dashboard', false);
 
         return view('settings.index', compact(
             'user', 'settings', 'customQuestions', 'auditLogs', 'users', 'roles', 'permissions',
-            'expenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles',
+            'expenseCategories', 'personalExpenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles',
             'paymentMethods', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId',
-            'friendsResyncedAt'
+            'friendsResyncedAt', 'showPersonalInDashboard'
         ));
     }
 
@@ -215,6 +220,7 @@ class SettingController extends Controller
             'food_default_expense_category_id',
             'snack_default_expense_category_id',
             'finance_dashboard_sections',
+            'show_personal_expenses_in_dashboard',
         ];
 
         foreach ($data as $key => $val) {
@@ -230,7 +236,7 @@ class SettingController extends Controller
                 Setting::create([
                     'key' => $key,
                     'value' => $storedValue,
-                    'type' => is_array($val) ? 'json' : 'string',
+                    'type' => is_array($val) ? 'json' : 'boolean',
                     'group' => 'finance',
                     'description' => $key,
                 ]);

@@ -99,7 +99,7 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
             'options' => extension_loaded('pdo_pgsql') ? [
                 // Supabase transaction pooling can move requests between backend sessions.
-                \Pdo::ATTR_EMULATE_PREPARES => true,
+                Pdo::ATTR_EMULATE_PREPARES => true,
             ] : [],
         ],
 

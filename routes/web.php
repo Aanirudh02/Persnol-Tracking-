@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\AllExpensesController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
@@ -18,12 +19,14 @@ use App\Http\Controllers\MistakeController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PersonalExpenseController;
 use App\Http\Controllers\PetrolController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScooterController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SleepController;
+use App\Http\Controllers\StatementController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -58,7 +61,18 @@ Route::middleware('auth')->group(function () {
     Route::prefix('finance')->group(function () {
         Route::get('/', [FinanceDashboardController::class, 'index'])->name('finance.index')->middleware('permission:finance.view');
 
+        // All Expenses overview
+        Route::get('/all-expenses', [AllExpensesController::class, 'index'])->name('all-expenses.index');
+
+        // Personal Expenses
+        Route::post('/personal-expenses/{personalExpense}/convert-to-normal', [PersonalExpenseController::class, 'convertToNormal'])->name('personal-expenses.convert-to-normal');
+        Route::resource('personal-expenses', PersonalExpenseController::class)->names('personal-expenses');
+
+        // Statements Module
+        Route::resource('statements', StatementController::class)->names('statements');
+
         // Expenses
+        Route::get('/expenses/calculate-category', [ExpenseController::class, 'calculateByCategory'])->name('expenses.calculate-category');
         Route::resource('expenses', ExpenseController::class)->names('expenses');
         Route::post('/expenses/group', [ExpenseController::class, 'group'])->name('expenses.group');
         Route::put('/expense-groups/{expenseGroup}', [ExpenseController::class, 'renameGroup'])->name('expense-groups.update');
@@ -95,6 +109,9 @@ Route::middleware('auth')->group(function () {
     // Categories (user-defined)
     Route::post('/categories/expense', [CategoryController::class, 'storeExpense'])->name('categories.expense.store');
     Route::delete('/categories/expense/{category}', [CategoryController::class, 'destroyExpense'])->name('categories.expense.destroy');
+    Route::post('/categories/personal', [CategoryController::class, 'storePersonal'])->name('categories.personal.store');
+    Route::put('/categories/personal/{category}', [CategoryController::class, 'updatePersonal'])->name('categories.personal.update');
+    Route::delete('/categories/personal/{category}', [CategoryController::class, 'destroyPersonal'])->name('categories.personal.destroy');
     Route::post('/categories/food', [CategoryController::class, 'storeFood'])->name('categories.food.store');
     Route::delete('/categories/food/{category}', [CategoryController::class, 'destroyFood'])->name('categories.food.destroy');
     Route::post('/categories/activity', [CategoryController::class, 'storeActivity'])->name('categories.activity.store');

@@ -52,6 +52,15 @@
             <x-nav-link href="{{ route('expenses.index') }}" :active="request()->routeIs('expenses.*')" icon="trending-down">
                 Expenses
             </x-nav-link>
+            <x-nav-link href="{{ route('personal-expenses.index') }}" :active="request()->routeIs('personal-expenses.*')" icon="user">
+                Personal Expenses
+            </x-nav-link>
+            <x-nav-link href="{{ route('all-expenses.index') }}" :active="request()->routeIs('all-expenses.*')" icon="layers">
+                All Expenses Overview
+            </x-nav-link>
+            <x-nav-link href="{{ route('statements.index') }}" :active="request()->routeIs('statements.*')" icon="file-text">
+                Statements
+            </x-nav-link>
             <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">
                 Money Received
             </x-nav-link>
@@ -242,6 +251,15 @@
             </div>
 
             <div class="grid grid-cols-3 gap-3 text-center">
+                <a href="{{ route('personal-expenses.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
+                    <span class="text-xl">🛍️</span> Personal Expenses
+                </a>
+                <a href="{{ route('all-expenses.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
+                    <span class="text-xl">📚</span> All Expenses
+                </a>
+                <a href="{{ route('statements.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
+                    <span class="text-xl">📄</span> Statements
+                </a>
                 <a href="{{ route('food.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">🍔</span> Food & Snacks
                 </a>

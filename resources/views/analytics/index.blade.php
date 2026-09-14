@@ -6,11 +6,25 @@
                 <p class="text-xs text-slate-500">Visual trends across money, habits, food, scooter trips, and sleep quality.</p>
             </div>
 
-            <!-- Date range selector -->
-            <div class="flex items-center gap-1.5 text-xs bg-white dark:bg-slate-800 p-1 rounded-xl border border-sky-100 dark:border-slate-700 shadow-sm">
-                <a href="{{ route('analytics.index', ['days' => 7]) }}" class="px-3.5 py-1.5 rounded-lg font-semibold transition {{ $days == 7 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' : 'text-slate-600 hover:text-sky-600' }}">7 Days</a>
-                <a href="{{ route('analytics.index', ['days' => 30]) }}" class="px-3.5 py-1.5 rounded-lg font-semibold transition {{ $days == 30 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' : 'text-slate-600 hover:text-sky-600' }}">30 Days</a>
-                <a href="{{ route('analytics.index', ['days' => 90]) }}" class="px-3.5 py-1.5 rounded-lg font-semibold transition {{ $days == 90 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' : 'text-slate-600 hover:text-sky-600' }}">90 Days</a>
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Expense Type Toggle: Normal (Default) vs Personal -->
+                <div class="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm text-xs">
+                    <a href="{{ route('analytics.index', ['days' => $days, 'expense_type' => 'normal']) }}"
+                        class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 {{ ($expenseType ?? 'normal') === 'normal' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300' }}">
+                        <span>📘</span> Normal (Default)
+                    </a>
+                    <a href="{{ route('analytics.index', ['days' => $days, 'expense_type' => 'personal']) }}"
+                        class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 {{ ($expenseType ?? 'normal') === 'personal' ? 'bg-pink-600 text-white shadow-sm' : 'text-slate-600 hover:text-pink-600 dark:text-slate-300' }}">
+                        <span>🛍️</span> Personal
+                    </a>
+                </div>
+
+                <!-- Date range selector -->
+                <div class="flex items-center gap-1.5 text-xs bg-white dark:bg-slate-800 p-1 rounded-xl border border-sky-100 dark:border-slate-700 shadow-sm">
+                    <a href="{{ route('analytics.index', ['days' => 7, 'expense_type' => $expenseType ?? 'normal']) }}" class="px-3.5 py-1.5 rounded-lg font-semibold transition {{ $days == 7 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' : 'text-slate-600 hover:text-sky-600' }}">7 Days</a>
+                    <a href="{{ route('analytics.index', ['days' => 30, 'expense_type' => $expenseType ?? 'normal']) }}" class="px-3.5 py-1.5 rounded-lg font-semibold transition {{ $days == 30 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' : 'text-slate-600 hover:text-sky-600' }}">30 Days</a>
+                    <a href="{{ route('analytics.index', ['days' => 90, 'expense_type' => $expenseType ?? 'normal']) }}" class="px-3.5 py-1.5 rounded-lg font-semibold transition {{ $days == 90 ? 'bg-sky-600 text-white shadow-sm shadow-sky-500/20' : 'text-slate-600 hover:text-sky-600' }}">90 Days</a>
+                </div>
             </div>
         </div>
 
@@ -19,7 +33,14 @@
 
             <!-- 1. Finance: Income vs Expenses -->
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-sky-100 dark:border-slate-800 shadow-sm space-y-3">
-                <h2 class="font-bold text-sm text-slate-900 dark:text-white">Income vs Expenses ({{ $days }} Days)</h2>
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold text-sm text-slate-900 dark:text-white">
+                        Income vs {{ ($expenseType ?? 'normal') === 'personal' ? 'Personal Expenses' : 'Normal Expenses' }} ({{ $days }} Days)
+                    </h2>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ ($expenseType ?? 'normal') === 'personal' ? 'bg-pink-100 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' }}">
+                        {{ ($expenseType ?? 'normal') === 'personal' ? '🛍️ Personal' : '📘 Normal' }}
+                    </span>
+                </div>
                 <div class="h-64 w-full">
                     <canvas id="financeChart"></canvas>
                 </div>
@@ -27,7 +48,14 @@
 
             <!-- 2. Finance: Category Breakdown Doughnut -->
             <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
-                <h2 class="font-bold text-sm text-slate-900 dark:text-white">Expense Distribution by Category</h2>
+                <div class="flex items-center justify-between">
+                    <h2 class="font-bold text-sm text-slate-900 dark:text-white">
+                        {{ ($expenseType ?? 'normal') === 'personal' ? 'Personal ' : '' }}Expense Distribution by Category
+                    </h2>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ ($expenseType ?? 'normal') === 'personal' ? 'bg-pink-100 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' }}">
+                        {{ ($expenseType ?? 'normal') === 'personal' ? '🛍️ Personal' : '📘 Normal' }}
+                    </span>
+                </div>
                 <div class="h-64 w-full">
                     <canvas id="categoryChart"></canvas>
                 </div>

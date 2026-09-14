@@ -200,10 +200,10 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100">
-                <h2 class="text-lg font-semibold text-slate-900">Finance Dashboard</h2>
-                <p class="text-sm text-slate-500 mt-1">Choose which sections show on the finance dashboard.</p>
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Finance Dashboard</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Choose which sections show on the finance dashboard.</p>
             </div>
             <form action="{{ route('settings.system') }}" method="POST" class="p-6 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 @csrf
@@ -215,14 +215,109 @@
                     'show_expense_by_category' => 'Expense by category',
                     'show_friend_overview' => 'Friend overview',
                 ] as $key => $label)
-                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <label class="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-3 py-3 text-slate-800 dark:text-slate-200">
                         <input type="checkbox" name="finance_dashboard_sections[{{ $key }}]" value="1" @checked($financeDashboardSections[$key] ?? false)>
                         <span>{{ $label }}</span>
                     </label>
                 @endforeach
-                <button class="sm:col-span-2 rounded-xl bg-slate-900 py-2.5 font-semibold text-white">Save dashboard settings</button>
+
+                <div class="sm:col-span-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <label class="flex items-center gap-3 rounded-xl border border-pink-200 dark:border-pink-900 bg-pink-50/60 dark:bg-pink-950/40 p-3.5 text-slate-900 dark:text-white cursor-pointer">
+                        <input type="hidden" name="show_personal_expenses_in_dashboard" value="0">
+                        <input type="checkbox" name="show_personal_expenses_in_dashboard" value="1" @checked($showPersonalInDashboard)>
+                        <div>
+                            <span class="font-bold text-xs text-pink-700 dark:text-pink-300">Show Personal Expenses in Main Dashboard</span>
+                            <span class="block text-[10px] text-slate-500 dark:text-slate-400">By default, personal & family expenses stay separate and hidden from dashboard totals. Enable this if you want them included.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <button class="sm:col-span-2 rounded-xl bg-slate-900 dark:bg-slate-800 py-2.5 font-semibold text-white">Save dashboard settings</button>
             </form>
         </div>
+
+        <!-- Personal Expense Categories Management -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-pink-100 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>🛍️</span> Dynamic Personal Expense Categories
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage categories for family, hotel, shopping, tour, and personal spending.</p>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <form action="{{ route('categories.personal.store') }}" method="POST" class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+                    @csrf
+                    <input type="text" name="name" required placeholder="Category name (e.g. Tour, Hotel, Family)..." class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white">
+                    <input type="color" name="color" value="#ec4899" title="Category Color" class="h-10 w-12 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1 cursor-pointer">
+                    <button type="submit" style="background-color: #db2777; color: #ffffff;" class="rounded-xl bg-pink-600 hover:bg-pink-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition whitespace-nowrap cursor-pointer">
+                        + Add Category
+                    </button>
+                </form>
+
+                <div class="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    @foreach($personalExpenseCategories as $pCat)
+                        <div class="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2.5 text-xs">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $pCat->color ?? '#ec4899' }}"></span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 truncate">{{ $pCat->name }}</span>
+                            </div>
+                            <div class="flex items-center gap-2.5 flex-shrink-0">
+                                <button type="button" onclick="openEditPersonalCatModal({{ $pCat->id }}, @js($pCat->name), @js($pCat->color ?? '#ec4899'))" class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
+                                    Edit
+                                </button>
+                                <form action="{{ route('categories.personal.destroy', $pCat) }}" method="POST" onsubmit="return confirm('Delete this personal category?');" class="inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-[11px] font-bold text-rose-500 hover:underline cursor-pointer">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Personal Category Modal -->
+        <div id="edit-personal-cat-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target === this) closeEditPersonalCatModal()">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white">Edit Category</h3>
+                    <button type="button" onclick="closeEditPersonalCatModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold cursor-pointer">&times;</button>
+                </div>
+                <form id="edit-personal-cat-form" action="" method="POST" class="space-y-4">
+                    @csrf
+                    @method('PUT')
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Category Name</label>
+                        <input type="text" name="name" id="edit-personal-cat-name" required class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Theme</label>
+                        <input type="color" name="color" id="edit-personal-cat-color" class="h-10 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1 cursor-pointer">
+                    </div>
+                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button type="button" onclick="closeEditPersonalCatModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer">Cancel</button>
+                        <button type="submit" style="background-color: #db2777; color: #ffffff;" class="px-5 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold shadow-sm transition cursor-pointer">
+                            Update Category
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            function openEditPersonalCatModal(id, name, color) {
+                document.getElementById('edit-personal-cat-form').action = '/categories/personal/' + id;
+                document.getElementById('edit-personal-cat-name').value = name;
+                document.getElementById('edit-personal-cat-color').value = color || '#ec4899';
+                document.getElementById('edit-personal-cat-modal').classList.remove('hidden');
+            }
+            function closeEditPersonalCatModal() {
+                document.getElementById('edit-personal-cat-modal').classList.add('hidden');
+            }
+        </script>
 
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100">

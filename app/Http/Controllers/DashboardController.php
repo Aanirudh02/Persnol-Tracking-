@@ -9,7 +9,9 @@ use App\Models\FoodEntry;
 use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\Mistake;
+use App\Models\PersonalExpense;
 use App\Models\ScooterTrip;
+use App\Models\Setting;
 use App\Services\DailyPromptService;
 use App\Services\DayTimelineService;
 use App\Services\WalletService;
@@ -63,9 +65,14 @@ class DashboardController extends Controller
 
         $workings = $timelineService->dayWorkings($user->id, $date);
 
+        $showPersonalInDashboard = (bool) Setting::getVal('show_personal_expenses_in_dashboard', false);
+
         if ($period === 'today') {
             $moneyReceived = $workings['income'];
             $expensesTotal = $workings['expenses'];
+            if ($showPersonalInDashboard) {
+                $expensesTotal += (float) PersonalExpense::where('user_id', $user->id)->where('date', $date)->sum('amount');
+            }
             $snacksCount = $workings['snack_count'];
             $petrolSpent = $workings['fuel'];
             $activitiesCount = Activity::where('user_id', $user->id)->where('date', $date)->count();
@@ -75,6 +82,9 @@ class DashboardController extends Controller
         } else {
             $moneyReceived = (float) Income::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->sum('amount');
             $expensesTotal = (float) Expense::where('user_id', $user->id)->whereNull('parent_id')->whereBetween('date', [$startDate, $endDate])->sum(DB::raw('amount + gst_amount'));
+            if ($showPersonalInDashboard) {
+                $expensesTotal += (float) PersonalExpense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->sum('amount');
+            }
             $snacksCount = FoodEntry::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->where('is_snack', true)->count();
             $petrolSpent = (float) FuelEntry::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->sum('amount');
             $activitiesCount = Activity::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->count();
@@ -96,10 +106,17 @@ class DashboardController extends Controller
             $d = Carbon::today()->subDays($i);
             $dateStr = $d->toDateString();
             $last7Days[] = $d->format('D, M j');
-            $expenseChartData[] = (float) Expense::where('user_id', $user->id)
+            $daySum = (float) Expense::where('user_id', $user->id)
                 ->whereNull('parent_id')
                 ->where('date', $dateStr)
                 ->sum(DB::raw('amount + gst_amount'));
+
+            if ($showPersonalInDashboard) {
+                $daySum += (float) PersonalExpense::where('user_id', $user->id)
+                    ->where('date', $dateStr)
+                    ->sum('amount');
+            }
+            $expenseChartData[] = $daySum;
         }
 
         $prevDate = Carbon::parse($date)->subDay()->toDateString();
