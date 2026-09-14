@@ -156,12 +156,13 @@ class SettingController extends Controller
         $snackDefaultExpenseCategoryId = Setting::getVal('snack_default_expense_category_id');
         $friendsResyncedAt = Setting::getVal('friends_resynced_at');
         $showPersonalInDashboard = (bool) Setting::getVal('show_personal_expenses_in_dashboard', false);
+        $allowStatementDeletion = (bool) Setting::getVal('allow_statement_deletion', true);
 
         return view('settings.index', compact(
             'user', 'settings', 'customQuestions', 'auditLogs', 'users', 'roles', 'permissions',
             'expenseCategories', 'personalExpenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles',
             'paymentMethods', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId',
-            'friendsResyncedAt', 'showPersonalInDashboard'
+            'friendsResyncedAt', 'showPersonalInDashboard', 'allowStatementDeletion'
         ));
     }
 
@@ -221,6 +222,7 @@ class SettingController extends Controller
             'snack_default_expense_category_id',
             'finance_dashboard_sections',
             'show_personal_expenses_in_dashboard',
+            'allow_statement_deletion',
         ];
 
         foreach ($data as $key => $val) {

@@ -19,6 +19,111 @@
             </div>
         </div>
 
+        <!-- Metric Summary Cards (Compact 3-Card Grid) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <!-- Card 1: Total Expense -->
+            <div class="rounded-2xl border border-rose-100 dark:border-rose-950/40 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col justify-between hover:shadow transition">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 text-xs">💰</span>
+                            Total Expense
+                        </span>
+                        @if(request()->filled('category_id') || request()->filled('payment_method') || request()->filled('from_date') || request()->filled('to_date') || request()->boolean('voluntary_only'))
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-600">Filtered</span>
+                        @else
+                            <span class="text-[10px] font-medium text-slate-400">All recorded</span>
+                        @endif
+                    </div>
+                    <div class="mt-2 text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400">
+                        ₹{{ number_format($totalAmount, 2) }}
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{{ $totalCount }} transaction(s)</span>
+                    @if(request()->filled('category_id') || request()->filled('payment_method') || request()->filled('from_date') || request()->filled('to_date'))
+                        <a href="{{ route('expenses.index') }}" class="text-[10px] font-semibold text-rose-600 hover:underline">Clear Filter</a>
+                    @else
+                        <span class="text-[10px] text-slate-400">Standard & splits</span>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Card 2: Expense by Payment Method -->
+            <div class="rounded-2xl border border-sky-100 dark:border-sky-950/40 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col justify-between hover:shadow transition">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-600 text-xs">💳</span>
+                            Expense by Payment
+                        </span>
+                        <span class="text-[10px] font-semibold text-sky-600 dark:text-sky-400">UPI, Cash / Money</span>
+                    </div>
+                    <div class="mt-2 space-y-1 max-h-20 overflow-y-auto pr-1">
+                        @forelse($expensesByPayment as $method => $amount)
+                            <div class="flex items-center justify-between text-xs py-0.5">
+                                <span class="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                                    @if(stripos($method, 'upi') !== false)
+                                        <span class="text-xs">⚡</span> <span class="font-semibold">UPI</span>
+                                    @elseif(stripos($method, 'cash') !== false || stripos($method, 'money') !== false)
+                                        <span class="text-xs">💵</span> <span>Cash / Money</span>
+                                    @elseif(stripos($method, 'card') !== false)
+                                        <span class="text-xs">💳</span> <span>Card</span>
+                                    @else
+                                        <span class="text-xs">🏦</span> <span>{{ $method }}</span>
+                                    @endif
+                                </span>
+                                <span class="font-bold text-slate-900 dark:text-white">₹{{ number_format($amount, 2) }}</span>
+                            </div>
+                        @empty
+                            <div class="text-[11px] text-slate-400 py-1">No payment records found</div>
+                        @endforelse
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{{ count($expensesByPayment) }} method(s) active</span>
+                    <span class="text-[10px] text-sky-600 font-semibold">Payment Split</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Non-Owned / Friend-Paid Expenses -->
+            <div class="rounded-2xl border border-indigo-100 dark:border-indigo-950/40 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col justify-between hover:shadow transition">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 text-xs">👥</span>
+                            Non-Owned Expenses
+                        </span>
+                        <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Friend Paid</span>
+                    </div>
+                    <div class="mt-1 flex items-baseline justify-between">
+                        <span class="text-[11px] text-slate-500">Friends paid total:</span>
+                        <span class="text-base font-black text-indigo-600 dark:text-indigo-400">₹{{ number_format($totalFriendPaid, 2) }}</span>
+                    </div>
+                    <div class="mt-1 space-y-1 max-h-16 overflow-y-auto pr-1">
+                        @forelse($friendPaidBreakdown as $friendName => $paidAmount)
+                            <div class="flex items-center justify-between text-xs py-0.5 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                <span class="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium truncate max-w-[130px]" title="{{ $friendName }}">
+                                    <span class="text-[11px]">👤</span> {{ $friendName }}
+                                </span>
+                                <span class="font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                                    - ₹{{ number_format($paidAmount, 2) }} paid
+                                </span>
+                            </div>
+                        @empty
+                            <div class="text-[11px] text-slate-400 py-1 flex items-center gap-1">
+                                <span>✓</span> No friend-paid expenses (100% self)
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{{ count($friendPaidBreakdown) }} friend(s) paid</span>
+                    <a href="{{ route('friends.index') }}" class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Friends Balance →</a>
+                </div>
+            </div>
+        </div>
+
         <!-- Filter Bar -->
         <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-sm">
             <form action="{{ route('expenses.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">

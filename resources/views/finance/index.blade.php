@@ -196,9 +196,22 @@
                         <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3 text-xs">
                             <div>
                                 <div class="font-semibold text-slate-900">{{ $expense->description }}</div>
-                                <div class="text-slate-500">{{ $expense->date->format('d M') }} · {{ $expense->category?->name ?? 'Other' }} · {{ $expense->payment_method }}</div>
-                                @if($expense->friendSplit)
-                                    <div class="text-indigo-600">Split with {{ $expense->friendSplit->friend?->name }}</div>
+                                @if($expense->friendSplits->isNotEmpty())
+                                    <div class="text-[11px] font-medium text-indigo-600">
+                                        👥 Split: {{ $expense->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ($s->paid_by_friend_amount > 0 ? ' (paid ₹' . number_format($s->paid_by_friend_amount, 2) . ')' : ''))->implode(', ') }}
+                                    </div>
+                                @elseif($expense->friendSplit)
+                                    <div class="text-[11px] font-medium text-indigo-600">
+                                        👥 Split with {{ $expense->friendSplit->friend?->name }}{{ $expense->friendSplit->paid_by_friend_amount > 0 ? ' (paid ₹' . number_format($expense->friendSplit->paid_by_friend_amount, 2) . ')' : '' }}
+                                    </div>
+                                @elseif($expense->paidByFriend)
+                                    <div class="text-[11px] font-medium text-indigo-600">
+                                        👥 Paid by {{ $expense->paidByFriend->name }} (₹{{ number_format($expense->totalAmount(), 2) }})
+                                    </div>
+                                @elseif(!empty($expense->paid_by) && $expense->paid_by !== 'Me')
+                                    <div class="text-[11px] font-medium text-indigo-600">
+                                        👥 Paid by {{ $expense->paid_by }}
+                                    </div>
                                 @endif
                             </div>
                             <div class="font-bold text-rose-600">₹{{ number_format($expense->totalAmount(), 2) }}</div>

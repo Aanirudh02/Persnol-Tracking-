@@ -29,7 +29,7 @@ class FinanceDashboardController extends Controller
         $recentExpenses = Expense::query()
             ->where('user_id', $user->id)
             ->whereNull('parent_id')
-            ->with(['category', 'friendSplit.friend'])
+            ->with(['category', 'paidByFriend', 'friendSplit.friend', 'friendSplits.friend'])
             ->orderByDesc('date')
             ->orderByDesc('created_at')
             ->take(5)

@@ -232,6 +232,17 @@
                     </label>
                 </div>
 
+                <div class="sm:col-span-2">
+                    <label class="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-3.5 text-slate-900 dark:text-white cursor-pointer">
+                        <input type="hidden" name="allow_statement_deletion" value="0">
+                        <input type="checkbox" name="allow_statement_deletion" value="1" @checked($allowStatementDeletion)>
+                        <div>
+                            <span class="font-bold text-xs text-slate-900 dark:text-white">Allow Statement Deletion</span>
+                            <span class="block text-[10px] text-slate-500 dark:text-slate-400">Enabled by default. If disabled, delete buttons are hidden across statements to prevent accidental deletion.</span>
+                        </div>
+                    </label>
+                </div>
+
                 <button class="sm:col-span-2 rounded-xl bg-slate-900 dark:bg-slate-800 py-2.5 font-semibold text-white">Save dashboard settings</button>
             </form>
         </div>

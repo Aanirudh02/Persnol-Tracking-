@@ -86,11 +86,15 @@
                                     <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                                         {{ $st->period_type }}
                                     </span>
-                                    <form action="{{ route('statements.destroy', $st) }}" method="POST" onsubmit="return confirm('Delete this statement?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-xs text-slate-400 hover:text-rose-600 font-bold transition cursor-pointer" title="Delete">✕</button>
-                                    </form>
+                                    @if($allowStatementDeletion)
+                                        <form action="{{ route('statements.destroy', $st) }}" method="POST" onsubmit="return confirm('Delete this statement?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-rose-600 transition cursor-pointer px-2 py-0.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40" title="Delete statement">
+                                                <span>🗑️</span> Delete
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                                 <h3 class="font-bold text-sm text-slate-900 dark:text-white mt-3">{{ $st->title }}</h3>
                                 <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1"><span>🕒</span> Taken: {{ $st->created_at->format('D, M j, Y • h:i A') }}</p>
@@ -133,11 +137,15 @@
                                     <span class="rounded-full bg-pink-50 dark:bg-pink-950/40 px-2.5 py-0.5 text-[10px] font-bold text-pink-700 dark:text-pink-300 uppercase tracking-wider">
                                         {{ $st->period_type }}
                                     </span>
-                                    <form action="{{ route('statements.destroy', $st) }}" method="POST" onsubmit="return confirm('Delete this statement?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-xs text-slate-400 hover:text-rose-600 font-bold transition cursor-pointer" title="Delete">✕</button>
-                                    </form>
+                                    @if($allowStatementDeletion)
+                                        <form action="{{ route('statements.destroy', $st) }}" method="POST" onsubmit="return confirm('Delete this statement?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-rose-600 transition cursor-pointer px-2 py-0.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40" title="Delete statement">
+                                                <span>🗑️</span> Delete
+                                            </button>
+                                        </form>
+                                    @endif
                                 </div>
                                 <h3 class="font-bold text-sm text-slate-900 dark:text-white mt-3">{{ $st->title }}</h3>
                                 <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1"><span>🕒</span> Taken: {{ $st->created_at->format('D, M j, Y • h:i A') }}</p>

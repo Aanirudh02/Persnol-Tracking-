@@ -7,6 +7,7 @@ use App\Models\ExpenseCategory;
 use App\Models\ExpenseStatement;
 use App\Models\PersonalExpense;
 use App\Models\PersonalExpenseCategory;
+use App\Models\Setting;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,8 @@ class StatementController extends Controller
             ->take(100)
             ->get();
 
+        $allowStatementDeletion = (bool) Setting::getVal('allow_statement_deletion', true);
+
         return view('finance.statements.index', compact(
             'tab',
             'normalStatements',
@@ -58,7 +61,8 @@ class StatementController extends Controller
             'normalCategories',
             'personalCategories',
             'recentNormalExpenses',
-            'recentPersonalExpenses'
+            'recentPersonalExpenses',
+            'allowStatementDeletion'
         ));
     }
 
@@ -115,18 +119,19 @@ class StatementController extends Controller
 
         $totalAmount = 0.0;
         $type = $validated['type'];
+        $customExpenseIds = null;
 
         if (! empty($validated['custom_expense_ids'])) {
-            $ids = array_map('intval', $validated['custom_expense_ids']);
+            $customExpenseIds = array_map('intval', $validated['custom_expense_ids']);
             if ($type === 'normal') {
                 $totalAmount = (float) Expense::query()
                     ->where('user_id', $user->id)
-                    ->whereIn('id', $ids)
+                    ->whereIn('id', $customExpenseIds)
                     ->sum(DB::raw('amount + gst_amount'));
             } else {
                 $totalAmount = (float) PersonalExpense::query()
                     ->where('user_id', $user->id)
-                    ->whereIn('id', $ids)
+                    ->whereIn('id', $customExpenseIds)
                     ->sum('amount');
             }
         } else {
@@ -138,15 +143,17 @@ class StatementController extends Controller
                 if (! empty($validated['category_ids'])) {
                     $q->whereIn('category_id', $validated['category_ids']);
                 }
+                $customExpenseIds = $q->pluck('id')->map('intval')->toArray();
                 $totalAmount = (float) $q->sum(DB::raw('amount + gst_amount'));
             } else {
                 $q = PersonalExpense::query()->where('user_id', $user->id);
                 if ($startDate && $endDate) {
-                    $q->whereBetween('date', [$startDate, $endDate]);
+                    $q->whereBetween('expense_date', [$startDate, $endDate]);
                 }
                 if (! empty($validated['category_ids'])) {
                     $q->whereIn('category_id', $validated['category_ids']);
                 }
+                $customExpenseIds = $q->pluck('id')->map('intval')->toArray();
                 $totalAmount = (float) $q->sum('amount');
             }
         }
@@ -164,7 +171,7 @@ class StatementController extends Controller
             'start_date' => $startDate,
             'end_date' => $endDate,
             'category_ids' => $validated['category_ids'] ?? null,
-            'custom_expense_ids' => $validated['custom_expense_ids'] ?? null,
+            'custom_expense_ids' => $customExpenseIds,
             'total_amount' => $totalAmount,
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -185,7 +192,7 @@ class StatementController extends Controller
                 $items = Expense::query()
                     ->where('user_id', $user->id)
                     ->whereIn('id', $ids)
-                    ->with('category')
+                    ->with(['category', 'paidByFriend', 'friendSplit.friend', 'friendSplits.friend'])
                     ->orderByDesc('date')
                     ->get();
             } else {
@@ -193,7 +200,7 @@ class StatementController extends Controller
                     ->where('user_id', $user->id)
                     ->whereIn('id', $ids)
                     ->with('category')
-                    ->orderByDesc('date')
+                    ->orderByDesc('expense_date')
                     ->get();
             }
         } else {
@@ -201,7 +208,8 @@ class StatementController extends Controller
                 $q = Expense::query()
                     ->where('user_id', $user->id)
                     ->whereNull('parent_id')
-                    ->with('category');
+                    ->where('created_at', '<=', $statement->created_at)
+                    ->with(['category', 'paidByFriend', 'friendSplit.friend', 'friendSplits.friend']);
                 if ($statement->start_date && $statement->end_date) {
                     $q->whereBetween('date', [$statement->start_date->toDateString(), $statement->end_date->toDateString()]);
                 }
@@ -212,14 +220,15 @@ class StatementController extends Controller
             } else {
                 $q = PersonalExpense::query()
                     ->where('user_id', $user->id)
+                    ->where('created_at', '<=', $statement->created_at)
                     ->with('category');
                 if ($statement->start_date && $statement->end_date) {
-                    $q->whereBetween('date', [$statement->start_date->toDateString(), $statement->end_date->toDateString()]);
+                    $q->whereBetween('expense_date', [$statement->start_date->toDateString(), $statement->end_date->toDateString()]);
                 }
                 if (! empty($statement->category_ids)) {
                     $q->whereIn('category_id', $statement->category_ids);
                 }
-                $items = $q->orderByDesc('date')->get();
+                $items = $q->orderByDesc('expense_date')->get();
             }
         }
 
@@ -234,7 +243,9 @@ class StatementController extends Controller
                 ];
             });
 
-        return view('finance.statements.show', compact('statement', 'items', 'categoryBreakdown'));
+        $allowStatementDeletion = (bool) Setting::getVal('allow_statement_deletion', true);
+
+        return view('finance.statements.show', compact('statement', 'items', 'categoryBreakdown', 'allowStatementDeletion'));
     }
 
     public function update(Request $request, ExpenseStatement $statement): RedirectResponse
@@ -254,6 +265,7 @@ class StatementController extends Controller
     public function destroy(ExpenseStatement $statement): RedirectResponse
     {
         abort_if($statement->user_id !== auth()->id(), 403);
+        abort_if(! (bool) Setting::getVal('allow_statement_deletion', true), 403, 'Statement deletion is disabled in Settings.');
 
         $type = $statement->type;
         $statement->delete();

@@ -5,6 +5,7 @@
             aside, header, nav, .no-print { display: none !important; }
             main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
             .print-card { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+            strong, .statement-friend-paid { font-weight: 700 !important; color: #000000 !important; }
         }
     </style>
 
@@ -15,6 +16,15 @@
                 &larr; Back to Statements
             </a>
             <div class="flex items-center gap-2">
+                @if($allowStatementDeletion)
+                    <form action="{{ route('statements.destroy', $statement) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this statement? This action cannot be undone.');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="px-3.5 py-2 border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 font-semibold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+                            <span>🗑️</span> Delete Statement
+                        </button>
+                    </form>
+                @endif
                 <button type="button" onclick="window.print()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     Print Statement
@@ -106,14 +116,65 @@
                             @forelse($items as $index => $item)
                                 @php
                                     $itemAmount = $statement->isNormal() ? $item->totalAmount() : (float) $item->amount;
+                                    $itemDate = $statement->isNormal() ? $item->date : ($item->expense_date ?? $item->created_at);
                                 @endphp
                                 <tr class="hover:bg-slate-50/70">
                                     <td class="py-3 px-4 text-slate-400 font-mono text-[10px]">{{ $index + 1 }}</td>
-                                    <td class="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">{{ $item->date->format('d M Y') }}</td>
+                                    <td class="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">{{ $itemDate ? \Carbon\Carbon::parse($itemDate)->format('d M Y') : '-' }}</td>
                                     <td class="py-3 px-4">
-                                        <span class="font-semibold text-slate-900">{{ $item->description ?: ($item->category?->name ?? 'Expense Item') }}</span>
+                                        <span class="font-semibold text-slate-900">{{ $item->description ?: ($item->title ?? ($item->category?->name ?? 'Expense Item')) }}</span>
                                         @if(!empty($item->notes))
-                                            <span class="block text-[11px] text-slate-400 italic">{{ $item->notes }}</span>
+                                            @php
+                                                $rawNotes = $item->notes;
+                                                $formattedNotes = e($rawNotes);
+
+                                                $friendContributions = [];
+                                                if ($statement->isNormal()) {
+                                                    if ($item->relationLoaded('friendSplits') && $item->friendSplits->isNotEmpty()) {
+                                                        foreach ($item->friendSplits as $s) {
+                                                            if ((float) $s->paid_by_friend_amount > 0 && $s->friend?->name) {
+                                                                $friendContributions[$s->friend->name] = (float) $s->paid_by_friend_amount;
+                                                            }
+                                                        }
+                                                    }
+                                                    if (empty($friendContributions) && $item->relationLoaded('friendSplit') && $item->friendSplit?->friend?->name) {
+                                                        if ((float) $item->friendSplit->paid_by_friend_amount > 0) {
+                                                            $friendContributions[$item->friendSplit->friend->name] = (float) $item->friendSplit->paid_by_friend_amount;
+                                                        }
+                                                    }
+                                                    if (empty($friendContributions) && $item->relationLoaded('paidByFriend') && $item->paidByFriend?->name) {
+                                                        $friendContributions[$item->paidByFriend->name] = (float) $item->totalAmount();
+                                                    }
+                                                    if (empty($friendContributions) && !empty($item->paid_by) && $item->paid_by !== 'Me') {
+                                                        $friendContributions[$item->paid_by] = (float) $item->totalAmount();
+                                                    }
+                                                }
+
+                                                if (preg_match('/Friend\(s\)\s*paid:\s*(?:₹|Rs\.?)?\s*([0-9.,]+)/i', $rawNotes, $matches)) {
+                                                    $amountVal = $matches[1];
+                                                    if (!empty($friendContributions)) {
+                                                        $friendStr = collect($friendContributions)
+                                                            ->map(fn($amt, $name) => '<strong class="font-bold text-slate-900 statement-friend-paid">' . e($name) . ':</strong> ₹' . number_format($amt, 2))
+                                                            ->implode(', ');
+                                                    } else {
+                                                        $fallbackName = (!empty($item->paid_by) && $item->paid_by !== 'Me') ? $item->paid_by : 'Friend';
+                                                        $friendStr = '<strong class="font-bold text-slate-900 statement-friend-paid">' . e($fallbackName) . ':</strong> ₹' . $amountVal;
+                                                    }
+                                                    $formattedNotes = preg_replace('/Friend\(s\)\s*paid:\s*(?:₹|Rs\.?)?\s*[0-9.,]+/i', $friendStr, $formattedNotes);
+                                                } else {
+                                                    $formattedNotes = preg_replace_callback('/([A-Za-z0-9\s]+):\s*(₹\s*[0-9.,]+)/', function($m) {
+                                                        $label = trim($m[1]);
+                                                        if (strcasecmp($label, 'Total bill') === 0 || strcasecmp($label, 'Payment breakdown') === 0) {
+                                                            return $m[0];
+                                                        }
+                                                        if (strcasecmp($label, 'You paid') === 0) {
+                                                            return '<span class="text-slate-600">' . $label . ':</span> ' . $m[2];
+                                                        }
+                                                        return '<strong class="font-bold text-slate-900 statement-friend-paid">' . e($label) . ':</strong> ' . $m[2];
+                                                    }, $formattedNotes);
+                                                }
+                                            @endphp
+                                            <span class="block text-[11px] text-slate-500 italic mt-0.5">{!! $formattedNotes !!}</span>
                                         @endif
                                     </td>
                                     <td class="py-3 px-4 whitespace-nowrap">

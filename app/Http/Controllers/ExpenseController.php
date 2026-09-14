@@ -8,6 +8,7 @@ use App\Models\ExpenseCategory;
 use App\Models\ExpenseGroup;
 use App\Models\FoodEntry;
 use App\Models\Friend;
+use App\Models\FriendSplit;
 use App\Services\AuditService;
 use App\Services\FinanceLinkService;
 use App\Services\FinanceService;
@@ -59,13 +60,103 @@ class ExpenseController extends Controller
         $expenses = $query->orderByDesc('date')->orderByDesc('created_at')->paginate(15)->withQueryString();
         $categories = ExpenseCategory::query()->orderBy('name')->get();
         $paymentMethods = $options->names('payment_method');
-        $totalAmount = (float) $financeService->expenseBaseQuery(
-            $user->id,
-            $request->string('from_date')->toString() ?: null,
-            $request->string('to_date')->toString() ?: null
-        )->sum(DB::raw('expenses.amount + expenses.gst_amount'));
 
-        return view('finance.expenses.index', compact('expenses', 'categories', 'totalAmount', 'paymentMethods'));
+        // Base query for top-level expenses matching current filters
+        $baseQuery = Expense::query()
+            ->where('user_id', $user->id)
+            ->whereNull('parent_id');
+
+        if ($request->filled('category_id')) {
+            $baseQuery->where('category_id', $request->integer('category_id'));
+        }
+        if ($request->filled('payment_method')) {
+            $baseQuery->where('payment_method', $request->string('payment_method'));
+        }
+        if ($request->filled('from_date')) {
+            $baseQuery->where('date', '>=', $request->string('from_date'));
+        }
+        if ($request->filled('to_date')) {
+            $baseQuery->where('date', '<=', $request->string('to_date'));
+        }
+        if ($request->boolean('voluntary_only')) {
+            $baseQuery->where('is_voluntary', true);
+        }
+
+        // 1. Total expenses
+        $totalAmount = (float) (clone $baseQuery)->sum(DB::raw('amount + gst_amount'));
+        $totalCount = (clone $baseQuery)->count();
+
+        // 2. Expense by payment method breakdown
+        $expensesByPayment = (clone $baseQuery)
+            ->whereNotNull('payment_method')
+            ->where('payment_method', '!=', '')
+            ->select('payment_method', DB::raw('SUM(amount + gst_amount) as total'))
+            ->groupBy('payment_method')
+            ->orderByDesc('total')
+            ->pluck('total', 'payment_method')
+            ->toArray();
+
+        // 3. Non-owned / friend-paid expenses breakdown
+        $friendPaidBreakdown = [];
+        $matchingExpenseIds = (clone $baseQuery)->pluck('id');
+
+        if ($matchingExpenseIds->isNotEmpty()) {
+            $splits = FriendSplit::query()
+                ->whereIn('expense_id', $matchingExpenseIds)
+                ->with('friend')
+                ->get();
+
+            $coveredExpenseIds = [];
+
+            foreach ($splits as $split) {
+                $paidAmount = (float) $split->paid_by_friend_amount;
+                if ($paidAmount <= 0 && (float) $split->friend_share > 0 && (float) $split->paid_by_me_amount <= 0) {
+                    $paidAmount = (float) $split->friend_share;
+                }
+                if ($paidAmount > 0) {
+                    $friendName = $split->friend?->name ?? 'Friend';
+                    $friendPaidBreakdown[$friendName] = ($friendPaidBreakdown[$friendName] ?? 0.0) + $paidAmount;
+                    $coveredExpenseIds[] = $split->expense_id;
+                }
+            }
+
+            $directFriendExpenses = (clone $baseQuery)
+                ->whereNotIn('id', $coveredExpenseIds)
+                ->where(function ($q) {
+                    $q->where('paid_by_type', 'friend')
+                        ->orWhere(function ($sub) {
+                            $sub->whereNotNull('paid_by')
+                                ->where('paid_by', '!=', 'Me')
+                                ->where('paid_by', '!=', '');
+                        })
+                        ->orWhere(function ($sub) {
+                            $sub->whereNotNull('paid_by_friend_id')
+                                ->where('paid_by_type', '!=', 'me');
+                        });
+                })
+                ->with('paidByFriend')
+                ->get();
+
+            foreach ($directFriendExpenses as $exp) {
+                $friendName = $exp->paidByFriend?->name ?? (trim($exp->paid_by) ?: 'Friend');
+                $amount = (float) $exp->totalAmount();
+                $friendPaidBreakdown[$friendName] = ($friendPaidBreakdown[$friendName] ?? 0.0) + $amount;
+            }
+        }
+
+        arsort($friendPaidBreakdown);
+        $totalFriendPaid = array_sum($friendPaidBreakdown);
+
+        return view('finance.expenses.index', compact(
+            'expenses',
+            'categories',
+            'totalAmount',
+            'totalCount',
+            'paymentMethods',
+            'expensesByPayment',
+            'friendPaidBreakdown',
+            'totalFriendPaid'
+        ));
     }
 
     public function create(OptionsService $options): View
@@ -129,7 +220,22 @@ class ExpenseController extends Controller
             if ($targetUserSpend < $totalBill) {
                 $registeredAmount = round($targetUserSpend, 2);
                 $registeredGst = 0.0;
-                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', Friend(s) paid: ₹'.number_format($paidByFriends, 2).')';
+                $friendPaidList = [];
+                if (! empty($splitData['multi_splits'])) {
+                    foreach ($splitData['multi_splits'] as $ms) {
+                        $p = (float) ($ms['paid_by_friend_amount'] ?? 0);
+                        if ($p > 0) {
+                            $friend = Friend::query()->find($ms['friend_id']);
+                            $friendPaidList[] = ($friend?->name ?? 'Friend').': ₹'.number_format($p, 2);
+                        }
+                    }
+                }
+                if (empty($friendPaidList) && ! empty($splitData['friend_id'])) {
+                    $friend = Friend::query()->find($splitData['friend_id']);
+                    $friendPaidList[] = ($friend?->name ?? 'Friend').': ₹'.number_format($paidByFriends, 2);
+                }
+                $friendStr = ! empty($friendPaidList) ? implode(', ', $friendPaidList) : 'Friend: ₹'.number_format($paidByFriends, 2);
+                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', '.$friendStr.')';
                 $validated['notes'] = trim(($validated['notes'] ?? '')."\n".$payerNote);
             }
         }
@@ -486,7 +592,22 @@ class ExpenseController extends Controller
             if ($targetUserSpend < $totalBill) {
                 $registeredAmount = round($targetUserSpend, 2);
                 $registeredGst = 0.0;
-                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', Friend(s) paid: ₹'.number_format($paidByFriends, 2).')';
+                $friendPaidList = [];
+                if (! empty($splitData['multi_splits'])) {
+                    foreach ($splitData['multi_splits'] as $ms) {
+                        $p = (float) ($ms['paid_by_friend_amount'] ?? 0);
+                        if ($p > 0) {
+                            $friend = Friend::query()->find($ms['friend_id']);
+                            $friendPaidList[] = ($friend?->name ?? 'Friend').': ₹'.number_format($p, 2);
+                        }
+                    }
+                }
+                if (empty($friendPaidList) && ! empty($splitData['friend_id'])) {
+                    $friend = Friend::query()->find($splitData['friend_id']);
+                    $friendPaidList[] = ($friend?->name ?? 'Friend').': ₹'.number_format($paidByFriends, 2);
+                }
+                $friendStr = ! empty($friendPaidList) ? implode(', ', $friendPaidList) : 'Friend: ₹'.number_format($paidByFriends, 2);
+                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', '.$friendStr.')';
                 if (! str_contains($validated['notes'] ?? '', 'Total bill:')) {
                     $validated['notes'] = trim(($validated['notes'] ?? '')."\n".$payerNote);
                 }

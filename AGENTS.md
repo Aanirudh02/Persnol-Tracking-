@@ -153,6 +153,16 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
 - Rerun a test after each change to it.
-- Run `vendor/bin/phpunit` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+=== my_tracker/finance rules ===
+
+# Expense Domain Separation & Split Rules
+
+- **Strict Domain Separation**:
+  - `Normal Expenses` strictly map to the `Expense` model and `/finance/expenses` routes/controllers (standard college, daily, and friend-split expenses).
+  - `Private / Personal Expenses` strictly map to the `PersonalExpense` model and `/finance/personal-expenses` routes/controllers (personal, family, hotel, shopping, tour). They must never mix or bleed into normal expenses or normal statements.
+  - Statements must enforce this strict separation: normal statements only contain normal expenses, and personal statements only contain personal expenses.
+  - Statements are strictly static snapshots: when a statement is generated, the matching expense IDs must be snapshotted (`custom_expense_ids`) so future expenses recorded during an ongoing month never alter or bleed into existing statements.
+- **Friend Name Display**:
+  - Whenever friends contribute or pay (even if more than one friend pays), always show each friend's specific name and amount paid (`{Friend Name}: ₹{paid}`) in bold on show/PDF views, expenses summary cards, and dashboard cards. Never collapse into generic labels like "Friend(s) paid".
 
 </laravel-boost-guidelines>
