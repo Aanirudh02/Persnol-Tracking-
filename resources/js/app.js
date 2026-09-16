@@ -211,15 +211,98 @@ window.bindPlaceAutocomplete = function(inputId, suggestId, hiddenIds, onPick) {
     });
 };
 
+// ─── Trip Map State ────────────────────────────────────────────────────────
+let _tripMap = null;
+let _tripMapLayer = null;
+let _tripMapMarkers = [];
+
+function _ensureTripMap() {
+    const container = document.getElementById('trip-map-preview');
+    if (!container) return false;
+    if (_tripMap) return true;
+
+    if (typeof window.L === 'undefined') return false;
+
+    _tripMap = window.L.map(container, { zoomControl: true, attributionControl: true });
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+    }).addTo(_tripMap);
+
+    return true;
+}
+
+function _clearTripMapOverlay() {
+    if (_tripMapLayer) { _tripMapLayer.remove(); _tripMapLayer = null; }
+    _tripMapMarkers.forEach(m => m.remove());
+    _tripMapMarkers = [];
+}
+
+function _makeMarker(lat, lng, color, label) {
+    if (!_tripMap || typeof window.L === 'undefined') return;
+    const icon = window.L.divIcon({
+        html: `<div style="
+            width:28px;height:28px;border-radius:50% 50% 50% 0;
+            background:${color};transform:rotate(-45deg);
+            border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3);">
+        </div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+        className: '',
+    });
+    const marker = window.L.marker([lat, lng], { icon })
+        .bindTooltip(label, { permanent: false, direction: 'top', offset: [0, -30] })
+        .addTo(_tripMap);
+    _tripMapMarkers.push(marker);
+    return marker;
+}
+
+// ─── Collect stops from dynamic stop rows ──────────────────────────────────
+window.getStopsFromUI = function() {
+    const rows = document.querySelectorAll('.stop-row');
+    const stops = [];
+    rows.forEach(row => {
+        const lat = row.querySelector('[data-stop-lat]')?.value;
+        const lng = row.querySelector('[data-stop-lng]')?.value;
+        const label = row.querySelector('[data-stop-label]')?.value;
+        if (lat && lng) {
+            stops.push({ lat: parseFloat(lat), lng: parseFloat(lng), label: label || 'Stop' });
+        }
+    });
+    return stops;
+};
+
+// ─── Build hidden stops JSON for form submission ───────────────────────────
+window.syncStopsInput = function() {
+    const stops = window.getStopsFromUI();
+    const hidden = document.getElementById('stops_json');
+    if (hidden) hidden.value = JSON.stringify(stops);
+};
+
+// ─── Update the "Open in Google Maps" link with stops ─────────────────────
+function _updateDirMapsLink(slat, slng, elat, elng, stops) {
+    const dirMaps = document.getElementById('dir_maps');
+    if (!dirMaps) return;
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${slat},${slng}&destination=${elat},${elng}&travelmode=driving`;
+    if (stops.length) {
+        url += '&waypoints=' + stops.map(s => `${s.lat},${s.lng}`).join('|');
+    }
+    dirMaps.href = url;
+    dirMaps.classList.remove('hidden');
+}
+
+// ─── Main preview & map updater ────────────────────────────────────────────
 window.previewTripRoute = async function(mileage = 40) {
     const slat = document.getElementById('start_latitude')?.value;
     const slng = document.getElementById('start_longitude')?.value;
     const elat = document.getElementById('end_latitude')?.value;
     const elng = document.getElementById('end_longitude')?.value;
+
     const preview = document.getElementById('route-preview');
     const mileageEl = document.getElementById('preview-mileage');
     const hint = document.getElementById('preview-hint');
     const dirMaps = document.getElementById('dir_maps');
+
     if (mileageEl) mileageEl.textContent = Number(mileage).toFixed(1);
     if (!preview) return;
 
@@ -232,25 +315,188 @@ window.previewTripRoute = async function(mileage = 40) {
         return;
     }
 
+    const stops = window.getStopsFromUI();
+    window.syncStopsInput();
+
     const waypoints = [
         { lat: parseFloat(slat), lng: parseFloat(slng) },
+        ...stops.map(s => ({ lat: s.lat, lng: s.lng })),
         { lat: parseFloat(elat), lng: parseFloat(elng) },
     ];
+
+    // ── Distance calculation ──
     try {
         const res = await fetch(`/geo/route?waypoints=${encodeURIComponent(JSON.stringify(waypoints))}`);
         const data = await res.json();
         const oneWay = data.distance_km;
         if (oneWay == null) return;
+
         const toAndFro = document.querySelector('input[name="to_and_fro"]')?.checked;
         const total = toAndFro ? oneWay * 2 : oneWay;
         const litres = mileage > 0 ? (total / mileage) : 0;
+
         if (hint) hint.classList.add('hidden');
         document.getElementById('preview-one-way').textContent = oneWay.toFixed(2);
         document.getElementById('preview-total').textContent = total.toFixed(2);
         document.getElementById('preview-litres').textContent = litres.toFixed(3);
-        if (dirMaps) {
-            dirMaps.href = `https://www.google.com/maps/dir/?api=1&origin=${slat},${slng}&destination=${elat},${elng}`;
-            dirMaps.classList.remove('hidden');
-        }
+        _updateDirMapsLink(slat, slng, elat, elng, stops);
     } catch (e) {}
+
+    // ── Map preview (Leaflet / OSM) ──
+    if (!_ensureTripMap()) return;
+    _clearTripMapOverlay();
+
+    try {
+        // Fetch OSRM route geometry
+        const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(';');
+        const routeRes = await fetch(
+            `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`,
+            { headers: { 'User-Agent': 'LifeTracker/1.0' } }
+        );
+        const routeData = await routeRes.json();
+        const geometry = routeData?.routes?.[0]?.geometry;
+
+        if (geometry) {
+            _tripMapLayer = window.L.geoJSON(geometry, {
+                style: { color: '#3b82f6', weight: 4, opacity: 0.85 },
+            }).addTo(_tripMap);
+        }
+
+        // Add markers
+        _makeMarker(parseFloat(slat), parseFloat(slng), '#16a34a', 'Start');
+        stops.forEach((s, i) => _makeMarker(s.lat, s.lng, '#f59e0b', `Stop ${i + 1}: ${s.label}`));
+        _makeMarker(parseFloat(elat), parseFloat(elng), '#dc2626', 'End');
+
+        // Fit map bounds
+        const allPoints = waypoints.map(w => [w.lat, w.lng]);
+        _tripMap.fitBounds(window.L.latLngBounds(allPoints).pad(0.15));
+    } catch (e) {
+        // Fallback: just centre on start/end midpoint
+        const midLat = (parseFloat(slat) + parseFloat(elat)) / 2;
+        const midLng = (parseFloat(slng) + parseFloat(elng)) / 2;
+        _makeMarker(parseFloat(slat), parseFloat(slng), '#16a34a', 'Start');
+        _makeMarker(parseFloat(elat), parseFloat(elng), '#dc2626', 'End');
+        _tripMap.setView([midLat, midLng], 12);
+    }
 };
+
+// ─── Stop row management ───────────────────────────────────────────────────
+let _stopIndex = 0;
+
+window.addStopRow = function(initialLabel = '', initialLat = '', initialLng = '') {
+    const container = document.getElementById('stops-container');
+    if (!container) return;
+
+    const idx = _stopIndex++;
+    const row = document.createElement('div');
+    row.className = 'stop-row';
+    row.dataset.stopIdx = idx;
+
+    const suggestId = `stop_suggest_${idx}`;
+    row.innerHTML = `
+        <div class="stop-input-wrap">
+            <label class="block font-semibold text-slate-700 mb-1 text-xs">📍 Via (stop ${container.children.length + 1})</label>
+            <input
+                type="text"
+                class="w-full px-3 py-2.5 bg-slate-50 border border-amber-300 rounded-xl text-sm"
+                autocomplete="off"
+                placeholder="e.g. Gandhipuram Bus Stand, Coimbatore"
+                value="${initialLabel}"
+            >
+            <input type="hidden" data-stop-lat value="${initialLat}">
+            <input type="hidden" data-stop-lng value="${initialLng}">
+            <input type="hidden" data-stop-label value="${initialLabel}">
+            <div id="${suggestId}" class="geo-suggest hidden"></div>
+        </div>
+        <button type="button" class="remove-stop-btn" title="Remove stop" onclick="window.removeStopRow(this)">✕</button>
+    `;
+
+    container.appendChild(row);
+
+    // Bind autocomplete on the new input
+    const input = row.querySelector('input[type="text"]');
+    const box = row.querySelector('.geo-suggest');
+    const latEl = row.querySelector('[data-stop-lat]');
+    const lngEl = row.querySelector('[data-stop-lng]');
+    const labelEl = row.querySelector('[data-stop-label]');
+
+    const applyStop = (label, lat, lng) => {
+        input.value = label;
+        latEl.value = lat;
+        lngEl.value = lng;
+        labelEl.value = label;
+        box.classList.add('hidden');
+        window.syncStopsInput();
+        const getMileage = () => parseFloat(document.getElementById('vehicle_id')?.selectedOptions?.[0]?.dataset?.mileage || '40');
+        window.previewTripRoute(getMileage());
+    };
+
+    const run = debounce(async () => {
+        const q = input.value.trim();
+        if (q.length < 3) { box.classList.add('hidden'); return; }
+        try {
+            const res = await fetch(`/geo/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (!Array.isArray(data) || !data.length) {
+                box.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">No matches</div>';
+                box.classList.remove('hidden');
+                return;
+            }
+            box.innerHTML = '';
+            data.forEach(place => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = place.label;
+                btn.addEventListener('click', () => applyStop(place.label, place.lat, place.lng));
+                box.appendChild(btn);
+            });
+            box.classList.remove('hidden');
+        } catch (e) {}
+    }, 350);
+
+    input.addEventListener('input', () => {
+        latEl.value = ''; lngEl.value = ''; labelEl.value = '';
+        run();
+    });
+    input.addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const q = input.value.trim();
+        if (q.length < 3) return;
+        try {
+            const res = await fetch(`/geo/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (data?.[0]) applyStop(data[0].label, data[0].lat, data[0].lng);
+        } catch (e) {}
+    });
+    document.addEventListener('click', (e) => {
+        if (!box.contains(e.target) && e.target !== input) box.classList.add('hidden');
+    });
+
+    // Renumber existing stop labels
+    _renumberStops();
+
+    if (initialLat && initialLng) {
+        const getMileage = () => parseFloat(document.getElementById('vehicle_id')?.selectedOptions?.[0]?.dataset?.mileage || '40');
+        window.previewTripRoute(getMileage());
+    }
+};
+
+window.removeStopRow = function(btn) {
+    const row = btn.closest('.stop-row');
+    if (row) row.remove();
+    _renumberStops();
+    window.syncStopsInput();
+    const getMileage = () => parseFloat(document.getElementById('vehicle_id')?.selectedOptions?.[0]?.dataset?.mileage || '40');
+    window.previewTripRoute(getMileage());
+};
+
+function _renumberStops() {
+    const container = document.getElementById('stops-container');
+    if (!container) return;
+    [...container.querySelectorAll('.stop-row')].forEach((row, i) => {
+        const lbl = row.querySelector('label');
+        if (lbl) lbl.textContent = `📍 Via (stop ${i + 1})`;
+    });
+}
+

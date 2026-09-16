@@ -124,6 +124,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/geo/search', [GeoController::class, 'search'])->name('geo.search');
     Route::get('/geo/route', [GeoController::class, 'route'])->name('geo.route');
+    Route::get('/geo/reverse', [GeoController::class, 'reverse'])->name('geo.reverse');
 
     Route::get('/vehicles', [VehicleController::class, 'index'])->name('vehicles.index');
     Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');

@@ -29,4 +29,34 @@ class GoogleMapProviderTest extends TestCase
 
         $this->assertSame('DMart Coimbatore', $results[0]['label']);
     }
+
+    public function test_google_route_distance_calculates_via_directions_api(): void
+    {
+        Config::set('services.maps.google_key', 'fake-key');
+        Cache::flush();
+
+        Http::fake([
+            'https://maps.googleapis.com/maps/api/directions/json*' => Http::response([
+                'status' => 'OK',
+                'routes' => [
+                    [
+                        'legs' => [
+                            ['distance' => ['value' => 12500]],
+                            ['distance' => ['value' => 3500]],
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $waypoints = [
+            ['lat' => 11.0168, 'lng' => 76.9558],
+            ['lat' => 11.0250, 'lng' => 76.9600],
+            ['lat' => 11.0350, 'lng' => 76.9700],
+        ];
+
+        $km = (new GoogleMapProvider(new OsmMapProvider))->routeDistanceKm($waypoints);
+
+        $this->assertSame(16.0, $km);
+    }
 }

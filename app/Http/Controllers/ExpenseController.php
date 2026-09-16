@@ -146,11 +146,13 @@ class ExpenseController extends Controller
 
         arsort($friendPaidBreakdown);
         $totalFriendPaid = array_sum($friendPaidBreakdown);
+        $ownedTotalAmount = max(0.0, round($totalAmount - $totalFriendPaid, 2));
 
         return view('finance.expenses.index', compact(
             'expenses',
             'categories',
             'totalAmount',
+            'ownedTotalAmount',
             'totalCount',
             'paymentMethods',
             'expensesByPayment',

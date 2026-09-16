@@ -13,4 +13,6 @@ interface MapProviderInterface
      * @param  array<int, array{lat: float, lng: float}>  $waypoints
      */
     public function routeDistanceKm(array $waypoints): ?float;
+
+    public function reverseGeocode(float $lat, float $lng): ?string;
 }

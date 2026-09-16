@@ -1,4 +1,9 @@
 <x-app-layout title="Edit Trip">
+    @push('head')
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    @endpush
+
     <div class="max-w-2xl mx-auto space-y-6">
         <div>
             <a href="{{ route('scooter.index') }}" class="text-sm font-semibold text-slate-600 hover:underline">&larr; Back to trips</a>
@@ -9,6 +14,9 @@
         <form action="{{ route('scooter.update', $trip) }}" method="POST" class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 text-sm" id="trip-plan-form">
             @csrf
             @method('PUT')
+            {{-- Hidden stops JSON --}}
+            <input type="hidden" name="stops" id="stops_json" value="{{ json_encode($trip->stops ?? []) }}">
+
             <div>
                 <label class="block font-semibold text-slate-700 mb-1">Title</label>
                 <input type="text" name="title" value="{{ old('title', $trip->title) }}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
@@ -25,6 +33,16 @@
                 <div id="from_suggest" class="geo-suggest hidden"></div>
             </div>
 
+            {{-- Stops container --}}
+            <div id="stops-container" class="space-y-3"></div>
+
+            {{-- Add stop button --}}
+            <button type="button"
+                onclick="window.addStopRow()"
+                class="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2 rounded-xl transition">
+                &#xFF0B; Add stop (via)
+            </button>
+
             <div class="relative">
                 <label class="block font-semibold text-slate-700 mb-1">End location *</label>
                 <input type="text" id="to_label" name="to_label" required autocomplete="off" placeholder="414-A Tex Park Road, Nehru Nagar West, Coimbatore 641014" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl" value="{{ old('to_label', $trip->to_label ?? $trip->end_address) }}">
@@ -34,6 +52,12 @@
                 <p id="to_picked" class="mt-1 text-xs text-slate-500 {{ $trip->end_latitude ? '' : 'hidden' }}">@if($trip->end_latitude)Selected coords: {{ number_format($trip->end_latitude, 5) }}, {{ number_format($trip->end_longitude, 5) }}@endif</p>
                 <a id="to_maps" href="https://www.google.com/maps/search/?api=1&query={{ $trip->end_latitude }},{{ $trip->end_longitude }}" target="_blank" class="{{ $trip->end_latitude ? '' : 'hidden' }} text-xs font-semibold text-slate-700 hover:underline">View end on Google Maps</a>
                 <div id="to_suggest" class="geo-suggest hidden"></div>
+            </div>
+
+            {{-- Map preview --}}
+            <div>
+                <div id="trip-map-preview" class="w-full"></div>
+                <p class="mt-1 text-xs text-slate-400">&#x1F5FA; Live route preview — powered by OpenStreetMap</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -95,10 +119,23 @@
             vehicleSelect?.addEventListener('change', refresh);
             document.getElementById('to_and_fro')?.addEventListener('change', refresh);
 
+            // Populate existing stops
+            @php
+                $existingStops = old('stops') ? json_decode(old('stops'), true) : ($trip->stops ?? []);
+            @endphp
+            @if(!empty($existingStops) && is_array($existingStops))
+                @foreach($existingStops as $s)
+                    window.addStopRow(@json($s['label'] ?? ''), @json($s['lat'] ?? ''), @json($s['lng'] ?? ''));
+                @endforeach
+            @endif
+
             document.getElementById('trip-plan-form')?.addEventListener('submit', async (e) => {
                 const startLat = document.getElementById('start_latitude');
                 const endLat = document.getElementById('end_latitude');
-                if (startLat?.value && endLat?.value) return;
+                if (startLat?.value && endLat?.value) {
+                    window.syncStopsInput();
+                    return;
+                }
                 e.preventDefault();
                 const form = e.target;
                 const resolve = async (inputId, latId, lngId, addressId) => {

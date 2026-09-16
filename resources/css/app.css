@@ -102,3 +102,58 @@ body {
 .geo-suggest button:last-child {
     border-bottom: none;
 }
+
+/* Trip route map preview */
+#trip-map-preview {
+    height: 280px;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+}
+
+/* Stop rows */
+.stop-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+.stop-row .stop-input-wrap {
+    flex: 1;
+    position: relative;
+}
+.stop-row .remove-stop-btn {
+    flex-shrink: 0;
+    margin-top: 0.35rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+.stop-row .remove-stop-btn:hover {
+    background: #fecaca;
+}
+
+/* Map source toggle */
+.map-source-toggle {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+.map-source-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    cursor: pointer;
+    font-weight: 500;
+}

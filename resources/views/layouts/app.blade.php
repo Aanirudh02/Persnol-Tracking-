@@ -16,6 +16,7 @@
     </script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('head')
 </head>
 <body class="app-body min-h-screen bg-[#f4f8fc] text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased font-sans overflow-x-hidden selection:bg-sky-500 selection:text-white">
 

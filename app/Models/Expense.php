@@ -116,10 +116,32 @@ class Expense extends Model
     public function totalPaidByFriends(): float
     {
         if ($this->relationLoaded('friendSplits') && $this->friendSplits->isNotEmpty()) {
-            return (float) $this->friendSplits->sum('paid_by_friend_amount');
+            $sum = (float) $this->friendSplits->sum('paid_by_friend_amount');
+            if ($sum <= 0) {
+                $friendShareSum = (float) $this->friendSplits->where('paid_by_me_amount', '<=', 0)->sum('friend_share');
+                if ($friendShareSum > 0) {
+                    return $friendShareSum;
+                }
+            }
+
+            return $sum;
         }
 
-        return (float) ($this->friendSplit?->paid_by_friend_amount ?? ($this->paid_by_type === 'friend' ? $this->totalAmount() : 0));
+        if ($this->friendSplit) {
+            $paid = (float) $this->friendSplit->paid_by_friend_amount;
+            if ($paid <= 0 && (float) $this->friendSplit->friend_share > 0 && (float) $this->friendSplit->paid_by_me_amount <= 0) {
+                $paid = (float) $this->friendSplit->friend_share;
+            }
+            if ($paid > 0) {
+                return $paid;
+            }
+        }
+
+        if ($this->paid_by_type === 'friend' || ($this->paid_by_friend_id && $this->paid_by_type !== 'me') || ($this->paid_by && ! in_array(strtolower(trim($this->paid_by)), ['me', 'self', 'user', '']))) {
+            return $this->totalAmount();
+        }
+
+        return 0.0;
     }
 
     public function foodEntries(): HasMany

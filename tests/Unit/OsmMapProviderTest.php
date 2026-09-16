@@ -32,13 +32,30 @@ class OsmMapProviderTest extends TestCase
         Http::assertSent(fn ($request): bool => str_contains($request->url(), 'photon.komoot.io'));
     }
 
-    public function test_provider_failure_returns_empty_results(): void
+    public function test_local_landmarks_resolve_ngp_kalapatti_mahil_nehru(): void
     {
+        Cache::flush();
         Http::fake([
-            'https://photon.komoot.io/*' => Http::response([], 503),
-            'https://nominatim.openstreetmap.org/*' => Http::response([], 503),
+            'https://photon.komoot.io/*' => Http::response([]),
+            'https://nominatim.openstreetmap.org/*' => Http::response([]),
         ]);
 
-        $this->assertSame([], app(OsmMapProvider::class)->searchPlaces('unknown place Coimbatore'));
+        $provider = app(OsmMapProvider::class);
+
+        $ngp = $provider->searchPlaces('ngp college');
+        $this->assertNotEmpty($ngp);
+        $this->assertStringContainsString('N.G.P.', $ngp[0]['label']);
+
+        $kalapati = $provider->searchPlaces('kalapati');
+        $this->assertNotEmpty($kalapati);
+        $this->assertStringContainsString('Kalapatti', $kalapati[0]['label']);
+
+        $mahil = $provider->searchPlaces('mahil pharmacy');
+        $this->assertNotEmpty($mahil);
+        $this->assertStringContainsString('Mahil', $mahil[0]['label']);
+
+        $nehru = $provider->searchPlaces('nehru nagar');
+        $this->assertNotEmpty($nehru);
+        $this->assertStringContainsString('Nehru Nagar', $nehru[0]['label']);
     }
 }

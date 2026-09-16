@@ -3,6 +3,7 @@
 namespace App\Services\Maps;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -11,31 +12,39 @@ class OsmMapProvider implements MapProviderInterface
     public function searchPlaces(string $query): array
     {
         $query = $this->normalizeQuery($query);
-        if (strlen($query) < 3) {
+        if (strlen($query) < 2) {
             return [];
         }
 
-        $cacheKey = 'geo:search:v4:'.md5(mb_strtolower($query));
+        $cacheKey = 'geo:search:v5:'.md5(mb_strtolower($query));
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && $cached !== []) {
             return $cached;
         }
 
-        $merged = array_merge(
+        // Layer 1: Dynamic Trip History (auto-remembers any place user previously entered/visited)
+        $historyResults = $this->searchHistoryPlaces($query);
+
+        // Layer 2: Real-time Live OSM Search (Photon + Nominatim)
+        $liveResults = array_merge(
             $this->searchPhoton($query),
             $this->searchNominatim($query),
             $this->localLandmarks($query)
         );
 
+        $merged = array_merge($historyResults, $liveResults);
         $results = $this->rankResults($query, $merged);
 
+        // Layer 3: Dynamic NLP Token Breakdown if exact phrase gave no hits
         if ($results === []) {
             foreach ($this->queryVariants($query) as $variant) {
-                $results = $this->rankResults($variant, array_merge(
+                $variantResults = array_merge(
+                    $this->searchHistoryPlaces($variant),
                     $this->searchPhoton($variant),
                     $this->searchNominatim($variant),
                     $this->localLandmarks($variant)
-                ));
+                );
+                $results = $this->rankResults($variant, $variantResults);
                 if ($results !== []) {
                     break;
                 }
@@ -47,6 +56,72 @@ class OsmMapProvider implements MapProviderInterface
         }
 
         return $results;
+    }
+
+    /**
+     * Dynamically finds places previously logged in scooter trips matching the query.
+     *
+     * @return array<int, array{label: string, lat: float, lng: float}>
+     */
+    protected function searchHistoryPlaces(string $query): array
+    {
+        try {
+            $term = trim($query);
+            if (strlen($term) < 2) {
+                return [];
+            }
+
+            $rows = DB::table('scooter_trips')
+                ->select(['from_label', 'start_address', 'start_latitude', 'start_longitude', 'to_label', 'end_address', 'end_latitude', 'end_longitude', 'stops'])
+                ->where(function ($q) use ($term) {
+                    $q->where('from_label', 'LIKE', "%{$term}%")
+                        ->orWhere('to_label', 'LIKE', "%{$term}%")
+                        ->orWhere('start_address', 'LIKE', "%{$term}%")
+                        ->orWhere('end_address', 'LIKE', "%{$term}%")
+                        ->orWhere('stops', 'LIKE', "%{$term}%");
+                })
+                ->limit(20)
+                ->get();
+
+            $results = [];
+            foreach ($rows as $r) {
+                if (! empty($r->from_label) && $r->start_latitude && $r->start_longitude && stripos((string) $r->from_label, $term) !== false) {
+                    $results[] = [
+                        'label' => (string) $r->from_label,
+                        'lat' => (float) $r->start_latitude,
+                        'lng' => (float) $r->start_longitude,
+                    ];
+                }
+                if (! empty($r->to_label) && $r->end_latitude && $r->end_longitude && stripos((string) $r->to_label, $term) !== false) {
+                    $results[] = [
+                        'label' => (string) $r->to_label,
+                        'lat' => (float) $r->end_latitude,
+                        'lng' => (float) $r->end_longitude,
+                    ];
+                }
+                if (! empty($r->stops)) {
+                    $stops = json_decode((string) $r->stops, true);
+                    if (is_array($stops)) {
+                        foreach ($stops as $s) {
+                            if (! empty($s['label']) && ! empty($s['lat']) && ! empty($s['lng']) && stripos((string) $s['label'], $term) !== false) {
+                                $results[] = [
+                                    'label' => (string) $s['label'],
+                                    'lat' => (float) $s['lat'],
+                                    'lng' => (float) $s['lng'],
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+
+            return collect($results)
+                ->unique(fn ($row) => round($row['lat'], 4).','.round($row['lng'], 4))
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function routeDistanceKm(array $waypoints): ?float
@@ -106,33 +181,146 @@ class OsmMapProvider implements MapProviderInterface
         $q = mb_strtolower($query);
         $hits = [];
 
-        $isGoldwins = str_contains($q, 'goldwin')
-            || (str_contains($q, 'chinni') && (str_contains($q, '641062') || str_contains($q, 'aerodrome') || str_contains($q, 'civil')));
-        if ($isGoldwins) {
+        // 1. Dr. NGP College / Institutions
+        if (str_contains($q, 'ngp') || str_contains($q, 'n.g.p') || (str_contains($q, 'dr ngp') || str_contains($q, 'dr.ngp'))) {
             $hits[] = [
-                'label' => '112 Goldwins, Civil Aerodrome Post, Chinniyampalayam, Coimbatore, Tamil Nadu 641062',
-                'lat' => 11.03085,
-                'lng' => 77.04295,
+                'label' => 'Dr. N.G.P. Arts and Science College, Kalapatti Road, Coimbatore, Tamil Nadu 641048',
+                'lat' => 11.05580,
+                'lng' => 77.03750,
+            ];
+            $hits[] = [
+                'label' => 'Dr. N.G.P. Institute of Technology, Kalapatti Road, Coimbatore, Tamil Nadu 641048',
+                'lat' => 11.05700,
+                'lng' => 77.03600,
+            ];
+            $hits[] = [
+                'label' => 'Dr. N.G.P. Research Center / Conference Center, Kalapatti Road, Coimbatore 641048',
+                'lat' => 11.05650,
+                'lng' => 77.03700,
             ];
         }
 
-        $isTexPark = (str_contains($q, 'tex park') || str_contains($q, 'texpark') || (str_contains($q, '414') && str_contains($q, 'nehru')))
-            && ! str_contains($q, 'urolog');
-        $isNehruWest = str_contains($q, 'nehru nagar west')
-            || (str_contains($q, 'nehru') && str_contains($q, '641014'));
-        if ($isTexPark || $isNehruWest) {
+        // 2. Kalapatti (and common spelling variations like kalapati)
+        if (str_contains($q, 'kalapat') || str_contains($q, 'kalapatti')) {
+            $hits[] = [
+                'label' => 'Kalapatti, Coimbatore, Tamil Nadu 641048',
+                'lat' => 11.07180,
+                'lng' => 77.03540,
+            ];
+            $hits[] = [
+                'label' => 'Kalapatti Main Road, Civil Aerodrome Post, Coimbatore 641014',
+                'lat' => 11.04500,
+                'lng' => 77.03100,
+            ];
+            $hits[] = [
+                'label' => 'Kalapatti Four Roads / Junction, Coimbatore, Tamil Nadu 641048',
+                'lat' => 11.07450,
+                'lng' => 77.03700,
+            ];
+        }
+
+        // 3. Mahil Pharmacy / Medicals
+        if (str_contains($q, 'mahil')) {
+            $hits[] = [
+                'label' => 'Mahil Pharmacy & Medicals, Kalapatti Main Road, Nehru Nagar, Coimbatore 641014',
+                'lat' => 11.04250,
+                'lng' => 77.03200,
+            ];
+            $hits[] = [
+                'label' => 'Mahil Clinic & Pharmacy, SITRA to Kalapatti Road, Coimbatore 641014',
+                'lat' => 11.03850,
+                'lng' => 77.03450,
+            ];
+        }
+
+        // 4. Nehru Nagar / Nehru Nagar West / East
+        if (str_contains($q, 'nehru') || str_contains($q, '641014')) {
+            $hits[] = [
+                'label' => 'Nehru Nagar West, Kalapatti Road, Coimbatore, Tamil Nadu 641014',
+                'lat' => 11.04400,
+                'lng' => 77.02700,
+            ];
+            $hits[] = [
+                'label' => 'Nehru Nagar East, Kalapatti Main Road, Coimbatore, Tamil Nadu 641014',
+                'lat' => 11.04350,
+                'lng' => 77.03150,
+            ];
             $hits[] = [
                 'label' => '414-A Tex Park Road, Nehru Nagar West, Coimbatore, Tamil Nadu 641014',
                 'lat' => 11.01855,
                 'lng' => 77.02685,
             ];
-        }
-
-        if (str_contains($q, 'imik') || (str_contains($q, 'nehru nagar') && str_contains($q, 'technolog'))) {
             $hits[] = [
-                'label' => 'IMIK Technologies, Nehru Nagar, Coimbatore, Tamil Nadu',
+                'label' => 'IMIK Technologies, Nehru Nagar, Coimbatore, Tamil Nadu 641014',
                 'lat' => 11.01855,
                 'lng' => 77.02685,
+            ];
+        }
+
+        // 5. Goldwins / Chinniyampalayam
+        $isGoldwins = str_contains($q, 'goldwin')
+            || (str_contains($q, 'chinni') && (str_contains($q, '641062') || str_contains($q, 'aerodrome') || str_contains($q, 'civil')));
+        if ($isGoldwins || str_contains($q, 'chinniyampalayam')) {
+            $hits[] = [
+                'label' => '112 Goldwins, Civil Aerodrome Post, Chinniyampalayam, Coimbatore, Tamil Nadu 641062',
+                'lat' => 11.03085,
+                'lng' => 77.04295,
+            ];
+            $hits[] = [
+                'label' => 'Chinniyampalayam, Avinashi Road, Coimbatore, Tamil Nadu 641062',
+                'lat' => 11.03250,
+                'lng' => 77.05100,
+            ];
+            $hits[] = [
+                'label' => 'DMart Chinniyampalayam, Avinashi Road, Coimbatore 641062',
+                'lat' => 11.03400,
+                'lng' => 77.04900,
+            ];
+        }
+
+        // 6. SITRA / Airport
+        if (str_contains($q, 'sitra') || str_contains($q, 'airport')) {
+            $hits[] = [
+                'label' => 'SITRA Junction, Avinashi Road, Civil Aerodrome Post, Coimbatore 641014',
+                'lat' => 11.03450,
+                'lng' => 77.03900,
+            ];
+            $hits[] = [
+                'label' => 'Coimbatore International Airport (CJB), Peelamedu, Coimbatore 641014',
+                'lat' => 11.02980,
+                'lng' => 77.04340,
+            ];
+        }
+
+        // 7. KMCH / Hospitals
+        if (str_contains($q, 'kmch') || str_contains($q, 'kovai medical')) {
+            $hits[] = [
+                'label' => 'Kovai Medical Center and Hospital (KMCH), Avinashi Road, Coimbatore 641014',
+                'lat' => 11.03350,
+                'lng' => 77.03200,
+            ];
+        }
+
+        // 8. Hope College / Peelamedu / Gandhipuram
+        if (str_contains($q, 'hope college') || str_contains($q, 'hopecollege')) {
+            $hits[] = [
+                'label' => 'Hope College, Avinashi Road, Peelamedu, Coimbatore 641004',
+                'lat' => 11.02550,
+                'lng' => 77.00550,
+            ];
+        }
+        if (str_contains($q, 'gandhipuram')) {
+            $hits[] = [
+                'label' => 'Gandhipuram Central Bus Stand, Coimbatore, Tamil Nadu 641012',
+                'lat' => 11.01800,
+                'lng' => 76.96700,
+            ];
+        }
+        if (str_contains($q, 'peelamedu')) {
+            $hits[] = [
+                'label' => 'Peelamedu, Coimbatore, Tamil Nadu 641004',
+                'lat' => 11.02700,
+                'lng' => 77.01500,
             ];
         }
 
@@ -361,39 +549,112 @@ class OsmMapProvider implements MapProviderInterface
     protected function queryVariants(string $query): array
     {
         $variants = [];
-        $parts = array_values(array_filter(array_map('trim', preg_split('/,/', $query) ?: [])));
+        $q = trim($query);
 
-        if (count($parts) >= 2) {
-            $variants[] = implode(', ', array_slice($parts, -3));
-            $variants[] = implode(', ', array_slice($parts, -2));
-            $variants[] = implode(' ', array_slice($parts, 0, 3));
+        // 1. Generic token & punctuation decomposition
+        $clean = preg_replace('/[,\-\/]+/', ' ', $q) ?? $q;
+        $clean = trim(preg_replace('/\s+/', ' ', $clean) ?? '');
+
+        // Suffix with regional context
+        $variants[] = $clean.' Coimbatore';
+        $variants[] = $clean.' Tamil Nadu';
+
+        // Comma-separated parts (e.g. "Coffee Meet, Kalapatti")
+        $commaParts = array_values(array_filter(array_map('trim', explode(',', $q))));
+        if (count($commaParts) >= 2) {
+            $first = $commaParts[0];
+            $second = $commaParts[1];
+            $variants[] = $first.' '.$second.' Coimbatore';
+            $variants[] = $first.' Coimbatore';
+            $variants[] = $second.' Coimbatore';
         }
 
-        $variants[] = preg_replace('/^\d+[,\s\-]*/', '', $query) ?? $query;
-        $variants[] = preg_replace('/\bTechnolgies\b/i', 'Technologies', $query) ?? $query;
+        // Multi-word slices
+        $words = explode(' ', $clean);
+        if (count($words) >= 3) {
+            $variants[] = implode(' ', array_slice($words, 0, 2)).' Coimbatore';
+            $variants[] = implode(' ', array_slice($words, 0, 2)).' '.end($words);
+            $variants[] = implode(' ', array_slice($words, -2)).' Coimbatore';
+        } elseif (count($words) === 2) {
+            $variants[] = $words[0].' '.$words[1].' Coimbatore';
+            $variants[] = $words[0].' Coimbatore';
+            $variants[] = $words[1].' Coimbatore';
+        }
 
+        // Remove filler prepositions ("near", "opp", "opposite", "beside", "behind", "next to")
+        $withoutFillers = preg_replace('/\b(near|opp|opposite|beside|behind|next to)\b/i', '', $clean);
+        $withoutFillers = trim(preg_replace('/\s+/', ' ', $withoutFillers ?? '') ?? '');
+        if ($withoutFillers !== '' && $withoutFillers !== $clean) {
+            $variants[] = $withoutFillers;
+            $variants[] = $withoutFillers.' Coimbatore';
+        }
+
+        // Specific high-frequency shorthands
         if (stripos($query, 'dmart') !== false || stripos($query, 'd mart') !== false) {
             $variants[] = 'DMart Chinniyampalayam Coimbatore Tamil Nadu';
             $variants[] = 'DMart Coimbatore Tamil Nadu';
-            $variants[] = 'DMart near Chinniyampalayam Coimbatore';
         }
-
         if (stripos($query, 'Chinni') !== false || stripos($query, 'Goldwin') !== false || stripos($query, '641062') !== false) {
             $variants[] = 'Chinniyampalayam Coimbatore 641062';
             $variants[] = 'Goldwins Chinniyampalayam Coimbatore';
-            $variants[] = 'Civil Aerodrome Coimbatore 641062';
         }
         if (stripos($query, 'Tex Park') !== false || stripos($query, 'Texpark') !== false || stripos($query, '641014') !== false) {
             $variants[] = 'Tex Park Road Nehru Nagar West Coimbatore 641014';
             $variants[] = 'Nehru Nagar West Coimbatore 641014';
-            $variants[] = 'Texpark Coimbatore';
         }
-        if (stripos($query, 'Nehru') !== false) {
-            $variants[] = 'Nehru Nagar West Coimbatore';
-            $variants[] = 'Nehru Nagar Coimbatore';
+        if (stripos($query, 'ngp') !== false || stripos($query, 'n.g.p') !== false) {
+            $variants[] = 'Dr NGP College Kalapatti Road Coimbatore';
+            $variants[] = 'Dr NGP Institute of Technology Coimbatore';
+        }
+        if (stripos($query, 'kalapat') !== false) {
+            $variants[] = 'Kalapatti Coimbatore';
+            $variants[] = 'Kalapatti Main Road Coimbatore';
+        }
+        if (stripos($query, 'mahil') !== false) {
+            $variants[] = 'Mahil Pharmacy Kalapatti Road Coimbatore';
         }
 
         return array_values(array_unique(array_filter($variants, fn ($v) => strlen(trim($v)) >= 3)));
+    }
+
+    public function reverseGeocode(float $lat, float $lng): ?string
+    {
+        $cacheKey = 'geo:reverse:'.round($lat, 4).','.round($lng, 4);
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'LifeTracker/1.0 (personal scooter tracker; contact: local)',
+                'Accept' => 'application/json',
+            ])
+                ->timeout(8)
+                ->get('https://nominatim.openstreetmap.org/reverse', [
+                    'format' => 'json',
+                    'lat' => $lat,
+                    'lon' => $lng,
+                    'addressdetails' => 1,
+                ]);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $label = $this->formatNominatimLabel($response->json() ?? []);
+            if ($label !== '') {
+                Cache::put($cacheKey, $label, now()->addDays(14));
+
+                return $label;
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::warning('Reverse geocode failed: '.$e->getMessage());
+
+            return null;
+        }
     }
 
     protected function normalizeQuery(string $query): string
@@ -401,6 +662,7 @@ class OsmMapProvider implements MapProviderInterface
         $query = trim(preg_replace('/\s+/', ' ', $query) ?? '');
         $query = preg_replace('/\bD\s*[-]?\s*Mart\b/i', 'DMart', $query) ?? $query;
         $query = preg_replace('/\bChinniampalayam\b/i', 'Chinniyampalayam', $query) ?? $query;
+        $query = preg_replace('/\bKalapati\b/i', 'Kalapatti', $query) ?? $query;
         $query = preg_replace('/\bTamilnadu\b/i', 'Tamil Nadu', $query) ?? $query;
 
         return $query;

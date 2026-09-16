@@ -30,4 +30,21 @@ class GeoController extends Controller
             'distance_km' => $distance,
         ]);
     }
+
+    public function reverse(Request $request, MapProviderInterface $maps)
+    {
+        $lat = (float) $request->get('lat');
+        $lng = (float) $request->get('lng');
+        if (! $lat || ! $lng) {
+            return response()->json(['label' => '']);
+        }
+
+        $label = $maps->reverseGeocode($lat, $lng);
+
+        return response()->json([
+            'label' => $label ?: "Pinned Location ({$lat}, {$lng})",
+            'lat' => $lat,
+            'lng' => $lng,
+        ]);
+    }
 }

@@ -4,13 +4,13 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h1 class="expense-page-title text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Expenses</h1>
-                <p class="text-xs text-slate-500">Total recorded: <span class="font-bold text-rose-600">₹{{ number_format($totalAmount, 2) }}</span></p>
+                <p class="text-xs text-slate-500">Total recorded: <span class="font-bold text-rose-600">₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}</span>@if(($totalFriendPaid ?? 0) > 0) <span class="text-slate-400 font-normal">(excludes ₹{{ number_format($totalFriendPaid, 2) }} non-owned)</span>@endif</p>
             </div>
             <div class="flex flex-wrap items-center gap-2.5">
                 <a href="{{ route('statements.create', ['type' => 'normal']) }}" style="background-color: #0d9488; color: #ffffff;" class="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md shadow-teal-600/20 flex items-center gap-1.5 transition active:scale-95">
                     <span>📄</span> Take Statement
                 </a>
-                <button type="button" onclick="openCalcModal()" style="background-color: #7c3aed; color: #ffffff;" class="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
+                <button type="button" onclick="openCalcModal()" style="background-color: #7c3aed; color: #ffffff;" class="px-4 py-2.5 rounded-xl bg-purple-600 hover:purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 flex items-center gap-1.5 transition active:scale-95 cursor-pointer">
                     <span>🧮</span> Calculate by Category
                 </button>
                 <a href="{{ route('expenses.create') }}" style="background-color: #0284c7; color: #ffffff;" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-600/20 flex items-center gap-1.5 transition active:scale-95">
@@ -36,15 +36,23 @@
                         @endif
                     </div>
                     <div class="mt-2 text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400">
-                        ₹{{ number_format($totalAmount, 2) }}
+                        ₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}
                     </div>
+                    @if(($totalFriendPaid ?? 0) > 0)
+                        <div class="mt-2 flex items-center justify-between text-[11px] font-medium bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                            <span class="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                <span class="text-indigo-600 dark:text-indigo-400 font-bold">👥</span> Non-owned (Friend paid):
+                            </span>
+                            <span class="font-bold text-indigo-600 dark:text-indigo-400">₹{{ number_format($totalFriendPaid, 2) }}</span>
+                        </div>
+                    @endif
                 </div>
                 <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
                     <span>{{ $totalCount }} transaction(s)</span>
                     @if(request()->filled('category_id') || request()->filled('payment_method') || request()->filled('from_date') || request()->filled('to_date'))
                         <a href="{{ route('expenses.index') }}" class="text-[10px] font-semibold text-rose-600 hover:underline">Clear Filter</a>
                     @else
-                        <span class="text-[10px] text-slate-400">Standard & splits</span>
+                        <span class="text-[10px] text-slate-400">Excludes non-owned</span>
                     @endif
                 </div>
             </div>
@@ -251,6 +259,9 @@
                                     <td class="py-3 px-4 font-bold text-rose-600 dark:text-rose-400 text-sm whitespace-nowrap">
                                         @if($isGroup)
                                             ₹{{ number_format($myPaid, 2) }} <span class="block text-[10px] font-normal text-slate-400">your spend</span>
+                                        @elseif($friendsPaid > 0)
+                                            ₹{{ number_format($myPaid, 2) }}
+                                            <span class="block text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">Friend: ₹{{ number_format($friendsPaid, 2) }}</span>
                                         @else
                                             ₹{{ number_format($displayAmount, 2) }}
                                         @endif

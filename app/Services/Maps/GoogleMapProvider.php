@@ -2,6 +2,7 @@
 
 namespace App\Services\Maps;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -45,7 +46,69 @@ class GoogleMapProvider implements MapProviderInterface
 
     public function routeDistanceKm(array $waypoints): ?float
     {
-        return $this->fallback->routeDistanceKm($waypoints);
+        $points = array_values(array_filter($waypoints, fn ($w) => isset($w['lat'], $w['lng'])));
+        if (count($points) < 2) {
+            return null;
+        }
+
+        $key = (string) config('services.maps.google_key');
+        if ($key === '') {
+            return $this->fallback->routeDistanceKm($waypoints);
+        }
+
+        $coords = collect($points)
+            ->map(fn ($w) => round((float) $w['lat'], 5).','.round((float) $w['lng'], 5))
+            ->implode(';');
+
+        $cacheKey = 'geo:google_route:v1:'.md5($coords);
+        $cached = Cache::get($cacheKey);
+        if (is_numeric($cached)) {
+            return (float) $cached;
+        }
+
+        try {
+            $origin = $points[0]['lat'].','.$points[0]['lng'];
+            $destination = $points[count($points) - 1]['lat'].','.$points[count($points) - 1]['lng'];
+
+            $params = [
+                'origin' => $origin,
+                'destination' => $destination,
+                'mode' => 'driving',
+                'key' => $key,
+            ];
+
+            if (count($points) > 2) {
+                $intermediates = array_slice($points, 1, -1);
+                $waypointsParam = collect($intermediates)
+                    ->map(fn ($p) => $p['lat'].','.$p['lng'])
+                    ->implode('|');
+                $params['waypoints'] = $waypointsParam;
+            }
+
+            $response = Http::timeout(10)->get('https://maps.googleapis.com/maps/api/directions/json', $params);
+
+            if ($response->successful() && $response->json('status') === 'OK') {
+                $routes = $response->json('routes') ?? [];
+                if (! empty($routes)) {
+                    $legs = $routes[0]['legs'] ?? [];
+                    $totalMeters = collect($legs)->sum(fn ($leg) => data_get($leg, 'distance.value', 0));
+                    if ($totalMeters > 0) {
+                        $km = round($totalMeters / 1000, 2);
+                        Cache::put($cacheKey, $km, now()->addDays(7));
+
+                        return $km;
+                    }
+                }
+            }
+
+            Log::warning('Google Directions API status: '.($response->json('status') ?? 'request failed'));
+
+            return $this->fallback->routeDistanceKm($waypoints);
+        } catch (\Throwable $exception) {
+            Log::warning('Google Directions API failed: '.$exception->getMessage());
+
+            return $this->fallback->routeDistanceKm($waypoints);
+        }
     }
 
     /**
@@ -73,5 +136,29 @@ class GoogleMapProvider implements MapProviderInterface
         ]);
 
         return implode(', ', array_unique($parts)) ?: (string) ($result['formatted_address'] ?? '');
+    }
+
+    public function reverseGeocode(float $lat, float $lng): ?string
+    {
+        $key = (string) config('services.maps.google_key');
+        if ($key === '') {
+            return $this->fallback->reverseGeocode($lat, $lng);
+        }
+
+        try {
+            $response = Http::timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                'latlng' => "{$lat},{$lng}",
+                'key' => $key,
+            ]);
+
+            $results = $response->json('results') ?? [];
+            if (! empty($results)) {
+                return $this->formatGoogleAddress($results[0]);
+            }
+
+            return $this->fallback->reverseGeocode($lat, $lng);
+        } catch (\Throwable $e) {
+            return $this->fallback->reverseGeocode($lat, $lng);
+        }
     }
 }

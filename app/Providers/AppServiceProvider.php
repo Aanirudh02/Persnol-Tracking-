@@ -6,7 +6,6 @@ use App\Models\ActivityCategory;
 use App\Models\ExpenseCategory;
 use App\Models\IncomeCategory;
 use App\Services\DailyPromptService;
-use App\Services\Maps\GoogleMapProvider;
 use App\Services\Maps\MapProviderInterface;
 use App\Services\Maps\OsmMapProvider;
 use App\Services\OptionsService;
@@ -18,12 +17,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(MapProviderInterface::class, function () {
-            return match (config('services.maps.provider', 'osm')) {
-                'google' => new GoogleMapProvider(new OsmMapProvider),
-                default => new OsmMapProvider,
-            };
-        });
+        $this->app->bind(MapProviderInterface::class, OsmMapProvider::class);
     }
 
     public function boot(): void
