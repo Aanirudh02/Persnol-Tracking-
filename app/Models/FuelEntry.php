@@ -51,7 +51,7 @@ class FuelEntry extends Model
 
     public function expense(): HasOne
     {
-        return $this->hasOne(Expense::class, 'id', 'expense_id');
+        return $this->hasOne(Expense::class, 'id', 'expense_id')->withTrashed();
     }
 
     public function vehicle(): BelongsTo

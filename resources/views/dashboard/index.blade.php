@@ -192,33 +192,53 @@
             </div>
 
             <!-- Monthly Financial Overview -->
-            <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800 flex items-center justify-center text-lg shrink-0">
-                        🗓️
-                    </div>
-                    <div>
-                        <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                            <span>Monthly Total</span>
-                            <span class="text-[10px] font-normal text-slate-400">({{ \Carbon\Carbon::parse($startOfMonth)->format('F Y') }})</span>
+            <div class="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between gap-3">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800 flex items-center justify-center text-lg shrink-0">
+                            🗓️
                         </div>
-                        <div class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                            <span>Net:</span>
-                            <strong class="{{ ($monthlyIncomeTotal - $monthlyExpensesTotal) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
-                                ₹{{ number_format($monthlyIncomeTotal - $monthlyExpensesTotal, 2) }}
-                            </strong>
+                        <div>
+                            <div class="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                <span>Monthly Total</span>
+                                <span class="text-[10px] font-normal text-slate-400">({{ \Carbon\Carbon::parse($startOfMonth)->format('F Y') }})</span>
+                            </div>
+                            <div class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                <span>Net:</span>
+                                <strong class="{{ ($monthlyIncomeTotal - $monthlyExpensesTotal) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                    ₹{{ number_format($monthlyIncomeTotal - $monthlyExpensesTotal, 2) }}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                        <div>
+                            <span class="text-[10px] uppercase font-semibold text-slate-400 block">Total Spend</span>
+                            <span class="text-sm font-bold text-rose-600 dark:text-rose-400">₹{{ number_format($monthlyExpensesTotal, 2) }}</span>
+                        </div>
+                        <div class="w-px h-7 bg-slate-200 dark:bg-slate-800"></div>
+                        <div>
+                            <span class="text-[10px] uppercase font-semibold text-slate-400 block">Income</span>
+                            <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format($monthlyIncomeTotal, 2) }}</span>
                         </div>
                     </div>
                 </div>
-                <div class="flex items-center gap-4 text-xs w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
-                    <div>
-                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Expenses</span>
-                        <span class="text-sm font-bold text-rose-600 dark:text-rose-400">₹{{ number_format($monthlyExpensesTotal, 2) }}</span>
+
+                <!-- Monthly Spend Clarification & Breakdown Controls -->
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">Base: ₹{{ number_format($monthlyBaseExpenses, 2) }}</span>
+                        @if($monthlyVoluntaryExpenses > 0)
+                            <span class="px-2 py-0.5 rounded-md bg-pink-50 dark:bg-pink-950/50 text-pink-700 dark:text-pink-300 font-semibold" title="Discretionary / Voluntary">Voluntary: +₹{{ number_format($monthlyVoluntaryExpenses, 2) }}</span>
+                        @endif
                     </div>
-                    <div class="w-px h-7 bg-slate-200 dark:bg-slate-800"></div>
-                    <div>
-                        <span class="text-[10px] uppercase font-semibold text-slate-400 block">Income</span>
-                        <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">₹{{ number_format($monthlyIncomeTotal, 2) }}</span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="document.getElementById('monthly-breakdown-modal').classList.toggle('hidden')" class="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer">
+                            <span>📊</span> Category & Payment Breakdown
+                        </button>
+                        <a href="{{ route('expenses.index', ['period' => 'month']) }}" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-semibold">
+                            Open in Expenses &rarr;
+                        </a>
                     </div>
                 </div>
             </div>
@@ -535,4 +555,87 @@
             });
         });
     </script>
+
+    <!-- Monthly Breakdown Modal -->
+    <div id="monthly-breakdown-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>🗓️</span> Monthly Expense Breakdown
+                    </h3>
+                    <p class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($startOfMonth)->format('F Y') }} spending details</p>
+                </div>
+                <button type="button" onclick="document.getElementById('monthly-breakdown-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 text-2xl font-bold cursor-pointer">&times;</button>
+            </div>
+
+            <!-- Total Card -->
+            <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Monthly Spend</span>
+                    <div class="text-xl font-black text-rose-600 dark:text-rose-400">₹{{ number_format($monthlyExpensesTotal, 2) }}</div>
+                </div>
+                <div class="text-right text-xs space-y-0.5">
+                    <div class="text-slate-600 dark:text-slate-300 font-medium">Base Needs: <strong>₹{{ number_format($monthlyBaseExpenses, 2) }}</strong></div>
+                    @if($monthlyVoluntaryExpenses > 0)
+                        <div class="text-pink-600 dark:text-pink-400 font-semibold">Voluntary / Leisure: <strong>₹{{ number_format($monthlyVoluntaryExpenses, 2) }}</strong></div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <span>📊</span> Spend by Category
+                </h4>
+                <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    @forelse($monthlyCategoryBreakdown as $cat)
+                        <div class="p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {{ $cat['color'] }}"></span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-200">{{ $cat['name'] }}</span>
+                                <span class="text-[10px] text-slate-400">({{ $cat['count'] }}x)</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-bold text-slate-900 dark:text-white">₹{{ number_format($cat['total'], 2) }}</span>
+                                <span class="text-[10px] text-slate-400 block">{{ $cat['percentage'] }}%</span>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="text-center py-4 text-xs text-slate-400">No category records found for this month.</div>
+                    @endforelse
+                </div>
+            </div>
+
+            <!-- Payment Type Breakdown -->
+            <div class="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <span>💳</span> Spend by Payment Method
+                </h4>
+                <div class="grid grid-cols-2 gap-2">
+                    @forelse($monthlyPaymentBreakdown as $pay)
+                        <div class="p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs">
+                            <div class="flex items-center justify-between text-slate-500 mb-1">
+                                <span class="font-semibold text-slate-700 dark:text-slate-300">{{ $pay['method'] }}</span>
+                                <span class="text-[10px]">{{ $pay['count'] }}x</span>
+                            </div>
+                            <div class="font-bold text-slate-900 dark:text-white text-sm">₹{{ number_format($pay['total'], 2) }}</div>
+                            <div class="text-[10px] text-slate-400 mt-0.5">{{ $pay['percentage'] }}% of month</div>
+                        </div>
+                    @empty
+                        <div class="col-span-2 text-center py-3 text-xs text-slate-400">No payment records found.</div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <a href="{{ route('expenses.index', ['period' => 'month']) }}" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition">
+                    View in Expenses Table &rarr;
+                </a>
+                <button type="button" onclick="document.getElementById('monthly-breakdown-modal').classList.add('hidden')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200 transition cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
 </x-app-layout>

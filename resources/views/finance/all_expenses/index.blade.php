@@ -29,16 +29,17 @@
                 </div>
             </div>
 
-            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <a href="{{ route('expenses.breakdown') }}" class="group block rounded-3xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-400 hover:shadow-md transition cursor-pointer">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Normal Expenses</span>
-                    <span class="text-lg">📘</span>
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 group-hover:text-indigo-600 transition">Normal Expenses</span>
+                    <span class="text-lg group-hover:scale-110 transition">📘</span>
                 </div>
-                <div class="mt-2 text-2xl font-bold text-slate-900">₹{{ number_format($normalTotal, 2) }}</div>
-                <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
-                    Regular college & tracked
+                <div class="mt-2 text-2xl font-bold text-slate-900 group-hover:text-indigo-600 transition">₹{{ number_format($normalTotal, 2) }}</div>
+                <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-indigo-600 font-semibold flex items-center justify-between">
+                    <span>Regular & tracked</span>
+                    <span>Month-wise & Petrol &rarr;</span>
                 </div>
-            </div>
+            </a>
 
             <div class="rounded-3xl border border-pink-100 bg-white p-5 shadow-sm">
                 <div class="flex items-center justify-between">

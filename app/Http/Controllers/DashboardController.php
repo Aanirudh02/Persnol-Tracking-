@@ -135,15 +135,69 @@ class DashboardController extends Controller
 
         $weeklyExpensesTotal = (float) Expense::where('user_id', $user->id)
             ->whereNull('parent_id')
-            ->where('is_voluntary', false)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->whereBetween('date', [$startOfWeek, $endOfWeek])
             ->sum(DB::raw('amount + gst_amount'));
 
         $monthlyExpensesTotal = (float) Expense::where('user_id', $user->id)
             ->whereNull('parent_id')
-            ->where('is_voluntary', false)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->sum(DB::raw('amount + gst_amount'));
+
+        $monthlyBaseExpenses = (float) Expense::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('is_voluntary', false)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum(DB::raw('amount + gst_amount'));
+
+        $monthlyVoluntaryExpenses = (float) Expense::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('is_voluntary', true)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->sum(DB::raw('amount + gst_amount'));
+
+        $monthlyCategoryBreakdown = Expense::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->with('category')
+            ->get()
+            ->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')
+            ->map(function ($group, $name) use ($monthlyExpensesTotal) {
+                $cTotal = round((float) $group->sum(fn ($e) => (float) $e->amount + (float) $e->gst_amount), 2);
+
+                return [
+                    'name' => $name,
+                    'count' => $group->count(),
+                    'total' => $cTotal,
+                    'percentage' => $monthlyExpensesTotal > 0 ? round(($cTotal / $monthlyExpensesTotal) * 100, 1) : 0,
+                    'color' => $group->first()->category?->color ?? '#64748b',
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
+
+        $monthlyPaymentBreakdown = Expense::where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereBetween('date', [$startOfMonth, $endOfMonth])
+            ->get()
+            ->groupBy(fn ($e) => $e->payment_method ?: 'Other')
+            ->map(function ($group, $method) use ($monthlyExpensesTotal) {
+                $pTotal = round((float) $group->sum(fn ($e) => (float) $e->amount + (float) $e->gst_amount), 2);
+
+                return [
+                    'method' => $method,
+                    'count' => $group->count(),
+                    'total' => $pTotal,
+                    'percentage' => $monthlyExpensesTotal > 0 ? round(($pTotal / $monthlyExpensesTotal) * 100, 1) : 0,
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
 
         $weeklyIncomeTotal = (float) Income::where('user_id', $user->id)
             ->whereBetween('date', [$startOfWeek, $endOfWeek])
@@ -160,6 +214,10 @@ class DashboardController extends Controller
             'expensesTotal',
             'weeklyExpensesTotal',
             'monthlyExpensesTotal',
+            'monthlyBaseExpenses',
+            'monthlyVoluntaryExpenses',
+            'monthlyCategoryBreakdown',
+            'monthlyPaymentBreakdown',
             'weeklyIncomeTotal',
             'monthlyIncomeTotal',
             'startOfWeek',

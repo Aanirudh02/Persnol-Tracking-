@@ -5,6 +5,28 @@
             <h1 class="text-2xl font-bold text-slate-900 mt-2">{{ $expense->description }}</h1>
             <p class="text-sm text-slate-500">₹{{ number_format($expense->totalAmount(), 2) }} · {{ $expense->category?->name ?? 'Uncategorized' }} · {{ $expense->date->format('d M Y') }}</p>
             @if($expense->is_voluntary)<span class="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-pink-50 text-pink-700">Voluntary</span>@endif
+
+            @if($expense->trashed())
+                <div class="mt-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs">
+                    <span class="font-medium">⚠️ This expense was soft-deleted on {{ $expense->deleted_at->format('d M Y, H:i') }}.</span>
+                    <form action="{{ route('expenses.restore', $expense) }}" method="POST">
+                        @csrf
+                        <button type="submit" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold cursor-pointer transition">
+                            Restore to Active
+                        </button>
+                    </form>
+                </div>
+            @elseif($expense->is_archived)
+                <div class="mt-3 p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-purple-800 text-xs flex items-center justify-between shadow-xs">
+                    <span class="font-medium">📦 This expense is archived under Historical records.</span>
+                    <form action="{{ route('expenses.restore', $expense) }}" method="POST">
+                        @csrf
+                        <button type="submit" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold cursor-pointer transition">
+                            Restore to Active
+                        </button>
+                    </form>
+                </div>
+            @endif
         </div>
 
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-sm space-y-2">

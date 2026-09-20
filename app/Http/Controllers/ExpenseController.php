@@ -9,6 +9,7 @@ use App\Models\ExpenseGroup;
 use App\Models\FoodEntry;
 use App\Models\Friend;
 use App\Models\FriendSplit;
+use App\Models\FuelEntry;
 use App\Services\AuditService;
 use App\Services\FinanceLinkService;
 use App\Services\FinanceService;
@@ -46,15 +47,29 @@ class ExpenseController extends Controller
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->whereNull('parent_id')
             ->count();
-        $archivedCount = Expense::where('user_id', $user->id)
-            ->where('is_archived', true)
+        $archivedCount = Expense::withTrashed()
+            ->where('user_id', $user->id)
+            ->where(fn ($q) => $q->where('is_archived', true)->orWhereNotNull('deleted_at'))
             ->whereNull('parent_id')
             ->count();
 
         if ($status === 'archived') {
-            $query->where('is_archived', true);
+            $query->withTrashed()->where(fn ($q) => $q->where('is_archived', true)->orWhereNotNull('deleted_at'));
         } else {
             $query->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false));
+        }
+
+        $period = $request->get('period', 'all');
+        $fromDate = $request->get('from_date');
+        $toDate = $request->get('to_date');
+        [$startDate, $endDate] = $this->resolveDates($period, $fromDate, $toDate);
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('date', [$startDate, $endDate]);
+        } elseif ($request->filled('from_date')) {
+            $query->where('date', '>=', $request->string('from_date'));
+        } elseif ($request->filled('to_date')) {
+            $query->where('date', '<=', $request->string('to_date'));
         }
 
         if ($request->filled('category_id')) {
@@ -62,12 +77,6 @@ class ExpenseController extends Controller
         }
         if ($request->filled('payment_method')) {
             $query->where('payment_method', $request->string('payment_method'));
-        }
-        if ($request->filled('from_date')) {
-            $query->where('date', '>=', $request->string('from_date'));
-        }
-        if ($request->filled('to_date')) {
-            $query->where('date', '<=', $request->string('to_date'));
         }
         if ($request->boolean('voluntary_only')) {
             $query->where('is_voluntary', true);
@@ -88,17 +97,19 @@ class ExpenseController extends Controller
             $baseQuery->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false));
         }
 
+        if ($startDate && $endDate) {
+            $baseQuery->whereBetween('date', [$startDate, $endDate]);
+        } elseif ($request->filled('from_date')) {
+            $baseQuery->where('date', '>=', $request->string('from_date'));
+        } elseif ($request->filled('to_date')) {
+            $baseQuery->where('date', '<=', $request->string('to_date'));
+        }
+
         if ($request->filled('category_id')) {
             $baseQuery->where('category_id', $request->integer('category_id'));
         }
         if ($request->filled('payment_method')) {
             $baseQuery->where('payment_method', $request->string('payment_method'));
-        }
-        if ($request->filled('from_date')) {
-            $baseQuery->where('date', '>=', $request->string('from_date'));
-        }
-        if ($request->filled('to_date')) {
-            $baseQuery->where('date', '<=', $request->string('to_date'));
         }
         if ($request->boolean('voluntary_only')) {
             $baseQuery->where('is_voluntary', true);
@@ -119,8 +130,8 @@ class ExpenseController extends Controller
         foreach ($matchingExpenses as $item) {
             $method = $item->payment_method ?: 'Other';
             $itemTotal = $item->totalAmount();
+            $itemOwned = $itemTotal;
             $itemFriendPaid = $item->totalPaidByFriends();
-            $itemOwned = max(0.0, round($itemTotal - $itemFriendPaid, 2));
 
             if (! isset($expensesByPayment[$method])) {
                 $expensesByPayment[$method] = [
@@ -187,7 +198,7 @@ class ExpenseController extends Controller
 
         arsort($friendPaidBreakdown);
         $totalFriendPaid = array_sum($friendPaidBreakdown);
-        $ownedTotalAmount = max(0.0, round($totalAmount - $totalFriendPaid, 2));
+        $ownedTotalAmount = round($totalAmount, 2);
 
         return view('finance.expenses.index', compact(
             'expenses',
@@ -201,7 +212,10 @@ class ExpenseController extends Controller
             'totalFriendPaid',
             'status',
             'activeCount',
-            'archivedCount'
+            'archivedCount',
+            'period',
+            'fromDate',
+            'toDate'
         ));
     }
 
@@ -388,10 +402,15 @@ class ExpenseController extends Controller
                 ]]);
 
             $baseTotal = (float) $lines->sum(fn (array $line): float => (float) $line['amount']);
-            $allocatedGst = $lines->values()->map(function (array $line, int $index) use ($registeredGst, $baseTotal, $lines): array {
-                $gst = $index === $lines->count() - 1
-                    ? $registeredGst - (float) $lines->slice(0, $index)->sum('gst_amount')
-                    : ($baseTotal > 0 ? round($registeredGst * ((float) $line['amount'] / $baseTotal), 2) : 0);
+            $runningGst = 0.0;
+            $lineCount = $lines->count();
+            $allocatedGst = $lines->values()->map(function (array $line, int $index) use ($registeredGst, $baseTotal, $lineCount, &$runningGst): array {
+                if ($index === $lineCount - 1) {
+                    $gst = round($registeredGst - $runningGst, 2);
+                } else {
+                    $gst = $baseTotal > 0 ? round($registeredGst * ((float) $line['amount'] / $baseTotal), 2) : 0.0;
+                    $runningGst += $gst;
+                }
 
                 $line['gst_amount'] = round($gst, 2);
 
@@ -724,6 +743,10 @@ class ExpenseController extends Controller
             abort(403);
         }
 
+        if ($expense->trashed()) {
+            $expense->restore();
+        }
+
         $expense->update(['is_archived' => true]);
 
         return back()->with('success', 'Expense archived to Historical records.');
@@ -733,6 +756,10 @@ class ExpenseController extends Controller
     {
         if ($expense->user_id !== $request->user()->id) {
             abort(403);
+        }
+
+        if ($expense->trashed()) {
+            $expense->restore();
         }
 
         $expense->update(['is_archived' => false]);
@@ -769,7 +796,7 @@ class ExpenseController extends Controller
             reason: 'Deleted by user'
         );
 
-        if ($request->boolean('permanent') || $request->input('action') === 'delete_permanent') {
+        if ($request->boolean('permanent') || $request->input('action') === 'delete_permanent' || $expense->is_archived || $expense->trashed()) {
             $expense->forceDelete();
 
             return back()->with('success', 'Expense permanently deleted.');
@@ -777,7 +804,7 @@ class ExpenseController extends Controller
 
         $expense->delete();
 
-        return redirect()->route('expenses.index')->with('success', 'Expense deleted successfully!');
+        return redirect()->route('expenses.index')->with('success', 'Expense moved to Historical records.');
     }
 
     /**
@@ -1103,5 +1130,155 @@ class ExpenseController extends Controller
             'transaction_count' => $expenses->count(),
             'breakdown' => $breakdown,
         ]);
+    }
+
+    public function breakdown(Request $request, OptionsService $options): View
+    {
+        $user = $request->user();
+        $period = $request->get('period', 'all');
+        $fromDate = $request->get('from_date');
+        $toDate = $request->get('to_date');
+
+        [$startDate, $endDate] = $this->resolveDates($period, $fromDate, $toDate);
+
+        // 1. Normal Expenses query (active & top-level)
+        $expenseQuery = Expense::query()
+            ->where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->with(['category', 'paidByFriend', 'friendSplits.friend']);
+
+        if ($startDate && $endDate) {
+            $expenseQuery->whereBetween('date', [$startDate, $endDate]);
+        }
+
+        $expenses = $expenseQuery->orderByDesc('date')->orderByDesc('created_at')->get();
+
+        $totalNormalSpend = round((float) $expenses->sum(fn ($e) => $e->totalAmount()), 2);
+        $totalVoluntarySpend = round((float) $expenses->where('is_voluntary', true)->sum(fn ($e) => $e->totalAmount()), 2);
+        $totalBaseSpend = round(max(0, $totalNormalSpend - $totalVoluntarySpend), 2);
+
+        // Group by Month (e.g. "September 2026", "June 2026")
+        $monthlyGroups = $expenses->groupBy(fn ($e) => $e->date->format('F Y'))->map(function ($group, $monthName) {
+            $monthTotal = round((float) $group->sum(fn ($e) => $e->totalAmount()), 2);
+            $monthVoluntary = round((float) $group->where('is_voluntary', true)->sum(fn ($e) => $e->totalAmount()), 2);
+            $monthBase = round(max(0, $monthTotal - $monthVoluntary), 2);
+
+            $categories = $group->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')->map(function ($cGroup, $cName) use ($monthTotal) {
+                $cTotal = round((float) $cGroup->sum(fn ($e) => $e->totalAmount()), 2);
+
+                return [
+                    'name' => $cName,
+                    'count' => $cGroup->count(),
+                    'total' => $cTotal,
+                    'percentage' => $monthTotal > 0 ? round(($cTotal / $monthTotal) * 100, 1) : 0,
+                    'color' => $cGroup->first()->category?->color ?? '#3b82f6',
+                ];
+            })->sortByDesc('total')->values();
+
+            $payments = $group->groupBy(fn ($e) => $e->payment_method ?: 'Other')->map(function ($pGroup, $pMethod) {
+                return [
+                    'method' => $pMethod,
+                    'count' => $pGroup->count(),
+                    'total' => round((float) $pGroup->sum(fn ($e) => $e->totalAmount()), 2),
+                ];
+            })->sortByDesc('total')->values();
+
+            return [
+                'month' => $monthName,
+                'total' => $monthTotal,
+                'base' => $monthBase,
+                'voluntary' => $monthVoluntary,
+                'count' => $group->count(),
+                'categories' => $categories,
+                'payments' => $payments,
+                'items' => $group,
+            ];
+        });
+
+        // 2. Petrol Expenses Analysis for the Period
+        $fuelQuery = FuelEntry::query()
+            ->where('user_id', $user->id)
+            ->with(['expense', 'vehicle']);
+
+        if ($startDate && $endDate) {
+            $fuelQuery->whereBetween('date', [$startDate, $endDate]);
+        }
+
+        $allFuelEntries = $fuelQuery->orderByDesc('date')->orderByDesc('created_at')->get();
+
+        $totalPetrolCost = round((float) $allFuelEntries->sum('amount'), 2);
+        $totalPetrolLitres = round((float) $allFuelEntries->sum('litres'), 2);
+
+        // Split into Associated vs Unassociated
+        $associatedFuel = $allFuelEntries->filter(fn ($f) => $f->expense_id !== null && $f->expense !== null);
+        $unassociatedFuel = $allFuelEntries->filter(fn ($f) => $f->expense_id === null || $f->expense === null);
+
+        $associatedTotal = round((float) $associatedFuel->sum('amount'), 2);
+        $unassociatedTotal = round((float) $unassociatedFuel->sum('amount'), 2);
+
+        // Overall category breakdown for the selected period
+        $overallCategoryBreakdown = $expenses->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')->map(function ($group, $name) use ($totalNormalSpend) {
+            $catTotal = round((float) $group->sum(fn ($e) => $e->totalAmount()), 2);
+
+            return [
+                'name' => $name,
+                'count' => $group->count(),
+                'total' => $catTotal,
+                'percentage' => $totalNormalSpend > 0 ? round(($catTotal / $totalNormalSpend) * 100, 1) : 0,
+                'color' => $group->first()->category?->color ?? '#3b82f6',
+            ];
+        })->sortByDesc('total')->values();
+
+        // Overall payment method breakdown for the selected period
+        $overallPaymentBreakdown = $expenses->groupBy(fn ($e) => $e->payment_method ?: 'Other')->map(function ($group, $method) use ($totalNormalSpend) {
+            $payTotal = round((float) $group->sum(fn ($e) => $e->totalAmount()), 2);
+
+            return [
+                'method' => $method,
+                'count' => $group->count(),
+                'total' => $payTotal,
+                'percentage' => $totalNormalSpend > 0 ? round(($payTotal / $totalNormalSpend) * 100, 1) : 0,
+            ];
+        })->sortByDesc('total')->values();
+
+        return view('finance.expenses.breakdown', compact(
+            'period',
+            'fromDate',
+            'toDate',
+            'totalNormalSpend',
+            'totalBaseSpend',
+            'totalVoluntarySpend',
+            'monthlyGroups',
+            'allFuelEntries',
+            'totalPetrolCost',
+            'totalPetrolLitres',
+            'associatedFuel',
+            'unassociatedFuel',
+            'associatedTotal',
+            'unassociatedTotal',
+            'overallCategoryBreakdown',
+            'overallPaymentBreakdown'
+        ));
+    }
+
+    private function resolveDates(string $periodType, ?string $start, ?string $end): array
+    {
+        $today = Carbon::today();
+
+        return match ($periodType) {
+            'day', 'today' => [$today->toDateString(), $today->toDateString()],
+            'week' => [$today->copy()->startOfWeek()->toDateString(), $today->copy()->endOfWeek()->toDateString()],
+            'month' => [$today->copy()->startOfMonth()->toDateString(), $today->copy()->endOfMonth()->toDateString()],
+            'year' => [$today->copy()->startOfYear()->toDateString(), $today->copy()->endOfYear()->toDateString()],
+            'custom' => [
+                $start ?: $today->copy()->startOfMonth()->toDateString(),
+                $end ?: $today->toDateString(),
+            ],
+            default => [
+                $start ?: null,
+                $end ?: null,
+            ],
+        };
     }
 }

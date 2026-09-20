@@ -79,14 +79,15 @@ Route::middleware('auth')->group(function () {
         Route::resource('statements', StatementController::class)->names('statements');
 
         // Expenses
+        Route::get('/expenses/breakdown', [ExpenseController::class, 'breakdown'])->name('expenses.breakdown');
         Route::get('/expenses/calculate-category', [ExpenseController::class, 'calculateByCategory'])->name('expenses.calculate-category');
-        Route::resource('expenses', ExpenseController::class)->names('expenses');
+        Route::resource('expenses', ExpenseController::class)->withTrashed(['show', 'edit', 'update', 'restore', 'destroy'])->names('expenses');
         Route::post('/expenses/group', [ExpenseController::class, 'group'])->name('expenses.group');
         Route::put('/expense-groups/{expenseGroup}', [ExpenseController::class, 'renameGroup'])->name('expense-groups.update');
         Route::delete('/expense-groups/{expenseGroup}', [ExpenseController::class, 'ungroup'])->name('expense-groups.destroy');
         Route::delete('/expense-groups/{expenseGroup}/expenses/{expense}', [ExpenseController::class, 'detachFromGroup'])->name('expense-groups.expenses.detach');
-        Route::post('/expenses/{expense}/archive', [ExpenseController::class, 'archive'])->name('expenses.archive');
-        Route::post('/expenses/{expense}/restore', [ExpenseController::class, 'restore'])->name('expenses.restore');
+        Route::post('/expenses/{expense}/archive', [ExpenseController::class, 'archive'])->name('expenses.archive')->withTrashed();
+        Route::post('/expenses/{expense}/restore', [ExpenseController::class, 'restore'])->name('expenses.restore')->withTrashed();
         Route::put('/expense-groups/{expenseGroup}/expenses/{expense}/payment-method', [ExpenseController::class, 'updateGroupPaymentMethod'])->name('expense-groups.expenses.payment-method');
         Route::post('/expenses/{expense}/link-food', [ExpenseController::class, 'linkFood'])->name('expenses.link-food');
 
@@ -166,6 +167,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/scooter/{trip}/end', [ScooterController::class, 'endTrip'])->name('scooter.end')->middleware('permission:scooter.edit');
 
     // Petrol
+    Route::post('/petrol/{petrol}/link-expense', [PetrolController::class, 'linkExpense'])->name('petrol.link-expense');
     Route::resource('petrol', PetrolController::class)->names('petrol');
 
     // Mistakes & Lessons

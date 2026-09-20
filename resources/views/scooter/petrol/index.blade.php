@@ -72,15 +72,29 @@
                                 </td>
                                 <td class="py-3 px-4 whitespace-nowrap">
                                     <div class="font-bold text-teal-600 dark:text-teal-400">₹{{ number_format($fuel->amount, 2) }}</div>
-                                    <div class="mt-0.5">
-                                        @if($fuel->expense_id || $fuel->expense)
-                                            <a href="{{ $fuel->expense_id ? route('expenses.show', $fuel->expense_id) : '#' }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition" title="Logged as Expense">
+                                    <div class="mt-0.5 flex items-center gap-1">
+                                        @if($fuel->expense && $fuel->expense->is_archived)
+                                            <a href="{{ route('expenses.show', $fuel->expense_id) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 hover:bg-purple-100 transition" title="Archived Historical Expense">
+                                                <span>📦</span> Archived Expense
+                                            </a>
+                                        @elseif($fuel->expense && ! $fuel->expense->trashed())
+                                            <a href="{{ route('expenses.show', $fuel->expense_id) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition" title="Logged as Active Expense">
                                                 <span>💰</span> Expense Logged 
+                                            </a>
+                                        @elseif($fuel->expense_id)
+                                            <a href="{{ route('expenses.show', $fuel->expense_id) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 transition" title="Linked Expense Soft-Deleted">
+                                                <span>⚠️</span> Deleted Expense
                                             </a>
                                         @else
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400" title="Not logged as expense">
                                                 <span>⚪</span> Not Logged
                                             </span>
+                                            <form action="{{ route('petrol.link-expense', $fuel) }}" method="POST" class="inline">
+                                                @csrf
+                                                <button type="submit" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 dark:border-teal-800 transition cursor-pointer" title="Log as Normal Expense">
+                                                    + Log
+                                                </button>
+                                            </form>
                                         @endif
                                     </div>
                                 </td>

@@ -4,9 +4,12 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h1 class="expense-page-title text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Expenses</h1>
-                <p class="text-xs text-slate-500">Total recorded: <span class="font-bold text-rose-600">₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}</span>@if(($totalFriendPaid ?? 0) > 0) <span class="text-slate-400 font-normal">(excludes ₹{{ number_format($totalFriendPaid, 2) }} non-owned)</span>@endif</p>
+                <p class="text-xs text-slate-500">Your out-of-pocket spending: <span class="font-bold text-rose-600">₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}</span>@if(($totalFriendPaid ?? 0) > 0) <span class="text-slate-400 font-normal"> · Friend contributions: ₹{{ number_format($totalFriendPaid, 2) }} (tracked separately)</span>@endif</p>
             </div>
             <div class="flex flex-wrap items-center gap-2.5">
+                <a href="{{ route('expenses.breakdown') }}" style="background-color: #4f46e5; color: #ffffff;" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition active:scale-95">
+                    <span>📊</span> Month-Wise & Petrol Hub
+                </a>
                 <a href="{{ route('statements.create', ['type' => 'normal']) }}" style="background-color: #0d9488; color: #ffffff;" class="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md shadow-teal-600/20 flex items-center gap-1.5 transition active:scale-95">
                     <span>📄</span> Take Statement
                 </a>
@@ -29,31 +32,34 @@
                             <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 text-xs">💰</span>
                             Total Expense
                         </span>
-                        @if(request()->filled('category_id') || request()->filled('payment_method') || request()->filled('from_date') || request()->filled('to_date') || request()->boolean('voluntary_only'))
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-600">Filtered</span>
-                        @else
-                            <span class="text-[10px] font-medium text-slate-400">All recorded</span>
-                        @endif
+                        <!-- In-Card Time Preset Selector -->
+                        <div class="relative">
+                            @php
+                                $curPeriod = $period ?? request('period', 'all');
+                            @endphp
+                            <select onchange="window.location.href = this.value" class="text-[10px] font-bold py-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 focus:ring-1 focus:ring-rose-500 cursor-pointer">
+                                <option value="{{ route('expenses.index', array_merge(request()->except(['period', 'from_date', 'to_date', 'page']), ['period' => 'all'])) }}" @selected($curPeriod === 'all' && !request('from_date'))>All Time</option>
+                                <option value="{{ route('expenses.index', array_merge(request()->except(['period', 'from_date', 'to_date', 'page']), ['period' => 'year'])) }}" @selected($curPeriod === 'year')>This Year</option>
+                                <option value="{{ route('expenses.index', array_merge(request()->except(['period', 'from_date', 'to_date', 'page']), ['period' => 'month'])) }}" @selected($curPeriod === 'month')>This Month</option>
+                                <option value="{{ route('expenses.index', array_merge(request()->except(['period', 'from_date', 'to_date', 'page']), ['period' => 'week'])) }}" @selected($curPeriod === 'week')>This Week</option>
+                                <option value="{{ route('expenses.index', array_merge(request()->except(['period', 'from_date', 'to_date', 'page']), ['period' => 'day'])) }}" @selected($curPeriod === 'day' || $curPeriod === 'today')>Today</option>
+                                <option value="{{ route('expenses.index', array_merge(request()->except(['period', 'page']), ['period' => 'custom'])) }}" @selected($curPeriod === 'custom' || (request('from_date') && !in_array($curPeriod, ['year', 'month', 'week', 'day', 'all'])))>Custom Range</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="mt-2 text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400">
                         ₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}
                     </div>
-                    @if(($totalFriendPaid ?? 0) > 0)
-                        <div class="mt-2 flex items-center justify-between text-[11px] font-medium bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                            <span class="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                <span class="text-indigo-600 dark:text-indigo-400 font-bold">👥</span> Non-owned (Friend paid):
-                            </span>
-                            <span class="font-bold text-indigo-600 dark:text-indigo-400">₹{{ number_format($totalFriendPaid, 2) }}</span>
-                        </div>
-                    @endif
+                    <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Personal Out-of-Pocket</span>
+                        <span class="font-semibold text-rose-500 capitalize">{{ $curPeriod === 'all' ? 'All Records' : $curPeriod }} scope</span>
+                    </div>
                 </div>
                 <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
                     <span>{{ $totalCount }} transaction(s)</span>
-                    @if(request()->filled('category_id') || request()->filled('payment_method') || request()->filled('from_date') || request()->filled('to_date'))
-                        <a href="{{ route('expenses.index') }}" class="text-[10px] font-semibold text-rose-600 hover:underline">Clear Filter</a>
-                    @else
-                        <span class="text-[10px] text-slate-400">Excludes non-owned</span>
-                    @endif
+                    <a href="{{ route('expenses.breakdown') }}" class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1">
+                        <span>📊</span> Month Breakdown &rarr;
+                    </a>
                 </div>
             </div>
 
@@ -88,6 +94,8 @@
                                             <span class="text-xs">💵</span> <span>Cash / Money</span>
                                         @elseif(stripos($method, 'card') !== false)
                                             <span class="text-xs">💳</span> <span>Card</span>
+                                        @elseif(stripos($method, 'split') !== false)
+                                            <span class="text-xs">🔄</span> <span>Split Contribution</span>
                                         @else
                                             <span class="text-xs">🏦</span> <span>{{ $method }}</span>
                                         @endif
@@ -138,18 +146,18 @@
                 </div>
             </div>
 
-            <!-- Card 3: Non-Owned / Friend-Paid Expenses -->
+            <!-- Card 3: Friend Split Reference (Isolated Non-Owned) -->
             <div class="rounded-2xl border border-indigo-100 dark:border-indigo-950/40 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col justify-between hover:shadow transition">
                 <div>
                     <div class="flex items-center justify-between">
                         <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                             <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 text-xs">👥</span>
-                            Non-Owned Expenses
+                            Friend Splits Reference
                         </span>
-                        <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Friend Paid</span>
+                        <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Separate Tracker</span>
                     </div>
                     <div class="mt-1 flex items-baseline justify-between">
-                        <span class="text-[11px] text-slate-500">Friends paid total:</span>
+                        <span class="text-[11px] text-slate-500">Friend contributions:</span>
                         <span class="text-base font-black text-indigo-600 dark:text-indigo-400">₹{{ number_format($totalFriendPaid, 2) }}</span>
                     </div>
                     <div class="mt-1 space-y-1 max-h-16 overflow-y-auto pr-1">
@@ -159,20 +167,19 @@
                                     <span class="text-[11px]">👤</span> {{ $friendName }}
                                 </span>
                                 <span class="font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                                    - ₹{{ number_format($paidAmount, 2) }} paid
+                                    ₹{{ number_format($paidAmount, 2) }}
                                 </span>
                             </div>
                         @empty
-                            <div class="text-[11px] text-slate-400 py-1 flex items-center gap-1">
-                                <span>✓</span> No friend-paid expenses (100% self)
-                            </div>
+                            <div class="text-[11px] text-slate-400 py-2">No friend contributions recorded.</div>
                         @endforelse
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{{ count($friendPaidBreakdown) }} friend(s) paid</span>
-                    <a href="{{ route('friends.index') }}" class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Friends Balance →</a>
-                </div>
+                    <span class="text-[10px] text-slate-400">Not deducted from your spend</span>
+                    <a href="{{ route('friends.index') }}" class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                        Friends & Debts &rarr;
+                    </a>
             </div>
         </div>
 

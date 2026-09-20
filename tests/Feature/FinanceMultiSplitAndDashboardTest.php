@@ -66,7 +66,7 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
 
         // Parent expense exists
         $expense = Expense::query()->where('description', 'Surya Bakery')->firstOrFail();
-        $this->assertEquals(90.0, (float) $expense->amount);
+        $this->assertEquals(20.0, (float) $expense->amount);
         $this->assertStringContainsString('UPI', $expense->payment_method);
         $this->assertStringContainsString('Cash', $expense->payment_method);
         $this->assertStringContainsString('Payment breakdown', (string) $expense->notes);
@@ -188,7 +188,7 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
         $response->assertRedirect(route('expenses.index'));
 
         $expense = Expense::query()->where('description', 'Surya Bakery Co-pay')->firstOrFail();
-        $this->assertEquals(90.0, (float) $expense->amount);
+        $this->assertEquals(20.0, (float) $expense->amount);
 
         $split = FriendSplit::query()->where('expense_id', $expense->id)->firstOrFail();
         $this->assertEquals(70.0, (float) $split->paid_by_friend_amount);

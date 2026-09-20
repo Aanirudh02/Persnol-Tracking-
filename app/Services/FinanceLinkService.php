@@ -78,7 +78,7 @@ class FinanceLinkService
             $activeFriendIds[] = $friendId;
             $hasExplicitShare = isset($item['friend_share']) && $item['friend_share'] !== null && (float) $item['friend_share'] > 0;
             $paidByFriend = round((float) ($item['paid_by_friend_amount'] ?? 0), 2);
-            $friendShare = $hasExplicitShare ? round((float) $item['friend_share'], 2) : 0.0;
+            $friendShare = $hasExplicitShare ? round((float) $item['friend_share'], 2) : $paidByFriend;
 
             if (! $hasExplicitShare) {
                 // When friend paid and no share is specified (who paid alone), neither party owes anything
@@ -189,9 +189,9 @@ class FinanceLinkService
         $paidByFriend = round((float) ($splitData['paid_by_friend_amount'] ?? $this->defaultPaidByFriendAmount($paidByMode, $total)), 2);
 
         if (! $hasShares) {
-            $myShare = 0.0;
-            $friendShare = 0.0;
-            $paidByMeForSplit = 0.0;
+            $myShare = $paidByMe;
+            $friendShare = $paidByFriend;
+            $paidByMeForSplit = $paidByMe;
         } else {
             $myShare = round((float) ($splitData['my_share'] ?? $expense->split_my_share ?? $total), 2);
             $friendShare = round((float) ($splitData['friend_share'] ?? $expense->split_friend_share ?? max(0, $total - $myShare)), 2);

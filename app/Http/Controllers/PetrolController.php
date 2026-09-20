@@ -267,4 +267,22 @@ class PetrolController extends Controller
             'notes' => $fuel->notes,
         ]);
     }
+
+    public function linkExpense(Request $request, FuelEntry $petrol)
+    {
+        if ($petrol->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($petrol->expense_id && $petrol->expense && ! $petrol->expense->trashed()) {
+            return back()->with('info', 'This petrol entry is already linked to an active expense.');
+        }
+
+        DB::transaction(function () use ($request, $petrol): void {
+            $expense = $this->createExpenseForFuel($request, $petrol);
+            $petrol->update(['expense_id' => $expense->id]);
+        });
+
+        return back()->with('success', '⛽ Petrol fill logged as Normal Expense successfully!');
+    }
 }
