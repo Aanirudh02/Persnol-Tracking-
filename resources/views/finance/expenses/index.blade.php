@@ -65,32 +65,76 @@
                             <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-600 text-xs">💳</span>
                             Expense by Payment
                         </span>
-                        <span class="text-[10px] font-semibold text-sky-600 dark:text-sky-400">UPI, Cash / Money</span>
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-[10px] font-bold">
+                            <button type="button" id="pay-btn-owned" onclick="switchPaymentCardTab('owned')" class="px-2 py-0.5 rounded-md bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-300 shadow-xs cursor-pointer">Done by me</button>
+                            <button type="button" id="pay-btn-non-owned" onclick="switchPaymentCardTab('non_owned')" class="px-2 py-0.5 rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer">Non-owned</button>
+                        </div>
                     </div>
-                    <div class="mt-2 space-y-1 max-h-20 overflow-y-auto pr-1">
-                        @forelse($expensesByPayment as $method => $amount)
-                            <div class="flex items-center justify-between text-xs py-0.5">
-                                <span class="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                                    @if(stripos($method, 'upi') !== false)
-                                        <span class="text-xs">⚡</span> <span class="font-semibold">UPI</span>
-                                    @elseif(stripos($method, 'cash') !== false || stripos($method, 'money') !== false)
-                                        <span class="text-xs">💵</span> <span>Cash / Money</span>
-                                    @elseif(stripos($method, 'card') !== false)
-                                        <span class="text-xs">💳</span> <span>Card</span>
-                                    @else
-                                        <span class="text-xs">🏦</span> <span>{{ $method }}</span>
-                                    @endif
-                                </span>
-                                <span class="font-bold text-slate-900 dark:text-white">₹{{ number_format($amount, 2) }}</span>
-                            </div>
-                        @empty
-                            <div class="text-[11px] text-slate-400 py-1">No payment records found</div>
-                        @endforelse
+
+                    <!-- 1. Done by Me (Owned) List -->
+                    <div id="payment-card-owned" class="mt-2 space-y-1.5 max-h-24 overflow-y-auto pr-1">
+                        @php $ownedCount = 0; @endphp
+                        @foreach($expensesByPayment as $method => $data)
+                            @php
+                                $owned = is_array($data) ? ($data['owned'] ?? 0) : $data;
+                            @endphp
+                            @if($owned > 0)
+                                @php $ownedCount++; @endphp
+                                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                                        @if(stripos($method, 'upi') !== false)
+                                            <span class="text-xs">⚡</span> <span class="font-semibold">UPI</span>
+                                        @elseif(stripos($method, 'cash') !== false || stripos($method, 'money') !== false)
+                                            <span class="text-xs">💵</span> <span>Cash / Money</span>
+                                        @elseif(stripos($method, 'card') !== false)
+                                            <span class="text-xs">💳</span> <span>Card</span>
+                                        @else
+                                            <span class="text-xs">🏦</span> <span>{{ $method }}</span>
+                                        @endif
+                                    </span>
+                                    <span class="font-bold text-slate-900 dark:text-white">₹{{ number_format($owned, 2) }}</span>
+                                </div>
+                            @endif
+                        @endforeach
+                        @if($ownedCount === 0)
+                            <div class="text-[11px] text-slate-400 py-1">No self-paid expenses found</div>
+                        @endif
+                    </div>
+
+                    <!-- 2. Non-Owned (Friend-Paid / Split) List -->
+                    <div id="payment-card-non-owned" class="hidden mt-2 space-y-1.5 max-h-24 overflow-y-auto pr-1">
+                        @php $friendCount = 0; @endphp
+                        @foreach($expensesByPayment as $method => $data)
+                            @php
+                                $friend = is_array($data) ? ($data['friend'] ?? 0) : 0;
+                            @endphp
+                            @if($friend > 0)
+                                @php $friendCount++; @endphp
+                                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                                        <span class="text-xs">👥</span> <span>{{ $method }}</span>
+                                    </span>
+                                    <span class="font-bold text-indigo-600 dark:text-indigo-400">₹{{ number_format($friend, 2) }}</span>
+                                </div>
+                            @endif
+                        @endforeach
+                        @if($friendCount === 0 && ($totalFriendPaid ?? 0) > 0)
+                            @foreach($friendPaidBreakdown as $fName => $fAmt)
+                                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-50 dark:border-slate-800/40 last:border-b-0">
+                                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                                        <span class="text-xs">👤</span> <span>{{ $fName }} (Split)</span>
+                                    </span>
+                                    <span class="font-bold text-indigo-600 dark:text-indigo-400">₹{{ number_format($fAmt, 2) }}</span>
+                                </div>
+                            @endforeach
+                        @elseif($friendCount === 0)
+                            <div class="text-[11px] text-slate-400 py-1">No non-owned friend expenses</div>
+                        @endif
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{{ count($expensesByPayment) }} method(s) active</span>
-                    <span class="text-[10px] text-sky-600 font-semibold">Payment Split</span>
+                    <span id="payment-card-stat">Self: ₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}</span>
+                    <span class="text-[10px] text-sky-600 font-semibold cursor-pointer" onclick="togglePaymentCardTabDirect()">⇄ Switch View</span>
                 </div>
             </div>
 
@@ -132,45 +176,87 @@
             </div>
         </div>
 
-        <!-- Filter Bar -->
+        <!-- Active vs Archived Navigation Tabs -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+                <a href="{{ route('expenses.index', array_merge(request()->except(['page', 'status']), ['status' => 'active'])) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {{ ($status ?? 'active') === 'active' ? 'bg-sky-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700' }}">
+                    <span>💸 Active Expenses</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] {{ ($status ?? 'active') === 'active' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' }}">{{ $activeCount }}</span>
+                </a>
+                <a href="{{ route('expenses.index', array_merge(request()->except(['page', 'status']), ['status' => 'archived'])) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {{ ($status ?? 'active') === 'archived' ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700' }}">
+                    <span>📁 Archived / Historical</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] {{ ($status ?? 'active') === 'archived' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' }}">{{ $archivedCount }}</span>
+                </a>
+            </div>
+            @if(($status ?? 'active') === 'archived')
+                <div class="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-900">
+                    <span>ℹ️</span> <span>Historical Archive: Excluded from active statements. You can restore or delete items permanently.</span>
+                </div>
+            @endif
+        </div>
+
+        <!-- Filter Bar with Explicit Search & Reset -->
         <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-sm">
-            <form action="{{ route('expenses.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                    <label class="block text-slate-400 mb-1">Category</label>
-                    <select name="category_id" onchange="this.form.submit()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                        <option value="">All Categories</option>
-                        @foreach($categories as $c)
-                            <option value="{{ $c->id }}" {{ request('category_id') == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
-                        @endforeach
-                    </select>
+            <form action="{{ route('expenses.index') }}" method="GET" class="space-y-3 text-xs">
+                <input type="hidden" name="status" value="{{ $status ?? 'active' }}">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Category</label>
+                        <select name="category_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                            <option value="">All Categories</option>
+                            @foreach($categories as $c)
+                                <option value="{{ $c->id }}" {{ request('category_id') == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Method</label>
+                        <select name="payment_method" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                            <option value="">All Methods</option>
+                            @foreach($paymentMethods as $m)
+                                <option value="{{ $m }}" {{ request('payment_method') == $m ? 'selected' : '' }}>{{ $m }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">From Date</label>
+                        <input type="date" name="from_date" value="{{ request('from_date') }}" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">To Date</label>
+                        <input type="date" name="to_date" value="{{ request('to_date') }}" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">Method</label>
-                    <select name="payment_method" onchange="this.form.submit()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                        <option value="">All Methods</option>
-                        @foreach($paymentMethods as $m)
-                            <option value="{{ $m }}" {{ request('payment_method') == $m ? 'selected' : '' }}>{{ $m }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">From Date</label>
-                    <input type="date" name="from_date" value="{{ request('from_date') }}" onchange="this.form.submit()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">To Date</label>
-                    <input type="date" name="to_date" value="{{ request('to_date') }}" onchange="this.form.submit()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <a href="{{ route('expenses.index', ['status' => $status ?? 'active']) }}" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold transition">
+                        🔄 Reset
+                    </a>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition shadow-sm cursor-pointer">
+                        🔍 Search / Filter
+                    </button>
                 </div>
             </form>
         </div>
 
         <!-- Expenses Table / List -->
         <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-            <form id="group-expenses-form" action="{{ route('expenses.group') }}" method="POST" class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4 text-xs">
-                @csrf
-                <button type="submit" class="px-3 py-2 rounded-xl bg-sky-600 text-white font-semibold cursor-pointer">Group selected expenses</button>
-                <span class="text-slate-400">Select any two or more expenses that are not already in a group.</span>
-            </form>
+            @if(($status ?? 'active') === 'active')
+                <form id="group-expenses-form" action="{{ route('expenses.group') }}" method="POST" class="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 p-4 text-xs">
+                    @csrf
+                    <button type="submit" class="px-3 py-2 rounded-xl bg-sky-600 text-white font-semibold cursor-pointer">Group selected expenses</button>
+                    <span class="text-slate-400">Select any two or more expenses that are not already in a group.</span>
+                </form>
+            @else
+                <div class="flex items-center justify-between border-b border-amber-100 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20 p-4 text-xs">
+                    <div class="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold">
+                        <span>📁</span>
+                        <span>Archived / Historical Records ({{ $archivedCount }})</span>
+                    </div>
+                    <span class="text-slate-400 text-[11px]">Click "Restore" to move back to active, or "Delete" to permanently remove.</span>
+                </div>
+            @endif
             @if($expenses->isEmpty())
                 <div class="text-center py-16 text-slate-400 text-xs">
                     <span class="text-3xl block mb-2">💸</span>
@@ -261,7 +347,6 @@
                                             ₹{{ number_format($myPaid, 2) }} <span class="block text-[10px] font-normal text-slate-400">your spend</span>
                                         @elseif($friendsPaid > 0)
                                             ₹{{ number_format($myPaid, 2) }}
-                                            <span class="block text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">Friend: ₹{{ number_format($friendsPaid, 2) }}</span>
                                         @else
                                             ₹{{ number_format($displayAmount, 2) }}
                                         @endif
@@ -283,15 +368,30 @@
                                     </td>
                                     <td class="py-3 px-4 text-right whitespace-nowrap">
                                         @if($isGroup)
-                                            <button type="button" onclick="openGroupNameModal('{{ $exp->expenseGroup->id }}', @js($exp->expenseGroup->name))" class="mr-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-sky-300 hover:text-sky-700 cursor-pointer" title="Edit group name">✎</button>
-                                            <button type="button" class="font-semibold text-sky-700 dark:text-sky-400 hover:underline cursor-pointer" aria-expanded="false" onclick="toggleExpenseGroup('{{ $exp->expenseGroup->id }}', this)">Details</button>
+                                            <button type="button" onclick="openGroupNameModal('{{ $exp->expenseGroup->id }}', @js($exp->expenseGroup->name))" class="mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-sky-300 hover:text-sky-700 cursor-pointer" title="Edit group name">✎</button>
+                                            @if(($status ?? 'active') === 'active')
+                                                <form action="{{ route('expense-groups.destroy', $exp->expenseGroup) }}" method="POST" class="inline" onsubmit="return confirm('Ungroup these expenses into individual rows?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-xs text-amber-600 dark:text-amber-400 hover:underline font-semibold mr-1.5 cursor-pointer" title="Dissolve group into individual entries">Ungroup</button>
+                                                </form>
+                                            @endif
+                                            <button type="button" class="font-bold text-sky-700 dark:text-sky-400 hover:underline cursor-pointer" aria-expanded="false" onclick="toggleExpenseGroup('{{ $exp->expenseGroup->id }}', this)">Details</button>
+                                        @elseif(($status ?? 'active') === 'archived')
+                                            <form action="{{ route('expenses.restore', $exp) }}" method="POST" class="inline">
+                                                @csrf
+                                                <button type="submit" class="text-emerald-600 dark:text-emerald-400 hover:underline font-bold mr-2 cursor-pointer">
+                                                    ↩ Restore
+                                                </button>
+                                            </form>
+                                            <button type="button" onclick="openExpenseDeleteModal({{ $exp->id }}, @js($exp->description), {{ $exp->totalAmount() }}, @js($displayDate->format('d M Y')), true)" class="text-rose-600 hover:underline font-bold cursor-pointer">
+                                                Delete
+                                            </button>
                                         @elseif($isEditable)
                                             <a href="{{ route('expenses.edit', $exp) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-semibold mr-2">Edit</a>
-                                            <form action="{{ route('expenses.destroy', $exp) }}" method="POST" class="inline" onsubmit="return confirm('Archive this expense?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-rose-600 hover:text-rose-500 font-semibold cursor-pointer">Delete</button>
-                                            </form>
+                                            <button type="button" onclick="openExpenseDeleteModal({{ $exp->id }}, @js($exp->description), {{ $exp->totalAmount() }}, @js($displayDate->format('d M Y')), false)" class="text-rose-600 hover:underline font-semibold cursor-pointer">
+                                                Delete
+                                            </button>
                                         @else
                                             <span class="text-slate-400 text-[11px] font-medium" title="Edit window expired">🔒 Locked</span>
                                         @endif
@@ -299,12 +399,86 @@
                                 </tr>
                                 @if($isGroup)
                                     <tr id="expense-group-details-{{ $exp->expenseGroup->id }}" class="hidden">
-                                        <td colspan="8" class="bg-slate-50 dark:bg-slate-800/40 p-0">
-                                            <div class="grid grid-cols-2 gap-3 border-b border-slate-200 dark:border-slate-700 bg-sky-50/70 dark:bg-slate-800 p-4 text-xs sm:grid-cols-4">
-                                                <div><span class="block text-slate-500">Group total</span><strong class="text-base text-slate-900 dark:text-white">₹{{ number_format($displayAmount, 2) }}</strong></div>
-                                                <div><span class="block text-slate-500">Your spend</span><strong class="text-base text-emerald-700 dark:text-emerald-400">₹{{ number_format($myPaid, 2) }}</strong></div>
-                                                <div><span class="block text-slate-500">Friends paid</span><strong class="text-base text-indigo-700 dark:text-indigo-400">₹{{ number_format($friendsPaid, 2) }}</strong></div>
-                                                <div><span class="block text-slate-500">Breakdown</span><strong class="text-slate-800 dark:text-slate-200">{{ $displayBreakdown }}</strong></div>
+                                        <td colspan="8" class="bg-slate-50/70 dark:bg-slate-800/30 p-0 border-y border-sky-100 dark:border-slate-700">
+                                            <!-- Group Summary Strip -->
+                                            <div class="grid grid-cols-2 gap-3 border-b border-sky-100 dark:border-slate-700 bg-sky-50/80 dark:bg-slate-800 p-4 text-xs sm:grid-cols-4">
+                                                <div><span class="block text-slate-500">Group Total</span><strong class="text-base text-slate-900 dark:text-white">₹{{ number_format($displayAmount, 2) }}</strong></div>
+                                                <div><span class="block text-slate-500">Your Spend</span><strong class="text-base text-emerald-700 dark:text-emerald-400">₹{{ number_format($myPaid, 2) }}</strong></div>
+                                                <div><span class="block text-slate-500">Friends Paid</span><strong class="text-base text-indigo-700 dark:text-indigo-400">₹{{ number_format($friendsPaid, 2) }}</strong></div>
+                                                <div><span class="block text-slate-500">Payment Breakdown</span><strong class="text-slate-800 dark:text-slate-200">{{ $displayBreakdown }}</strong></div>
+                                            </div>
+
+                                            <!-- Nested Individual Entries Table -->
+                                            <div class="p-3.5 space-y-2">
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <span>📋</span> Individual Entries in "{{ $exp->expenseGroup->name }}" ({{ $groupExpenses->count() }})
+                                                    </span>
+                                                    <span class="text-[11px] text-slate-400">Edit or detach any item directly</span>
+                                                </div>
+                                                <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xs">
+                                                    <table class="w-full text-left text-xs">
+                                                        <thead class="bg-slate-50 dark:bg-slate-800 text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-700">
+                                                            <tr>
+                                                                <th class="py-2.5 px-3">Date</th>
+                                                                <th class="py-2.5 px-3">Description</th>
+                                                                <th class="py-2.5 px-3">Category</th>
+                                                                <th class="py-2.5 px-3">Amount</th>
+                                                                <th class="py-2.5 px-3">Method</th>
+                                                                <th class="py-2.5 px-3">Paid By</th>
+                                                                <th class="py-2.5 px-3 text-right">Actions</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                                            @foreach($groupExpenses as $child)
+                                                                @php
+                                                                    $childFriendsPaid = $child->totalPaidByFriends();
+                                                                    $childMyPaid = max(0, $child->totalAmount() - $childFriendsPaid);
+                                                                @endphp
+                                                                <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                                                                    <td class="py-2 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                                                        {{ $child->date->format('d M Y') }}
+                                                                        @if($child->time)<span class="block text-[10px] text-slate-400">{{ $child->time }}</span>@endif
+                                                                    </td>
+                                                                    <td class="py-2 px-3 font-medium text-slate-900 dark:text-white">
+                                                                        {{ $child->description }}
+                                                                        @if($child->notes)<span class="block text-[10px] text-slate-400">{{ $child->notes }}</span>@endif
+                                                                        @if($child->friendSplits->isNotEmpty())
+                                                                            <span class="block text-[10px] text-indigo-600 dark:text-indigo-400">
+                                                                                Split: {{ $child->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ' (₹' . number_format($s->friend_share, 2) . ')')->implode(', ') }}
+                                                                            </span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="py-2 px-3 whitespace-nowrap">
+                                                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                                                            {{ $child->category?->name ?? 'Other' }}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td class="py-2 px-3 font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                                                                        ₹{{ number_format($childMyPaid, 2) }}
+                                                                    </td>
+                                                                    <td class="py-2 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                                                        {{ $child->payment_method ?: 'Cash' }}
+                                                                    </td>
+                                                                    <td class="py-2 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                                                        {{ $child->paid_by ?: 'Me' }}
+                                                                    </td>
+                                                                    <td class="py-2 px-3 text-right whitespace-nowrap space-x-2">
+                                                                        <a href="{{ route('expenses.edit', $child) }}" class="text-indigo-600 hover:text-indigo-500 font-semibold text-xs">Edit</a>
+                                                                        <form action="{{ route('expense-groups.expenses.detach', [$exp->expenseGroup, $child]) }}" method="POST" class="inline" onsubmit="return confirm('Detach this expense from group?');">
+                                                                            @csrf
+                                                                            @method('DELETE')
+                                                                            <button type="submit" class="text-amber-600 hover:text-amber-500 font-semibold text-xs cursor-pointer">Detach</button>
+                                                                        </form>
+                                                                        <button type="button" onclick="openExpenseDeleteModal({{ $child->id }}, @js($child->description), {{ $child->totalAmount() }}, @js($child->date->format('d M Y')), {{ $child->is_archived ? 'true' : 'false' }})" class="text-rose-600 hover:text-rose-500 font-semibold text-xs cursor-pointer">
+                                                                            Delete
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -332,6 +506,58 @@
                     <input id="group-name-input" type="text" name="name" required maxlength="255" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-sm text-slate-900 dark:text-white">
                     <button type="submit" class="w-full rounded-xl bg-sky-600 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 cursor-pointer">Save group name</button>
                 </form>
+            </div>
+        </div>
+
+        <!-- 3-BUTTON DELETE / ARCHIVE CONFIRMATION MODAL -->
+        <div id="expense-action-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target === this) closeExpenseActionModal()">
+            <div class="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl" id="action-modal-icon">⚠️</span>
+                        <h3 id="action-modal-title" class="font-bold text-base text-slate-900 dark:text-white">Delete or Archive Expense</h3>
+                    </div>
+                    <button type="button" onclick="closeExpenseActionModal()" class="text-2xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">&times;</button>
+                </div>
+
+                <div class="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Expense:</span>
+                        <span id="action-modal-desc" class="font-bold text-slate-900 dark:text-white truncate max-w-[220px]"></span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Amount & Date:</span>
+                        <span class="font-bold text-rose-600 dark:text-rose-400"><span id="action-modal-amount"></span> · <span id="action-modal-date" class="text-slate-500 font-normal"></span></span>
+                    </div>
+                </div>
+
+                <p id="action-modal-help" class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Choose whether to move this expense to <strong>Archive/Historical</strong> or <strong>Delete Permanently</strong>.
+                </p>
+
+                <!-- 3 Action Buttons -->
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+                    <button type="button" onclick="closeExpenseActionModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition">
+                        Cancel
+                    </button>
+
+                    <!-- Archive Form -->
+                    <form id="action-archive-form" action="" method="POST" class="w-full sm:w-auto">
+                        @csrf
+                        <button type="submit" id="action-archive-btn" class="w-full px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5">
+                            <span>📁</span> <span>Archive</span>
+                        </button>
+                    </form>
+
+                    <!-- Permanent Delete Form -->
+                    <form id="action-delete-form" action="" method="POST" class="w-full sm:w-auto">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="w-full px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5">
+                            <span>🗑️</span> <span>Delete Permanently</span>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -422,6 +648,37 @@
             button.setAttribute('aria-expanded', String(!isHidden));
         }
 
+        function switchPaymentCardTab(tab) {
+            const ownedList = document.getElementById('payment-card-owned');
+            const nonOwnedList = document.getElementById('payment-card-non-owned');
+            const btnOwned = document.getElementById('pay-btn-owned');
+            const btnNonOwned = document.getElementById('pay-btn-non-owned');
+            const stat = document.getElementById('payment-card-stat');
+            
+            if (!ownedList || !nonOwnedList) return;
+            
+            if (tab === 'owned') {
+                ownedList.classList.remove('hidden');
+                nonOwnedList.classList.add('hidden');
+                btnOwned.className = 'px-2 py-0.5 rounded-md bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-300 shadow-xs cursor-pointer font-bold';
+                btnNonOwned.className = 'px-2 py-0.5 rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer';
+                if (stat) stat.textContent = 'Self: ₹{{ number_format($ownedTotalAmount ?? $totalAmount, 2) }}';
+            } else {
+                ownedList.classList.add('hidden');
+                nonOwnedList.classList.remove('hidden');
+                btnNonOwned.className = 'px-2 py-0.5 rounded-md bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-300 shadow-xs cursor-pointer font-bold';
+                btnOwned.className = 'px-2 py-0.5 rounded-md text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer';
+                if (stat) stat.textContent = 'Non-owned: ₹{{ number_format($totalFriendPaid ?? 0, 2) }}';
+            }
+        }
+
+        function togglePaymentCardTabDirect() {
+            const ownedList = document.getElementById('payment-card-owned');
+            if (ownedList) {
+                switchPaymentCardTab(ownedList.classList.contains('hidden') ? 'owned' : 'non_owned');
+            }
+        }
+
         function openGroupNameModal(groupId, groupName) {
             document.getElementById('group-name-form').action = `/finance/expense-groups/${groupId}`;
             document.getElementById('group-name-input').value = groupName;
@@ -433,6 +690,44 @@
 
         function closeGroupNameModal() {
             const modal = document.getElementById('group-name-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function openExpenseDeleteModal(id, description, amount, date, isArchived) {
+            document.getElementById('action-modal-desc').textContent = description || 'Expense';
+            document.getElementById('action-modal-amount').textContent = '₹' + Number(amount).toFixed(2);
+            document.getElementById('action-modal-date').textContent = date;
+            
+            const archiveBtn = document.getElementById('action-archive-btn');
+            const archiveForm = document.getElementById('action-archive-form');
+            const deleteForm = document.getElementById('action-delete-form');
+            const helpText = document.getElementById('action-modal-help');
+            const modalTitle = document.getElementById('action-modal-title');
+            
+            deleteForm.action = `/finance/expenses/${id}`;
+
+            if (isArchived) {
+                modalTitle.textContent = 'Permanently Delete Expense?';
+                archiveForm.action = `/finance/expenses/${id}/restore`;
+                archiveBtn.innerHTML = '<span>↩</span> <span>Restore to Active</span>';
+                archiveBtn.className = 'w-full px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5';
+                helpText.innerHTML = 'This expense is currently in <strong>Archived/Historical</strong>. You can restore it to active tracking or permanently delete it from the database.';
+            } else {
+                modalTitle.textContent = 'Delete or Archive Expense';
+                archiveForm.action = `/finance/expenses/${id}/archive`;
+                archiveBtn.innerHTML = '<span>📁</span> <span>Archive</span>';
+                archiveBtn.className = 'w-full px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5';
+                helpText.innerHTML = 'Choose whether to move this expense to <strong>Archive/Historical</strong> (keeps history without affecting regular dashboard/statements) or <strong>Delete Permanently</strong>.';
+            }
+            
+            const modal = document.getElementById('expense-action-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeExpenseActionModal() {
+            const modal = document.getElementById('expense-action-modal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }

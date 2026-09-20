@@ -17,18 +17,24 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Paid To *</label>
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Done To *</label>
                         <input type="text" name="paid_to" required value="{{ old('paid_to') }}" placeholder="e.g. Rahul, Landlord" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Paid By</label>
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Done By</label>
                         <input type="text" name="paid_by" value="{{ old('paid_by', 'Me') }}" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
                     </div>
                 </div>
 
-                <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Purpose *</label>
-                    <input type="text" name="purpose" required value="{{ old('purpose') }}" placeholder="e.g. Shared dinner, College fee, Room rent" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Purpose *</label>
+                        <input type="text" name="purpose" required value="{{ old('purpose') }}" placeholder="e.g. Shared dinner, College fee, Room rent" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                        <input type="text" name="category" value="{{ old('category', 'Me') }}" placeholder="e.g. Me, Personal, Bills" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">

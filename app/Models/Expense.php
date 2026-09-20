@@ -37,6 +37,7 @@ class Expense extends Model
         'receipt_image',
         'is_locked',
         'is_voluntary',
+        'is_archived',
     ];
 
     protected $casts = [
@@ -45,6 +46,7 @@ class Expense extends Model
         'date' => 'date',
         'is_locked' => 'boolean',
         'is_voluntary' => 'boolean',
+        'is_archived' => 'boolean',
         'split_my_share' => 'decimal:2',
         'split_friend_share' => 'decimal:2',
     ];

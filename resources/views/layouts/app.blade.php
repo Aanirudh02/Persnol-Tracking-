@@ -71,6 +71,9 @@
             <x-nav-link href="{{ route('friends.index') }}" :active="request()->routeIs('friends.*')" icon="users">
                 Friends & Splits
             </x-nav-link>
+            <x-nav-link href="{{ route('family-members.index') }}" :active="request()->routeIs('family-members.*')" icon="users">
+                Family Members
+            </x-nav-link>
 
             <div class="pt-2 pb-1">
                 <p class="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Life & Habits</p>

@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             DefaultSettingsSeeder::class,
             CategoriesSeeder::class,
             LookupAndVehicleSeeder::class,
+            PersonalExpenseSeeder::class,
         ]);
     }
 }

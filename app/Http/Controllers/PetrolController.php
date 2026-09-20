@@ -6,6 +6,7 @@ use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\FuelEntry;
+use App\Models\Vehicle;
 use App\Services\AuditService;
 use App\Services\FinanceService;
 use Carbon\Carbon;
@@ -18,19 +19,55 @@ class PetrolController extends Controller
     {
         $user = $request->user();
 
-        $entries = FuelEntry::where('user_id', $user->id)
-            ->with('expense')
-            ->orderByDesc('date')
-            ->orderByDesc('created_at')
-            ->paginate(15);
+        // Ensure default TVS Pep+ vehicle exists
+        $defaultVehicle = Vehicle::firstOrCreate(
+            ['user_id' => $user->id, 'name' => 'TVS Pep+'],
+            [
+                'make' => 'TVS',
+                'model' => 'Scooty Pep+',
+                'default_mileage_kmpl' => 45,
+                'fuel_type' => 'Petrol',
+                'is_default' => true,
+            ]
+        );
 
-        $totalSpent = (float) FuelEntry::where('user_id', $user->id)->sum('amount');
-        $totalLitres = (float) FuelEntry::where('user_id', $user->id)->sum('litres');
+        if (! Vehicle::where('user_id', $user->id)->where('is_default', true)->exists()) {
+            $defaultVehicle->update(['is_default' => true]);
+        }
+
+        // Associate any unassigned petrol records to TVS Pep+
+        FuelEntry::where('user_id', $user->id)
+            ->whereNull('vehicle_id')
+            ->update(['vehicle_id' => $defaultVehicle->id]);
+
+        $vehicles = Vehicle::where('user_id', $user->id)->orderByDesc('is_default')->orderBy('name')->get();
+
+        $query = FuelEntry::where('user_id', $user->id)
+            ->with(['expense', 'vehicle']);
+
+        if ($request->filled('vehicle_id')) {
+            $query->where('vehicle_id', $request->integer('vehicle_id'));
+        }
+
+        $entries = $query->orderByDesc('date')
+            ->orderByDesc('created_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        $baseStatsQuery = FuelEntry::where('user_id', $user->id);
+        if ($request->filled('vehicle_id')) {
+            $baseStatsQuery->where('vehicle_id', $request->integer('vehicle_id'));
+        }
+
+        $totalSpent = (float) (clone $baseStatsQuery)->sum('amount');
+        $totalLitres = (float) (clone $baseStatsQuery)->sum('litres');
         $avgPricePerLitre = $totalLitres > 0 ? round($totalSpent / $totalLitres, 2) : 0;
-        $latestOdometer = FuelEntry::where('user_id', $user->id)->max('odometer') ?? 0;
+        $latestOdometer = (clone $baseStatsQuery)->max('odometer') ?? 0;
 
         return view('scooter.petrol.index', compact(
             'entries',
+            'vehicles',
+            'defaultVehicle',
             'totalSpent',
             'totalLitres',
             'avgPricePerLitre',
@@ -40,7 +77,11 @@ class PetrolController extends Controller
 
     public function store(Request $request)
     {
+        $user = $request->user();
+        $defaultVehicle = Vehicle::defaultFor($user->id) ?? Vehicle::where('user_id', $user->id)->first();
+
         $validated = $request->validate([
+            'vehicle_id' => 'nullable|integer|exists:vehicles,id',
             'date' => 'required|date',
             'time' => 'nullable',
             'amount' => 'required|numeric|min:1',
@@ -59,8 +100,9 @@ class PetrolController extends Controller
         }
 
         $pricePerLitre = round($validated['amount'] / $validated['litres'], 2);
+        $vehicleId = $validated['vehicle_id'] ?? $defaultVehicle?->id;
 
-        $fuel = DB::transaction(function () use ($request, $validated, $imagePath, $pricePerLitre): FuelEntry {
+        $fuel = DB::transaction(function () use ($request, $validated, $imagePath, $pricePerLitre, $vehicleId): FuelEntry {
             $dailyRecord = DailyRecord::firstOrCreate([
                 'user_id' => $request->user()->id,
                 'record_date' => $validated['date'],
@@ -68,6 +110,7 @@ class PetrolController extends Controller
 
             $fuel = FuelEntry::create([
                 'user_id' => $request->user()->id,
+                'vehicle_id' => $vehicleId,
                 'daily_record_id' => $dailyRecord->id,
                 'date' => $validated['date'],
                 'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
@@ -103,7 +146,9 @@ class PetrolController extends Controller
             return redirect()->route('petrol.index')->with('error', '🔒 This petrol record is locked.');
         }
 
-        return view('scooter.petrol.edit', compact('petrol'));
+        $vehicles = Vehicle::where('user_id', auth()->id())->orderByDesc('is_default')->orderBy('name')->get();
+
+        return view('scooter.petrol.edit', compact('petrol', 'vehicles'));
     }
 
     public function update(Request $request, FuelEntry $petrol, FinanceService $financeService)
@@ -117,6 +162,7 @@ class PetrolController extends Controller
         }
 
         $validated = $request->validate([
+            'vehicle_id' => 'nullable|integer|exists:vehicles,id',
             'date' => 'required|date',
             'time' => 'nullable',
             'amount' => 'required|numeric|min:1',
@@ -131,7 +177,7 @@ class PetrolController extends Controller
 
         $validated['price_per_litre'] = round($validated['amount'] / $validated['litres'], 2);
 
-        $old = $petrol->only(['amount', 'litres', 'price_per_litre', 'odometer']);
+        $old = $petrol->only(['vehicle_id', 'amount', 'litres', 'price_per_litre', 'odometer']);
         DB::transaction(function () use ($request, $validated, $petrol): void {
             $petrol->update($validated);
 
@@ -147,7 +193,7 @@ class PetrolController extends Controller
             recordId: $petrol->id,
             action: 'updated',
             oldValues: $old,
-            newValues: $petrol->only(['amount', 'litres', 'price_per_litre', 'odometer']),
+            newValues: $petrol->only(['vehicle_id', 'amount', 'litres', 'price_per_litre', 'odometer']),
             reason: $request->input('reason', 'Updated by user')
         );
 
@@ -176,7 +222,7 @@ class PetrolController extends Controller
 
         return redirect()->route('petrol.index')->with('success', $deleteLinkedExpense
             ? 'Petrol record and linked expense deleted.'
-            : 'Petrol record deleted; linked expense preserved.');
+            : 'Petrol record deleted; linked expense preserved and disassociated.');
     }
 
     private function createExpenseForFuel(Request $request, FuelEntry $fuel): Expense

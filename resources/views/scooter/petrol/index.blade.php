@@ -34,6 +34,17 @@
             </div>
         </div>
 
+        @if(request()->filled('vehicle_id'))
+            <div class="flex items-center justify-between p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-xs">
+                <span class="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                    <span>🛵</span> Showing petrol entries for vehicle: <strong>{{ $vehicles->firstWhere('id', request('vehicle_id'))?->name ?? 'Selected Vehicle' }}</strong>
+                </span>
+                <a href="{{ route('petrol.index') }}" class="px-3 py-1 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition">
+                    Clear Vehicle Filter
+                </a>
+            </div>
+        @endif
+
         <!-- Fuel Entries Table -->
         <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
@@ -41,6 +52,7 @@
                     <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800">
                         <tr>
                             <th class="py-3.5 px-4">Date</th>
+                            <th class="py-3.5 px-4">Vehicle</th>
                             <th class="py-3.5 px-4">Amount</th>
                             <th class="py-3.5 px-4">Litres</th>
                             <th class="py-3.5 px-4">Price / L</th>
@@ -53,6 +65,11 @@
                         @forelse($entries as $fuel)
                             <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                                 <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ $fuel->date->format('d M Y') }}</td>
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <a href="{{ route('petrol.index', ['vehicle_id' => $fuel->vehicle_id]) }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 hover:bg-amber-100 transition cursor-pointer" title="Click to filter by {{ $fuel->vehicle?->name ?? 'TVS Pep+' }}">
+                                        🛵 {{ $fuel->vehicle?->name ?? 'TVS Pep+' }}
+                                    </a>
+                                </td>
                                 <td class="py-3 px-4 whitespace-nowrap">
                                     <div class="font-bold text-teal-600 dark:text-teal-400">₹{{ number_format($fuel->amount, 2) }}</div>
                                     <div class="mt-0.5">
@@ -72,36 +89,48 @@
                                 <td class="py-3 px-4 font-mono text-slate-500">{{ $fuel->odometer ? number_format($fuel->odometer) . ' km' : '--' }}</td>
                                 <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $fuel->petrol_station ?? '--' }}</td>
                                 <td class="py-3 px-4 text-right">
-                                    <a href="{{ route('petrol.edit', $fuel) }}" class="mr-3 text-slate-600 hover:underline">Edit</a>
+                                    <a href="{{ route('petrol.edit', $fuel) }}" class="mr-3 text-slate-600 hover:underline font-semibold">Edit</a>
                                     <form action="{{ route('petrol.destroy', $fuel) }}" method="POST" class="inline petrol-delete-form" data-has-expense="{{ $fuel->expense ? '1' : '0' }}">
                                         @csrf
                                         @method('DELETE')
                                         <input type="hidden" name="delete_linked_expense" value="0">
-                                        <button type="submit" class="text-rose-600 hover:underline">Delete</button>
+                                        <button type="submit" class="text-rose-600 hover:underline font-semibold cursor-pointer">Delete</button>
                                     </form>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="py-8 text-center text-slate-400">No petrol records found.</td></tr>
+                            <tr><td colspan="8" class="py-8 text-center text-slate-400">No petrol records found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
             <div class="p-4 border-t border-slate-100 dark:border-slate-800">
-                {{ $entries->links() }}
+                {{ $entries->links('vendor.pagination.custom') }}
             </div>
         </div>
     </div>
 
     <!-- ADD PETROL MODAL -->
     <div id="add-petrol-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                 <h3 class="font-bold text-base text-slate-900 dark:text-white">Record Petrol Fill</h3>
-                <button onclick="document.getElementById('add-petrol-modal').classList.add('hidden')" class="text-slate-400 text-2xl font-bold">&times;</button>
+                <button onclick="document.getElementById('add-petrol-modal').classList.add('hidden')" class="text-slate-400 text-2xl font-bold cursor-pointer">&times;</button>
             </div>
             <form action="{{ route('petrol.store') }}" method="POST" class="space-y-3 text-xs">
                 @csrf
+
+                <div>
+                    <label class="block text-slate-500 mb-1">Vehicle *</label>
+                    <select name="vehicle_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold">
+                        @foreach($vehicles as $veh)
+                            <option value="{{ $veh->id }}" {{ ($defaultVehicle && $defaultVehicle->id === $veh->id) || $veh->name === 'TVS Pep+' ? 'selected' : '' }}>
+                                {{ $veh->name }} {{ $veh->is_default ? '(Default)' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-slate-500 mb-1">Amount (₹) *</label>
@@ -153,7 +182,7 @@
                     <textarea name="notes" rows="2" placeholder="Optional details" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
                 </div>
 
-                <button type="submit" class="w-full py-2.5 rounded-xl bg-teal-600 text-white font-semibold shadow-md transition">Save Petrol Entry</button>
+                <button type="submit" class="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md transition cursor-pointer">Save Petrol Entry</button>
             </form>
         </div>
     </div>
@@ -168,8 +197,11 @@
 
                 if (form.dataset.hasExpense !== '1') return;
 
-                const deleteExpense = window.confirm('This petrol record has a linked expense. Press OK to delete the expense too, or Cancel to preserve and detach it.');
-                form.querySelector('[name="delete_linked_expense"]').value = deleteExpense ? '1' : '0';
+                const disassociateOnly = window.confirm(
+                    'This petrol log has a linked expense.\n\nPress OK to disassociate and preserve the expense intact (disassociate let petrol expense be as such).\n\nPress Cancel if you also want to delete the linked expense.'
+                );
+
+                form.querySelector('[name="delete_linked_expense"]').value = disassociateOnly ? '0' : '1';
             });
         });
 

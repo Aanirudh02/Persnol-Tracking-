@@ -32,6 +32,7 @@
             <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">Money Received</x-nav-link>
             <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">Payments</x-nav-link>
             <x-nav-link href="{{ route('friends.index') }}" :active="request()->routeIs('friends.*')" icon="users">Friends & Splits</x-nav-link>
+            <x-nav-link href="{{ route('family-members.index') }}" :active="request()->routeIs('family-members.*')" icon="users">Family Members</x-nav-link>
             <x-nav-link href="{{ route('credits.index', ['type' => 'credit']) }}" :active="request()->routeIs('credits.*') && request('type', 'credit') === 'credit'" icon="users">Credits (I owe)</x-nav-link>
             <x-nav-link href="{{ route('credits.index', ['type' => 'debt']) }}" :active="request()->routeIs('credits.*') && request('type') === 'debt'" icon="users">Debts (owe me)</x-nav-link>
 
@@ -181,6 +182,7 @@
             </div>
             <div class="grid grid-cols-3 gap-3 text-center">
                 @foreach([
+                    ['family-members.index', 'Family Members', []],
                     ['personal-expenses.index', 'Personal Expenses', []],
                     ['all-expenses.index', 'All Expenses', []],
                     ['statements.index', 'Statements', []],

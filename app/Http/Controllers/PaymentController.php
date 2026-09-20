@@ -61,7 +61,7 @@ class PaymentController extends Controller
             'paid_by' => $validated['paid_by'] ?? 'Me',
             'paid_to' => $validated['paid_to'],
             'purpose' => $validated['purpose'],
-            'category' => $validated['category'] ?? 'Other',
+            'category' => ! empty($validated['category']) ? $validated['category'] : 'Me',
             'payment_method' => $validated['payment_method'],
             'reference' => $validated['reference'] ?? null,
             'status' => $validated['status'],

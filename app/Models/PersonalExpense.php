@@ -14,11 +14,14 @@ class PersonalExpense extends Model
         'user_id',
         'category_id',
         'expense_id',
+        'personal_expense_group_id',
         'amount',
         'date',
         'time',
         'description',
         'payment_method',
+        'done_by',
+        'done_to',
         'notes',
         'is_voluntary',
         'is_archived',
@@ -39,6 +42,11 @@ class PersonalExpense extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(PersonalExpenseCategory::class, 'category_id');
+    }
+
+    public function personalExpenseGroup(): BelongsTo
+    {
+        return $this->belongsTo(PersonalExpenseGroup::class, 'personal_expense_group_id');
     }
 
     public function linkedExpense(): BelongsTo

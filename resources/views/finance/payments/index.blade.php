@@ -26,7 +26,8 @@
                         <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-200/80 dark:border-slate-800">
                             <tr>
                                 <th class="py-3.5 px-4">Date</th>
-                                <th class="py-3.5 px-4">Paid To</th>
+                                <th class="py-3.5 px-4">Done To / By</th>
+                                <th class="py-3.5 px-4">Category</th>
                                 <th class="py-3.5 px-4">Purpose</th>
                                 <th class="py-3.5 px-4">Amount</th>
                                 <th class="py-3.5 px-4">Method / Ref</th>
@@ -41,7 +42,15 @@
                                         {{ $pay->date->format('d M Y') }}
                                         <span class="block text-[10px] text-slate-400">{{ $pay->time }}</span>
                                     </td>
-                                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">{{ $pay->paid_to }}</td>
+                                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                                        <span>{{ $pay->paid_to }}</span>
+                                        <span class="block text-[10px] font-normal text-slate-400">Done by: {{ $pay->paid_by ?: 'Me' }}</span>
+                                    </td>
+                                    <td class="py-3 px-4 whitespace-nowrap">
+                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
+                                            {{ $pay->category ?: 'Me' }}
+                                        </span>
+                                    </td>
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">
                                         {{ $pay->purpose }}
                                         @if($pay->notes)
@@ -104,7 +113,7 @@
                     </table>
                 </div>
                 <div class="p-4 border-t border-slate-100 dark:border-slate-800">
-                    {{ $payments->links() }}
+                    {{ $payments->links('vendor.pagination.custom') }}
                 </div>
             @endif
         </div>

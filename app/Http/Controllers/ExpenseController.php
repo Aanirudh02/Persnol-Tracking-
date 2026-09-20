@@ -41,6 +41,22 @@ class ExpenseController extends Controller
                 'friendSplits.friend',
             ]);
 
+        $status = $request->get('status', 'active');
+        $activeCount = Expense::where('user_id', $user->id)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereNull('parent_id')
+            ->count();
+        $archivedCount = Expense::where('user_id', $user->id)
+            ->where('is_archived', true)
+            ->whereNull('parent_id')
+            ->count();
+
+        if ($status === 'archived') {
+            $query->where('is_archived', true);
+        } else {
+            $query->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false));
+        }
+
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->integer('category_id'));
         }
@@ -66,6 +82,12 @@ class ExpenseController extends Controller
             ->where('user_id', $user->id)
             ->whereNull('parent_id');
 
+        if ($status === 'archived') {
+            $baseQuery->where('is_archived', true);
+        } else {
+            $baseQuery->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false));
+        }
+
         if ($request->filled('category_id')) {
             $baseQuery->where('category_id', $request->integer('category_id'));
         }
@@ -86,15 +108,34 @@ class ExpenseController extends Controller
         $totalAmount = (float) (clone $baseQuery)->sum(DB::raw('amount + gst_amount'));
         $totalCount = (clone $baseQuery)->count();
 
-        // 2. Expense by payment method breakdown
-        $expensesByPayment = (clone $baseQuery)
+        // 2. Expense by payment method breakdown (self vs non-owned)
+        $matchingExpenses = (clone $baseQuery)
             ->whereNotNull('payment_method')
             ->where('payment_method', '!=', '')
-            ->select('payment_method', DB::raw('SUM(amount + gst_amount) as total'))
-            ->groupBy('payment_method')
-            ->orderByDesc('total')
-            ->pluck('total', 'payment_method')
-            ->toArray();
+            ->with(['friendSplits', 'friendSplit', 'paidByFriend'])
+            ->get();
+
+        $expensesByPayment = [];
+        foreach ($matchingExpenses as $item) {
+            $method = $item->payment_method ?: 'Other';
+            $itemTotal = $item->totalAmount();
+            $itemFriendPaid = $item->totalPaidByFriends();
+            $itemOwned = max(0.0, round($itemTotal - $itemFriendPaid, 2));
+
+            if (! isset($expensesByPayment[$method])) {
+                $expensesByPayment[$method] = [
+                    'total' => 0.0,
+                    'owned' => 0.0,
+                    'friend' => 0.0,
+                ];
+            }
+
+            $expensesByPayment[$method]['total'] += $itemTotal;
+            $expensesByPayment[$method]['owned'] += $itemOwned;
+            $expensesByPayment[$method]['friend'] += $itemFriendPaid;
+        }
+
+        uasort($expensesByPayment, fn ($a, $b) => $b['total'] <=> $a['total']);
 
         // 3. Non-owned / friend-paid expenses breakdown
         $friendPaidBreakdown = [];
@@ -157,7 +198,10 @@ class ExpenseController extends Controller
             'paymentMethods',
             'expensesByPayment',
             'friendPaidBreakdown',
-            'totalFriendPaid'
+            'totalFriendPaid',
+            'status',
+            'activeCount',
+            'archivedCount'
         ));
     }
 
@@ -654,14 +698,65 @@ class ExpenseController extends Controller
         return redirect()->route('expenses.index')->with('success', 'Expense updated successfully!');
     }
 
+    public function detachFromGroup(Request $request, ExpenseGroup $expenseGroup, Expense $expense): RedirectResponse
+    {
+        if ($expenseGroup->user_id !== $request->user()->id
+            || $expense->user_id !== $request->user()->id
+            || $expense->expense_group_id !== $expenseGroup->id) {
+            abort(403);
+        }
+
+        $expense->update(['expense_group_id' => null]);
+
+        if ($expenseGroup->expenses()->count() <= 1) {
+            $expenseGroup->expenses()->update(['expense_group_id' => null]);
+            $expenseGroup->delete();
+
+            return back()->with('success', 'Expense detached from group. Group dissolved as fewer than 2 items remain.');
+        }
+
+        return back()->with('success', 'Expense detached from group.');
+    }
+
+    public function archive(Request $request, Expense $expense): RedirectResponse
+    {
+        if ($expense->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $expense->update(['is_archived' => true]);
+
+        return back()->with('success', 'Expense archived to Historical records.');
+    }
+
+    public function restore(Request $request, Expense $expense): RedirectResponse
+    {
+        if ($expense->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $expense->update(['is_archived' => false]);
+
+        return back()->with('success', 'Expense restored to Active expenses.');
+    }
+
     public function destroy(Request $request, Expense $expense, FinanceLinkService $linkService): RedirectResponse
     {
         if ($expense->user_id !== auth()->id()) {
             abort(403);
         }
 
+        if ($request->input('action') === 'archive') {
+            return $this->archive($request, $expense);
+        }
+
         if ($expense->subItems()->exists() || $expense->foodEntries()->exists()) {
             return back()->with('error', 'Cannot delete expense with linked sub-items or food entries.');
+        }
+
+        // Gracefully disassociate petrol log if linked
+        if ($expense->fuelEntry()->exists()) {
+            $expense->fuelEntry()->update(['expense_id' => null]);
         }
 
         $linkService->removeExpenseFriendLink($expense);
@@ -673,6 +768,12 @@ class ExpenseController extends Controller
             oldValues: $expense->toArray(),
             reason: 'Deleted by user'
         );
+
+        if ($request->boolean('permanent') || $request->input('action') === 'delete_permanent') {
+            $expense->forceDelete();
+
+            return back()->with('success', 'Expense permanently deleted.');
+        }
 
         $expense->delete();
 

@@ -9,6 +9,7 @@ use App\Http\Controllers\CreditDebtController;
 use App\Http\Controllers\DailyRecordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\FamilyMemberController;
 use App\Http\Controllers\FinanceDashboardController;
 use App\Http\Controllers\FoodController;
 use App\Http\Controllers\FriendController;
@@ -66,6 +67,12 @@ Route::middleware('auth')->group(function () {
 
         // Personal Expenses
         Route::post('/personal-expenses/{personalExpense}/convert-to-normal', [PersonalExpenseController::class, 'convertToNormal'])->name('personal-expenses.convert-to-normal');
+        Route::post('/personal-expenses/group', [PersonalExpenseController::class, 'group'])->name('personal-expenses.group');
+        Route::put('/personal-expense-groups/{personalExpenseGroup}', [PersonalExpenseController::class, 'renameGroup'])->name('personal-expense-groups.update');
+        Route::delete('/personal-expense-groups/{personalExpenseGroup}', [PersonalExpenseController::class, 'ungroup'])->name('personal-expense-groups.destroy');
+        Route::delete('/personal-expense-groups/{personalExpenseGroup}/expenses/{personalExpense}', [PersonalExpenseController::class, 'detachFromGroup'])->name('personal-expense-groups.expenses.detach');
+        Route::post('/personal-expenses/{personalExpense}/archive', [PersonalExpenseController::class, 'archive'])->name('personal-expenses.archive');
+        Route::post('/personal-expenses/{personalExpense}/restore', [PersonalExpenseController::class, 'restore'])->name('personal-expenses.restore');
         Route::resource('personal-expenses', PersonalExpenseController::class)->names('personal-expenses');
 
         // Statements Module
@@ -77,6 +84,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/expenses/group', [ExpenseController::class, 'group'])->name('expenses.group');
         Route::put('/expense-groups/{expenseGroup}', [ExpenseController::class, 'renameGroup'])->name('expense-groups.update');
         Route::delete('/expense-groups/{expenseGroup}', [ExpenseController::class, 'ungroup'])->name('expense-groups.destroy');
+        Route::delete('/expense-groups/{expenseGroup}/expenses/{expense}', [ExpenseController::class, 'detachFromGroup'])->name('expense-groups.expenses.detach');
+        Route::post('/expenses/{expense}/archive', [ExpenseController::class, 'archive'])->name('expenses.archive');
+        Route::post('/expenses/{expense}/restore', [ExpenseController::class, 'restore'])->name('expenses.restore');
         Route::put('/expense-groups/{expenseGroup}/expenses/{expense}/payment-method', [ExpenseController::class, 'updateGroupPaymentMethod'])->name('expense-groups.expenses.payment-method');
         Route::post('/expenses/{expense}/link-food', [ExpenseController::class, 'linkFood'])->name('expenses.link-food');
 
@@ -130,6 +140,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
     Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
     Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+    Route::resource('family-members', FamilyMemberController::class)->names('family-members');
 
     Route::get('/food', [FoodController::class, 'index'])->name('food.index')->middleware('permission:food.view');
     Route::post('/food', [FoodController::class, 'store'])->name('food.store')->middleware('permission:food.create');

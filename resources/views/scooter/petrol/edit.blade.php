@@ -34,6 +34,21 @@
                 @csrf
                 @method('PUT')
 
+                <div>
+                    <label for="vehicle_id" class="block text-xs font-semibold text-slate-700 mb-1.5">Vehicle *</label>
+                    <select
+                        name="vehicle_id"
+                        id="vehicle_id"
+                        class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
+                    >
+                        @foreach($vehicles as $veh)
+                            <option value="{{ $veh->id }}" {{ old('vehicle_id', $petrol->vehicle_id) == $veh->id ? 'selected' : '' }}>
+                                {{ $veh->name }} {{ $veh->is_default ? '(Default)' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label for="date" class="block text-xs font-semibold text-slate-700 mb-1.5">Date *</label>
