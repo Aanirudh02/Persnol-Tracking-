@@ -82,9 +82,17 @@
                                                 <span>💰</span> Expense Logged 
                                             </a>
                                         @elseif($fuel->expense_id)
-                                            <a href="{{ route('expenses.show', $fuel->expense_id) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 transition" title="Linked Expense Soft-Deleted">
-                                                <span>⚠️</span> Deleted Expense
-                                            </a>
+                                            <div class="inline-flex items-center gap-1">
+                                                <a href="{{ route('expenses.show', $fuel->expense_id) }}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 hover:bg-amber-100 transition" title="Linked Expense Soft-Deleted">
+                                                    <span>⚠️</span> Deleted Expense
+                                                </a>
+                                                <form action="{{ route('petrol.link-expense', $fuel) }}" method="POST" class="inline">
+                                                    @csrf
+                                                    <button type="submit" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 dark:border-teal-800 transition cursor-pointer" title="Re-log as Normal Expense">
+                                                        + Re-log
+                                                    </button>
+                                                </form>
+                                            </div>
                                         @else
                                             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400" title="Not logged as expense">
                                                 <span>⚪</span> Not Logged

@@ -149,13 +149,49 @@
                     >{{ old('notes', $petrol->notes) }}</textarea>
                 </div>
 
-                @if(!$petrol->expense_id)
-                    <label class="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs text-slate-700">
+                @php
+                    $linkedExpense = $petrol->expense;
+                    $isLinkedActive = $linkedExpense && !$linkedExpense->trashed();
+                    $isLinkedDeleted = ($petrol->expense_id && !$linkedExpense) || ($linkedExpense && $linkedExpense->trashed());
+                @endphp
+
+                @if(!$petrol->expense_id || !$linkedExpense)
+                    <label class="flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 dark:bg-teal-950/40 p-3 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
                         <input type="checkbox" name="add_as_expense" value="1" class="mt-0.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500">
-                        <span><strong>Add this record as an expense</strong><span class="block text-[11px] text-slate-500">Creates an expense using the updated petrol details.</span></span>
+                        <span><strong>Add this record as an expense</strong><span class="block text-[11px] text-slate-500">Creates an active normal expense using updated petrol details.</span></span>
                     </label>
+                @elseif($isLinkedDeleted)
+                    <div class="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-3.5 text-xs space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                                <span>⚠️</span> The linked expense was deleted or archived.
+                            </span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-200">
+                                Deleted
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                            This petrol fill is currently not counted in your active expenses. Check the option below to re-log it as an active expense.
+                        </p>
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-amber-200/60 dark:border-amber-900/60">
+                            <label class="inline-flex items-center gap-2 font-bold text-teal-700 dark:text-teal-400 cursor-pointer">
+                                <input type="checkbox" name="add_as_expense" value="1" checked class="rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+                                <span>+ Re-log as Active Expense on save</span>
+                            </label>
+                            <a href="{{ route('expenses.show', $petrol->expense_id) }}" target="_blank" class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                View Deleted Expense &rarr;
+                            </a>
+                        </div>
+                    </div>
                 @else
-                    <p class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">This petrol record is linked to an expense. Updating it will update that expense too.</p>
+                    <div class="rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-3 text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
+                        <div>
+                            <strong>✓ Linked to Active Expense:</strong> Updating this petrol record will automatically update that expense too.
+                        </div>
+                        <a href="{{ route('expenses.show', $petrol->expense_id) }}" target="_blank" class="text-[11px] font-bold text-emerald-800 dark:text-emerald-200 hover:underline shrink-0 ml-2">
+                            View Expense &rarr;
+                        </a>
+                    </div>
                 @endif
 
                 <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">

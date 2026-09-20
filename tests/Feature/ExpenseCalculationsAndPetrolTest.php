@@ -249,4 +249,68 @@ class ExpenseCalculationsAndPetrolTest extends TestCase
             'payment_method' => 'Cash',
         ]);
     }
+
+    public function test_petrol_edit_and_relog_when_linked_expense_is_deleted(): void
+    {
+        $user = $this->createAdminUser();
+        $vehicle = Vehicle::create([
+            'user_id' => $user->id,
+            'name' => 'TVS Pep+',
+            'make' => 'TVS',
+            'model' => 'Scooty Pep+',
+            'default_mileage_kmpl' => 45,
+            'fuel_type' => 'Petrol',
+            'is_default' => true,
+        ]);
+        $cat = ExpenseCategory::create(['name' => 'Petrol', 'user_id' => $user->id]);
+
+        $expense = Expense::create([
+            'user_id' => $user->id,
+            'category_id' => $cat->id,
+            'amount' => 120.00,
+            'date' => Carbon::today()->toDateString(),
+            'description' => 'Petrol station fill',
+            'payment_method' => 'UPI',
+            'paid_by' => 'Me',
+        ]);
+
+        $fuel = FuelEntry::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $vehicle->id,
+            'expense_id' => $expense->id,
+            'date' => Carbon::today()->toDateString(),
+            'amount' => 120.00,
+            'litres' => 1.10,
+            'price_per_litre' => 109.09,
+            'payment_method' => 'UPI',
+        ]);
+
+        // Soft delete the expense
+        $expense->delete();
+        $this->assertTrue($expense->trashed());
+
+        // Edit view should show deleted warning and relog option, NOT 'Updating it will update that expense too'
+        $editResp = $this->actingAs($user)->get(route('petrol.edit', $fuel->id));
+        $editResp->assertOk();
+        $editResp->assertSee('The linked expense was deleted or archived');
+        $editResp->assertSee('Re-log as Active Expense');
+        $editResp->assertDontSee('This petrol record is linked to an expense. Updating it will update that expense too.');
+
+        // Update fuel with add_as_expense=1 (re-log)
+        $updateResp = $this->actingAs($user)->put(route('petrol.update', $fuel->id), [
+            'vehicle_id' => $vehicle->id,
+            'date' => Carbon::today()->toDateString(),
+            'amount' => 150.00,
+            'litres' => 1.38,
+            'payment_method' => 'UPI',
+            'add_as_expense' => '1',
+        ]);
+        $updateResp->assertRedirect(route('petrol.index'));
+
+        $fuel->refresh();
+        $this->assertNotEquals($expense->id, $fuel->expense_id);
+        $this->assertNotNull($fuel->expense);
+        $this->assertFalse($fuel->expense->trashed());
+        $this->assertEquals(150.00, (float) $fuel->expense->amount);
+    }
 }

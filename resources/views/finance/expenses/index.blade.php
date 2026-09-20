@@ -180,6 +180,7 @@
                     <a href="{{ route('friends.index') }}" class="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
                         Friends & Debts &rarr;
                     </a>
+                </div>
             </div>
         </div>
 

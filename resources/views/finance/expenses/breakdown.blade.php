@@ -132,6 +132,16 @@
                                     <div class="font-bold text-emerald-700 dark:text-emerald-400">₹{{ number_format($af->amount, 2) }}</div>
                                     @if($af->expense && $af->expense->is_archived)
                                         <a href="{{ route('expenses.show', $af->expense_id) }}" class="text-[10px] text-purple-600 dark:text-purple-400 font-bold hover:underline">📦 Archived Expense</a>
+                                    @elseif($af->expense && $af->expense->trashed())
+                                        <div class="flex items-center gap-1.5 justify-end">
+                                            <a href="{{ route('expenses.show', $af->expense_id) }}" class="text-[10px] text-amber-600 dark:text-amber-400 font-bold hover:underline">⚠️ Deleted</a>
+                                            <form action="{{ route('petrol.link-expense', $af) }}" method="POST" class="inline">
+                                                @csrf
+                                                <button type="submit" class="px-1.5 py-0.5 rounded bg-teal-600 hover:bg-teal-700 text-white font-bold text-[9px] shadow-xs cursor-pointer transition" title="Re-log as normal expense">
+                                                    + Re-log
+                                                </button>
+                                            </form>
+                                        </div>
                                     @else
                                         <a href="{{ route('expenses.show', $af->expense_id) }}" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline">View Expense &rarr;</a>
                                     @endif

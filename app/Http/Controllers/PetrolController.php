@@ -181,7 +181,8 @@ class PetrolController extends Controller
         DB::transaction(function () use ($request, $validated, $petrol): void {
             $petrol->update($validated);
 
-            if ($petrol->expense_id) {
+            $linkedExpense = $petrol->expense;
+            if ($petrol->expense_id && $linkedExpense && ! $linkedExpense->trashed()) {
                 $this->syncExpenseForFuel($petrol);
             } elseif ($request->boolean('add_as_expense')) {
                 $petrol->update(['expense_id' => $this->createExpenseForFuel($request, $petrol)->id]);
