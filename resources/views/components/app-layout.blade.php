@@ -45,6 +45,7 @@
             <x-nav-link href="{{ route('scooter.plan') }}" :active="request()->routeIs('scooter.plan*')" icon="navigation">Trip Planner</x-nav-link>
             <x-nav-link href="{{ route('vehicles.index') }}" :active="request()->routeIs('vehicles.*')" icon="navigation">Vehicles</x-nav-link>
             <x-nav-link href="{{ route('petrol.index') }}" :active="request()->routeIs('petrol.*')" icon="fuel">Petrol / Fuel</x-nav-link>
+            <x-nav-link href="{{ route('odometer.index') }}" :active="request()->routeIs('odometer.*')" icon="navigation">Odometer & Mileage</x-nav-link>
             <x-nav-link href="{{ route('mistakes.index') }}" :active="request()->routeIs('mistakes.*')" icon="alert-triangle">Mistakes</x-nav-link>
             <x-nav-link href="{{ route('notes.index') }}" :active="request()->routeIs('notes.*')" icon="file-text">Notes</x-nav-link>
 
@@ -193,6 +194,7 @@
                     ['scooter.plan', 'Plan Trip', []],
                     ['vehicles.index', 'Vehicles', []],
                     ['petrol.index', 'Petrol', []],
+                    ['odometer.index', 'Odometer', []],
                     ['credits.index', 'Credits', ['type' => 'credit']],
                     ['credits.index', 'Debts', ['type' => 'debt']],
                     ['settings.index', 'Settings', []],

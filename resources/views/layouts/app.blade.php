@@ -91,6 +91,9 @@
             <x-nav-link href="{{ route('petrol.index') }}" :active="request()->routeIs('petrol.*')" icon="fuel">
                 Petrol / Fuel
             </x-nav-link>
+            <x-nav-link href="{{ route('odometer.index') }}" :active="request()->routeIs('odometer.*')" icon="navigation">
+                Odometer & Mileage
+            </x-nav-link>
             <x-nav-link href="{{ route('mistakes.index') }}" :active="request()->routeIs('mistakes.*')" icon="alert-triangle">
                 Mistakes & Lessons
             </x-nav-link>
@@ -275,6 +278,9 @@
                 </a>
                 <a href="{{ route('petrol.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">⛽</span> Petrol / Fuel
+                </a>
+                <a href="{{ route('odometer.index') }}" class="p-3 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
+                    <span class="text-xl">⏱️</span> Odometer
                 </a>
                 <a href="{{ route('mistakes.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">⚠️</span> Mistakes

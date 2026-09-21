@@ -43,4 +43,11 @@ return [
         'bias_lng' => (float) env('MAP_BIAS_LNG', 76.9558),
     ],
 
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'dh5wd8etl'),
+        'api_key' => env('CLOUDINARY_API_KEY'),
+        'api_secret' => env('CLOUDINARY_API_SECRET'),
+        'folder' => env('CLOUDINARY_FOLDER', 'odometer'),
+    ],
+
 ];

@@ -18,6 +18,7 @@ use App\Http\Controllers\GeoController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\MistakeController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\OdometerController;
 use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PersonalExpenseController;
@@ -169,6 +170,13 @@ Route::middleware('auth')->group(function () {
     // Petrol
     Route::post('/petrol/{petrol}/link-expense', [PetrolController::class, 'linkExpense'])->name('petrol.link-expense');
     Route::resource('petrol', PetrolController::class)->names('petrol');
+
+    // Odometer & Mileage Cycles
+    Route::get('/odometer', [OdometerController::class, 'index'])->name('odometer.index');
+    Route::post('/odometer', [OdometerController::class, 'store'])->name('odometer.store');
+    Route::get('/odometer/{group}', [OdometerController::class, 'show'])->name('odometer.show');
+    Route::delete('/odometer/readings/{reading}', [OdometerController::class, 'destroyReading'])->name('odometer.readings.destroy');
+    Route::delete('/odometer/groups/{group}', [OdometerController::class, 'destroyGroup'])->name('odometer.groups.destroy');
 
     // Mistakes & Lessons
     Route::resource('mistakes', MistakeController::class)->names('mistakes');
