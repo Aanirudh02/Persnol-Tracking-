@@ -165,4 +165,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - **Friend Name Display**:
   - Whenever friends contribute or pay (even if more than one friend pays), always show each friend's specific name and amount paid (`{Friend Name}: ₹{paid}`) in bold on show/PDF views, expenses summary cards, and dashboard cards. Never collapse into generic labels like "Friend(s) paid".
 
+=== my_tracker/ui rules ===
+
+# UI & Form Conventions
+
+- **No Number Input Spinners**:
+  - Number input fields (`input[type="number"]`) must never display native browser stepper / spinner arrows (`▲`/`▼`). They are globally suppressed in `resources/css/app.css` via `-webkit-appearance: none` and `appearance: textfield`. Do not re-enable or add custom stepper buttons without explicit user request.
+
 </laravel-boost-guidelines>

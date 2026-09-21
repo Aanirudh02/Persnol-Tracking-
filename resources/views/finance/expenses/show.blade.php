@@ -33,7 +33,16 @@
             <p>Paid by: <strong>{{ $expense->paid_by }}</strong> · {{ $expense->payment_method }}</p>
             @php
                 $allSplits = $expense->friendSplits->isNotEmpty() ? $expense->friendSplits : ($expense->friendSplit ? collect([$expense->friendSplit]) : collect());
+                $payingFriends = $allSplits->filter(fn ($s) => (float) $s->paid_by_friend_amount > 0);
             @endphp
+            @if($payingFriends->isNotEmpty())
+                <p class="text-xs text-indigo-900 font-medium">
+                    Friend Contributions:
+                    @foreach($payingFriends as $pf)
+                        <span class="inline-block"><strong>{{ $pf->friend?->name ?? 'Friend' }}</strong>: <strong>₹{{ number_format($pf->paid_by_friend_amount, 2) }}</strong></span>@if(! $loop->last), @endif
+                    @endforeach
+                </p>
+            @endif
             @if($allSplits->isNotEmpty())
                 <div class="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 text-xs text-slate-700 space-y-2.5">
                     <p class="font-bold text-sm text-indigo-950 flex items-center gap-1.5">
@@ -47,15 +56,21 @@
                                     <span class="text-slate-500">· Share: ₹{{ number_format($s->friend_share, 2) }}</span>
                                     <span class="text-slate-500">· Paid: ₹{{ number_format($s->paid_by_friend_amount, 2) }}</span>
                                 </div>
-                                <div class="font-semibold {{ $s->netAmount() >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">
-                                    {{ $s->netAmount() >= 0 ? 'Owes you ₹' . number_format($s->netAmount(), 2) : 'You owe ₹' . number_format(abs($s->netAmount()), 2) }}
+                                <div class="font-semibold {{ abs($s->netAmount()) < 0.01 ? 'text-emerald-700' : ($s->netAmount() > 0 ? 'text-emerald-700' : 'text-rose-700') }}">
+                                    @if(abs($s->netAmount()) < 0.01)
+                                        ✓ Settled / No debt (₹0.00)
+                                    @elseif($s->netAmount() > 0)
+                                        Owes you ₹{{ number_format($s->netAmount(), 2) }}
+                                    @else
+                                        You owe ₹{{ number_format(abs($s->netAmount()), 2) }}
+                                    @endif
                                 </div>
                             </div>
                         @endforeach
                     </div>
                     <div class="pt-2 border-t border-indigo-200 font-semibold text-slate-800 flex justify-between">
                         <span>Your Share: ₹{{ number_format($expense->split_my_share ?? $allSplits->first()?->my_share ?? 0, 2) }}</span>
-                        <span>You Paid: ₹{{ number_format($allSplits->first()?->paid_by_me_amount ?? 0, 2) }}</span>
+                        <span>You Paid: ₹{{ number_format(($allSplits->first()?->paid_by_me_amount > 0 ? $allSplits->first()?->paid_by_me_amount : $expense->amount), 2) }}</span>
                     </div>
                 </div>
             @endif

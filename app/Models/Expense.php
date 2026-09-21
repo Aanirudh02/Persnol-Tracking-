@@ -182,6 +182,52 @@ class Expense extends Model
         return round(max(0, $this->totalAmount() - $this->consumedAmount()), 2);
     }
 
+    public function getTimeAttribute(?string $value): ?string
+    {
+        if (! $value) {
+            return null;
+        }
+
+        return strlen($value) > 5 ? substr($value, 0, 5) : $value;
+    }
+
+    public function originalBillTotal(): float
+    {
+        if ($this->notes && preg_match('/Total bill:\s*₹?([0-9,.]+)/i', $this->notes, $matches)) {
+            $parsed = (float) str_replace(',', '', $matches[1]);
+            if ($parsed > 0) {
+                return round($parsed, 2);
+            }
+        }
+
+        $friendPaid = $this->totalPaidByFriends();
+        if ($friendPaid > 0) {
+            return round($this->totalAmount() + $friendPaid, 2);
+        }
+
+        return $this->totalAmount();
+    }
+
+    public function isCombinationPayment(): bool
+    {
+        if ($this->notes && str_contains($this->notes, 'Total bill:')) {
+            return true;
+        }
+
+        if ($this->relationLoaded('friendSplits') && $this->friendSplits->isNotEmpty()) {
+            $hasPaid = (float) $this->friendSplits->sum('paid_by_friend_amount') > 0;
+            $allZeroNet = $this->friendSplits->every(fn (FriendSplit $s): bool => abs($s->netAmount()) < 0.05);
+
+            return $hasPaid && $allZeroNet;
+        }
+
+        if ($this->friendSplit) {
+            return (float) $this->friendSplit->paid_by_friend_amount > 0 && abs($this->friendSplit->netAmount()) < 0.05;
+        }
+
+        return false;
+    }
+
     public function isEditableByUser(?User $user = null): bool
     {
         $user = $user ?? auth()->user();

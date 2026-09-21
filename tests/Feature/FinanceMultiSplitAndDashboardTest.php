@@ -241,6 +241,137 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
         $this->assertEquals(0.0, $rahulSplit->netAmount());
     }
 
+    public function test_expense_edit_with_time_having_seconds_does_not_fail_validation(): void
+    {
+        $user = $this->createUser();
+        $category = ExpenseCategory::query()->create(['user_id' => $user->id, 'name' => 'General', 'is_archived' => false]);
+        $expense = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 50,
+            'date' => '2026-09-10',
+            'time' => '14:30:00',
+            'description' => 'Test Time Format Expense',
+            'payment_method' => 'Cash',
+            'paid_by' => 'Me',
+            'category_id' => $category->id,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('expenses.update', $expense), [
+            'amount' => 50,
+            'category_id' => $category->id,
+            'date' => '2026-09-10',
+            'time' => '14:30:00', // Browser submits time with seconds from database
+            'description' => 'Updated Description',
+            'payment_method' => 'Cash',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('expenses.index'));
+
+        $this->assertEquals('14:30', $expense->fresh()->time);
+    }
+
+    public function test_combination_payment_130_with_user_100_friend_30_recorded_properly_and_can_be_edited(): void
+    {
+        $user = $this->createUser();
+        $sandeep = Friend::query()->create(['user_id' => $user->id, 'name' => 'Sandeep', 'role' => 'Friend']);
+        $category = ExpenseCategory::query()->create(['user_id' => $user->id, 'name' => 'Lunch', 'is_archived' => false]);
+
+        // Scenario: Total ₹130.00: User paid ₹100.00, Sandeep paid ₹30.00
+        $response = $this->actingAs($user)->post(route('expenses.store'), [
+            'amount' => 130,
+            'gst_amount' => 0,
+            'description' => 'Team Lunch Combo',
+            'category_id' => $category->id,
+            'payment_method' => 'Split',
+            'date' => '2026-09-21',
+            'time' => '16:26',
+            'record_as_combination' => '1',
+            'split_my_share' => 0,
+            'split_paid_by_me_amount' => 100,
+            'splits' => [
+                [
+                    'friend_id' => $sandeep->id,
+                    'friend_share' => 0,
+                    'paid_by_friend_amount' => 30,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $expense = Expense::query()->where('description', 'Team Lunch Combo')->firstOrFail();
+
+        // User's recorded expense should be their spend (₹100)
+        $this->assertEquals(100.0, (float) $expense->amount);
+        $this->assertStringContainsString('Total bill: ₹130.00', $expense->notes);
+        $this->assertTrue($expense->isCombinationPayment());
+        $this->assertEquals(130.0, $expense->originalBillTotal());
+
+        // Split should track full bill ₹130, Sandeep paid ₹30, no debt created
+        $split = FriendSplit::query()->where('expense_id', $expense->id)->firstOrFail();
+        $this->assertEquals(130.0, (float) $split->total_amount);
+        $this->assertEquals(30.0, (float) $split->paid_by_friend_amount);
+        $this->assertEquals(0.0, $split->netAmount());
+
+        // Now test Edit view preloads correctly
+        $editResponse = $this->actingAs($user)->get(route('expenses.edit', $expense));
+        $editResponse->assertOk();
+        $editResponse->assertViewHas('originalBillTotal', 130.0);
+        $editResponse->assertViewHas('isCombination', true);
+
+        // Submit update on the expense with time with seconds
+        $updateResponse = $this->actingAs($user)->put(route('expenses.update', $expense), [
+            'amount' => 130,
+            'description' => 'Team Lunch Combo Updated',
+            'category_id' => $category->id,
+            'payment_method' => 'Split',
+            'date' => '2026-09-21',
+            'time' => '16:26:00', // Contains seconds
+            'record_as_combination' => '1',
+            'split_paid_by_me_amount' => 100,
+            'splits' => [
+                [
+                    'friend_id' => $sandeep->id,
+                    'paid_by_friend_amount' => 30,
+                ],
+            ],
+        ]);
+
+        $updateResponse->assertSessionHasNoErrors();
+        $this->assertEquals(100.0, (float) $expense->fresh()->amount);
+        $this->assertEquals('16:26', $expense->fresh()->time);
+    }
+
+    public function test_combination_payment_can_be_created_when_user_enters_own_share_in_amount(): void
+    {
+        $user = $this->createUser();
+        $sandeep = Friend::query()->create(['user_id' => $user->id, 'name' => 'Sandeep', 'role' => 'Friend']);
+        $category = ExpenseCategory::query()->create(['user_id' => $user->id, 'name' => 'Lunch', 'is_archived' => false]);
+
+        // User typed ₹100 in Amount (thinking of their share), and ₹30 in Sandeep's paid amount
+        $response = $this->actingAs($user)->post(route('expenses.store'), [
+            'amount' => 100,
+            'gst_amount' => 0,
+            'description' => 'Lunch where user typed 100 in amount',
+            'category_id' => $category->id,
+            'payment_method' => 'Split',
+            'date' => '2026-09-21',
+            'record_as_combination' => '1',
+            'split_paid_by_me_amount' => 100,
+            'splits' => [
+                [
+                    'friend_id' => $sandeep->id,
+                    'paid_by_friend_amount' => 30,
+                ],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $expense = Expense::query()->where('description', 'Lunch where user typed 100 in amount')->firstOrFail();
+        $this->assertEquals(100.0, (float) $expense->amount);
+        $this->assertStringContainsString('Total bill: ₹130.00', $expense->notes);
+    }
+
     private function createUser(): User
     {
         $user = User::factory()->create();

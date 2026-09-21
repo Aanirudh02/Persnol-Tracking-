@@ -31,7 +31,7 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block font-semibold text-slate-700">Amount</label>
-                        <input id="expense-total" type="number" step="0.01" name="amount" required value="{{ old('amount', $expense->amount) }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-lg font-bold">
+                        <input id="expense-total" type="number" step="0.01" name="amount" required value="{{ old('amount', $originalBillTotal ?? $expense->amount) }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-lg font-bold">
                     </div>
                     <div>
                         <label class="mb-1 block font-semibold text-slate-700">GST</label>
@@ -73,7 +73,7 @@
                 <div class="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-white p-3.5 sm:p-4 transition shadow-xs">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <label class="flex items-start gap-3 cursor-pointer select-none">
-                            <input type="checkbox" id="record-as-combination" name="record_as_combination" value="1" @checked(old('record_as_combination')) class="mt-0.5 h-4.5 w-4.5 rounded border-purple-300 text-purple-600 focus:ring-purple-500">
+                            <input type="checkbox" id="record-as-combination" name="record_as_combination" value="1" @checked(old('record_as_combination', $isCombination ?? false)) class="mt-0.5 h-4.5 w-4.5 rounded border-purple-300 text-purple-600 focus:ring-purple-500">
                             <div>
                                 <span class="text-sm font-bold text-purple-950 flex items-center gap-1.5">
                                     <span>🤝</span> Record as Combination Payment
@@ -97,7 +97,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block font-semibold text-slate-700">Time</label>
-                        <input type="time" name="time" value="{{ old('time', $expense->time) }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                        <input type="time" name="time" value="{{ old('time', $expense->time ? substr($expense->time, 0, 5) : date('H:i')) }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
                     </div>
                 </div>
 
@@ -133,7 +133,7 @@
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-semibold text-slate-700">Paid by you (What you actually paid)</label>
-                                <input type="number" step="0.01" min="0" name="split_paid_by_me_amount" id="split_paid_by_me_amount" value="{{ old('split_paid_by_me_amount', $splits->first()?->paid_by_me_amount ?? ($expense->paid_by_type === 'me' ? $expense->totalAmount() : 0)) }}" placeholder="0.00" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                                <input type="number" step="0.01" min="0" name="split_paid_by_me_amount" id="split_paid_by_me_amount" value="{{ old('split_paid_by_me_amount', ($splits->first()?->paid_by_me_amount > 0 ? $splits->first()?->paid_by_me_amount : (($isCombination ?? false) ? $expense->amount : ($expense->paid_by_type === 'me' ? $expense->totalAmount() : 0)))) }}" placeholder="0.00" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
                             </div>
                         </div>
                     </div>
@@ -405,20 +405,26 @@
             const paidOk = Math.abs(totalPaid - bill) < 0.05;
             const sharesLeftZero = (totalShares <= 0.05 && paidOk);
 
-            if (paidOk && (sharesLeftZero || comboMode)) {
+            if (comboMode && !paidOk && totalPaid > 0) {
+                splitStatusBadge.textContent = '⚠ Split Mismatch';
+                splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-amber-100 text-amber-800';
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> Total paid is ₹${totalPaid.toFixed(2)} (You: ₹${myPaid.toFixed(2)}, Friends: ₹${friendsPaidSum.toFixed(2)}) but bill is ₹${bill.toFixed(2)}. <button type="button" onclick="document.getElementById('expense-total').value = '${totalPaid.toFixed(2)}'; recalculateSplits();" class="ml-1.5 px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-[11px] shadow-2xs transition cursor-pointer">Sync Total Bill to ₹${totalPaid.toFixed(2)}</button>`;
+            } else if (paidOk && (sharesLeftZero || comboMode)) {
                 splitStatusBadge.textContent = '✓ Combination Paid (₹' + totalPaid.toFixed(2) + ')';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-purple-100 text-purple-800';
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Recorded who paid alone (no debt created).`;
             } else if (sharesOk && paidOk) {
                 splitStatusBadge.textContent = '✓ Split Balanced';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-emerald-100 text-emerald-800';
+                const hints = [];
+                hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
+                friendDetails.forEach(f => {
+                    hints.push(`${f.name} paid ₹${f.paid.toFixed(2)} (share ₹${f.share.toFixed(2)})`);
+                });
+                splitPayerHint.textContent = hints.join(' · ');
             } else {
                 splitStatusBadge.textContent = '⚠ Split Mismatch';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-amber-100 text-amber-800';
-            }
-
-            if (paidOk && (sharesLeftZero || comboMode)) {
-                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Recorded who paid alone (no debt created).`;
-            } else {
                 const hints = [];
                 hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
                 friendDetails.forEach(f => {
@@ -534,6 +540,10 @@
         @elseif($expense->split_with_friend_id)
             addFriendRow('{{ $expense->split_with_friend_id }}', '{{ $expense->split_friend_share }}', '{{ $expense->paid_by_type === "friend" ? $expense->totalAmount() : 0 }}');
         @endif
+
+        if (isCombinationMode()) {
+            onCombinationToggle();
+        }
 
         recalculateSplits();
     </script>

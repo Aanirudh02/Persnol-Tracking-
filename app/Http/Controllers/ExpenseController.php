@@ -368,7 +368,7 @@ class ExpenseController extends Controller
                     'amount' => $registeredAmount,
                     'gst_amount' => $registeredGst,
                     'date' => $validated['date'],
-                    'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
+                    'time' => ! empty($validated['time']) ? substr($validated['time'], 0, 5) : Carbon::now()->format('H:i'),
                     'description' => $validated['description'],
                     'payment_method' => $combinedMethod ?: $validated['payment_method'],
                     'paid_by' => $paidByLabel,
@@ -427,7 +427,7 @@ class ExpenseController extends Controller
                     'amount' => $line['amount'],
                     'gst_amount' => $line['gst_amount'] ?? 0,
                     'date' => $validated['date'],
-                    'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
+                    'time' => ! empty($validated['time']) ? substr($validated['time'], 0, 5) : Carbon::now()->format('H:i'),
                     'description' => $validated['description'],
                     'payment_method' => $line['payment_method'],
                     'paid_by' => $paidByLabel,
@@ -605,6 +605,8 @@ class ExpenseController extends Controller
         }
 
         $expense->load(['friendSplits.friend', 'friendSplit.friend']);
+        $isCombination = $expense->isCombinationPayment();
+        $originalBillTotal = $expense->originalBillTotal();
         $categories = ExpenseCategory::query()
             ->where(function ($q) {
                 $q->whereNull('is_archived')->orWhere('is_archived', false);
@@ -617,7 +619,7 @@ class ExpenseController extends Controller
             $paymentMethods[] = 'Split';
         }
 
-        return view('finance.expenses.edit', compact('expense', 'categories', 'friends', 'paymentMethods'));
+        return view('finance.expenses.edit', compact('expense', 'categories', 'friends', 'paymentMethods', 'isCombination', 'originalBillTotal'));
     }
 
     public function update(Request $request, Expense $expense, FinanceService $financeService, FinanceLinkService $linkService): RedirectResponse
@@ -672,14 +674,15 @@ class ExpenseController extends Controller
                     $friendPaidList[] = ($friend?->name ?? 'Friend').': ₹'.number_format($paidByFriends, 2);
                 }
                 $friendStr = ! empty($friendPaidList) ? implode(', ', $friendPaidList) : 'Friend: ₹'.number_format($paidByFriends, 2);
-                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', '.$friendStr.')';
-                if (! str_contains($validated['notes'] ?? '', 'Total bill:')) {
-                    $validated['notes'] = trim(($validated['notes'] ?? '')."\n".$payerNote);
-                }
+                $cleanNotes = preg_replace('/(?:\r?\n)?Total bill:\s*₹?[^\r\n]+/i', '', $validated['notes'] ?? '');
+                $validated['notes'] = trim(trim((string) $cleanNotes)."\n".$payerNote);
             }
         }
         $validated['amount'] = $registeredAmount;
         $validated['gst_amount'] = $registeredGst;
+        if (! empty($validated['time'])) {
+            $validated['time'] = substr($validated['time'], 0, 5);
+        }
 
         $expense->update([
             ...collect($validated)->except([
@@ -812,12 +815,36 @@ class ExpenseController extends Controller
      */
     private function validateExpense(Request $request, bool $isCreate = true): array
     {
+        if ($request->filled('time')) {
+            $rawTime = trim((string) $request->input('time'));
+            if (preg_match('/^(\d{1,2}:\d{2})(:\d{2})?$/', $rawTime, $m)) {
+                $request->merge(['time' => $m[1]]);
+            }
+        }
+
+        if ($request->boolean('record_as_combination')) {
+            $rawSplits = collect($request->input('splits', []))
+                ->filter(fn ($s) => ! empty($s['friend_id']) && (int) $s['friend_id'] > 0)
+                ->values();
+            $paidByMe = round((float) $request->input('split_paid_by_me_amount', 0), 2);
+            $friendsPaidTotal = $rawSplits->isNotEmpty()
+                ? round((float) $rawSplits->sum(fn ($s) => (float) ($s['paid_by_friend_amount'] ?? 0)), 2)
+                : round((float) $request->input('split_paid_by_friend_amount', 0), 2);
+
+            $currentAmount = round((float) $request->input('amount', 0), 2);
+            if ($paidByMe > 0 && $friendsPaidTotal > 0) {
+                if (abs(($paidByMe + $friendsPaidTotal) - $currentAmount) > 0.05 && abs($paidByMe - $currentAmount) <= 0.05) {
+                    $request->merge(['amount' => round($paidByMe + $friendsPaidTotal, 2)]);
+                }
+            }
+        }
+
         $rules = [
             'amount' => ['required', 'numeric', 'min:0.01'],
             'gst_amount' => ['nullable', 'numeric', 'min:0'],
             'category_id' => ['nullable', 'integer', 'exists:expense_categories,id'],
             'date' => ['required', 'date'],
-            'time' => ['nullable', 'date_format:H:i'],
+            'time' => ['nullable', 'date_format:H:i,H:i:s'],
             'description' => ['required', 'string', 'max:255'],
             'payment_method' => ['required', 'string', 'max:50'],
             'receipt_image' => ['nullable', 'image', 'max:5120'],

@@ -429,24 +429,36 @@
             sumPaid.textContent = `₹${totalPaid.toFixed(2)} of ₹${bill.toFixed(2)}`;
 
             const comboMode = isCombinationMode();
+            if (comboMode && totalPaid > 0 && Math.abs(totalPaid - bill) > 0.05 && (bill === 0 || Math.abs(myPaid - bill) < 0.05)) {
+                totalInput.value = totalPaid.toFixed(2);
+                bill = getFullBillTotal();
+                sumTotalBill.textContent = bill.toFixed(2);
+            }
+
             const sharesOk = Math.abs(totalShares - bill) < 0.05;
             const paidOk = Math.abs(totalPaid - bill) < 0.05;
             const sharesLeftZero = (totalShares <= 0.05 && paidOk);
 
-            if (paidOk && (sharesLeftZero || comboMode)) {
+            if (comboMode && !paidOk && totalPaid > 0) {
+                splitStatusBadge.textContent = '⚠ Split Mismatch';
+                splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-amber-100 text-amber-800';
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> Total paid is ₹${totalPaid.toFixed(2)} (You: ₹${myPaid.toFixed(2)}, Friends: ₹${friendsPaidSum.toFixed(2)}) but bill is ₹${bill.toFixed(2)}. <button type="button" onclick="document.getElementById('expense-total').value = '${totalPaid.toFixed(2)}'; recalculateSplits();" class="ml-1.5 px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-[11px] shadow-2xs transition cursor-pointer">Sync Total Bill to ₹${totalPaid.toFixed(2)}</button>`;
+            } else if (paidOk && (sharesLeftZero || comboMode)) {
                 splitStatusBadge.textContent = '✓ Combination Paid (₹' + totalPaid.toFixed(2) + ')';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-purple-100 text-purple-800';
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Registered as ₹${myRegistered.toFixed(2)} in your expenses (no debt created).`;
             } else if (sharesOk && paidOk) {
                 splitStatusBadge.textContent = '✓ Split Balanced';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-emerald-100 text-emerald-800';
+                const hints = [];
+                hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
+                friendDetails.forEach(f => {
+                    hints.push(`${f.name} paid ₹${f.paid.toFixed(2)} (share ₹${f.share.toFixed(2)})`);
+                });
+                splitPayerHint.textContent = hints.join(' · ');
             } else {
                 splitStatusBadge.textContent = '⚠ Split Mismatch';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-amber-100 text-amber-800';
-            }
-
-            if (paidOk && (sharesLeftZero || comboMode)) {
-                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Registered as ₹${myRegistered.toFixed(2)} in your expenses (no debt created).`;
-            } else {
                 const hints = [];
                 hints.push(`You paid ₹${myPaid.toFixed(2)} (share ₹${myShare.toFixed(2)})`);
                 friendDetails.forEach(f => {

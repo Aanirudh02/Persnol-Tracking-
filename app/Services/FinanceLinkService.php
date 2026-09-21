@@ -98,7 +98,7 @@ class FinanceLinkService
                 'description' => $expense->description,
                 'date' => $expense->date,
                 'payment_method' => $expense->payment_method,
-                'total_amount' => round((float) $expense->totalAmount(), 2),
+                'total_amount' => round((float) $expense->originalBillTotal(), 2),
                 'my_share' => $myShareForFriend,
                 'friend_share' => $friendShare,
                 'paid_by_me_amount' => $paidByMeForFriend,
@@ -183,7 +183,7 @@ class FinanceLinkService
         $hasShares = ($splitData && ($splitData['my_share'] !== null || $splitData['friend_share'] !== null))
             || ($expense->split_my_share !== null || $expense->split_friend_share !== null);
 
-        $total = round((float) $expense->totalAmount(), 2);
+        $total = round((float) $expense->originalBillTotal(), 2);
         $paidByMode = (string) ($splitData['paid_by_mode'] ?? $this->legacyPaidByMode($expense));
         $paidByMe = round((float) ($splitData['paid_by_me_amount'] ?? $this->defaultPaidByMeAmount($paidByMode, $total)), 2);
         $paidByFriend = round((float) ($splitData['paid_by_friend_amount'] ?? $this->defaultPaidByFriendAmount($paidByMode, $total)), 2);

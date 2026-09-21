@@ -157,3 +157,16 @@ body {
     cursor: pointer;
     font-weight: 500;
 }
+
+/* Disable number input spin buttons / stepper arrows globally across all textboxes */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
