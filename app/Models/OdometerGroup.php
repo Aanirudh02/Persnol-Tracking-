@@ -64,13 +64,27 @@ class OdometerGroup extends Model
     }
 
     /**
-     * Recalculate and update the summary metrics for this cycle.
+     * Recalculate and update the summary metrics and leg distances for this cycle.
      */
     public function recalculateSummary(): void
     {
         $readings = $this->readings()->get();
         if ($readings->isEmpty()) {
             return;
+        }
+
+        $prevKm = null;
+        foreach ($readings as $r) {
+            if ($r->reading_type === 'source' || $prevKm === null) {
+                $r->distance_km = 0;
+            } else {
+                $r->distance_km = max(0, round((float) $r->odometer_km - $prevKm, 2));
+                if ($r->duration_minutes && $r->duration_minutes > 0 && $r->distance_km > 0) {
+                    $r->avg_speed_kmh = round($r->distance_km / ($r->duration_minutes / 60), 2);
+                }
+            }
+            $r->saveQuietly();
+            $prevKm = (float) $r->odometer_km;
         }
 
         $first = $readings->first();

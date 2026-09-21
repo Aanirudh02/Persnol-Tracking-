@@ -178,6 +178,12 @@
                                         </a>
                                     @endif
 
+                                    <button type="button" onclick='openEditReadingModal(@json($reading))' class="p-1.5 rounded-lg hover:bg-white/20 text-indigo-200 hover:text-white transition cursor-pointer" title="Edit reading">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                    </button>
+
                                     <form action="{{ route('odometer.readings.destroy', $reading) }}" method="POST" onsubmit="return confirm('Delete this reading?');">
                                         @csrf
                                         @method('DELETE')
@@ -555,5 +561,145 @@
             const hasActive = @json((bool)$activeGroup);
             switchToTab(hasActive ? 'intermediate' : 'source');
         });
+
+        function openEditReadingModal(reading) {
+            const form = document.getElementById('edit-reading-form');
+            form.action = `/odometer/readings/${reading.id}`;
+
+            document.getElementById('edit_odometer_km').value = reading.odometer_km;
+            document.getElementById('edit_reading_date').value = reading.reading_date ? reading.reading_date.substring(0, 10) : '';
+            document.getElementById('edit_reading_time').value = reading.reading_time ? reading.reading_time.substring(0, 5) : '';
+            document.getElementById('edit_trip_name').value = reading.trip_name || '';
+            document.getElementById('edit_source_location').value = reading.source_location || '';
+            document.getElementById('edit_destination').value = reading.destination || '';
+            document.getElementById('edit_duration_minutes').value = reading.duration_minutes || '';
+            document.getElementById('edit_notes').value = reading.notes || '';
+
+            document.getElementById('edit-reading-modal').classList.remove('hidden');
+        }
+
+        function closeEditReadingModal() {
+            document.getElementById('edit-reading-modal').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeEditReadingModal();
+            }
+        });
     </script>
+
+    <!-- DIALOG MODAL: EDIT ODOMETER READING -->
+    <div id="edit-reading-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onclick="if(event.target === this) closeEditReadingModal()">
+        <div class="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden my-8" onclick="event.stopPropagation()">
+            <div class="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>✏️</span>
+                        <span>Edit Odometer Reading</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Update reading details. Leg distances will recalculate automatically.
+                    </p>
+                </div>
+                <button type="button" onclick="closeEditReadingModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center text-lg leading-none transition">
+                    &times;
+                </button>
+            </div>
+
+            <form id="edit-reading-form" action="" method="POST" enctype="multipart/form-data" class="p-5 sm:p-6 space-y-4">
+                @csrf
+                @method('PUT')
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                        <label for="edit_odometer_km" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Odometer (km) <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="number" step="0.1" name="odometer_km" id="edit_odometer_km" required
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label for="edit_reading_date" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Date <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="date" name="reading_date" id="edit_reading_date" required
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label for="edit_reading_time" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Time
+                        </label>
+                        <input type="time" name="reading_time" id="edit_reading_time"
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                        <label for="edit_trip_name" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Trip Name / Purpose
+                        </label>
+                        <input type="text" name="trip_name" id="edit_trip_name"
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label for="edit_source_location" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            From (Location)
+                        </label>
+                        <input type="text" name="source_location" id="edit_source_location"
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label for="edit_destination" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            To (Destination)
+                        </label>
+                        <input type="text" name="destination" id="edit_destination"
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label for="edit_duration_minutes" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Duration (Minutes)
+                        </label>
+                        <input type="number" name="duration_minutes" id="edit_duration_minutes" min="1" max="1440"
+                            class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label for="edit_odometer_image" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Replace Photo (Optional)
+                        </label>
+                        <input type="file" name="odometer_image" id="edit_odometer_image" accept="image/*"
+                            class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-950 dark:file:text-indigo-300">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="edit_notes" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Notes
+                    </label>
+                    <input type="text" name="notes" id="edit_notes"
+                        class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+                    <button type="button" onclick="closeEditReadingModal()"
+                        class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition cursor-pointer">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </x-app-layout>

@@ -65,6 +65,34 @@ class OdometerController extends Controller
             ?? 0
         );
 
+        // All readings for the CRUD table list with search and filter
+        $readingsQuery = OdometerReading::where('user_id', $user->id)
+            ->with(['group', 'vehicle']);
+
+        if ($request->filled('type')) {
+            $readingsQuery->where('reading_type', $request->type);
+        }
+
+        if ($request->filled('cycle_id')) {
+            $readingsQuery->where('odometer_group_id', $request->cycle_id);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $readingsQuery->where(function ($q) use ($search) {
+                $q->where('trip_name', 'like', "%{$search}%")
+                    ->orWhere('source_location', 'like', "%{$search}%")
+                    ->orWhere('destination', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
+
+        $allReadings = $readingsQuery->orderByDesc('reading_date')
+            ->orderByDesc('reading_time')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
         return view('odometer.index', compact(
             'activeGroup',
             'activeReadings',
@@ -76,7 +104,8 @@ class OdometerController extends Controller
             'totalKmLogged',
             'averageMileage',
             'bestMileage',
-            'latestOdometer'
+            'latestOdometer',
+            'allReadings'
         ));
     }
 
@@ -306,6 +335,63 @@ class OdometerController extends Controller
         $group->load(['readings', 'startFuelEntry', 'endFuelEntry', 'vehicle']);
 
         return view('odometer.show', compact('group'));
+    }
+
+    /**
+     * Update an existing odometer reading.
+     */
+    public function updateReading(Request $request, OdometerReading $reading, CloudinaryService $cloudinary): RedirectResponse
+    {
+        if ($reading->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'odometer_km' => 'required|numeric|min:0',
+            'reading_date' => 'required|date',
+            'reading_time' => 'nullable|string|max:10',
+            'trip_name' => 'nullable|string|max:150',
+            'source_location' => 'nullable|string|max:255',
+            'destination' => 'nullable|string|max:255',
+            'duration_minutes' => 'nullable|integer|min:1|max:1440',
+            'odometer_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:8192',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($request->hasFile('odometer_image')) {
+            $validated['odometer_image'] = $cloudinary->upload($request->file('odometer_image'), 'odometer');
+        }
+
+        if (! empty($validated['reading_time'])) {
+            $validated['reading_time'] = Carbon::parse($validated['reading_time'])->format('H:i:s');
+        }
+
+        $reading->update($validated);
+
+        if ($reading->group) {
+            $reading->group->recalculateSummary();
+        }
+
+        return back()->with('success', 'Reading updated successfully!');
+    }
+
+    /**
+     * Update cycle title or notes.
+     */
+    public function updateGroup(Request $request, OdometerGroup $group): RedirectResponse
+    {
+        if ($group->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'notes' => 'nullable|string',
+        ]);
+
+        $group->update($validated);
+
+        return back()->with('success', 'Cycle updated successfully!');
     }
 
     /**

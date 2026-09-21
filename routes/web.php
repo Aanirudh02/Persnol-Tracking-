@@ -175,7 +175,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/odometer', [OdometerController::class, 'index'])->name('odometer.index');
     Route::post('/odometer', [OdometerController::class, 'store'])->name('odometer.store');
     Route::get('/odometer/{group}', [OdometerController::class, 'show'])->name('odometer.show');
+    Route::put('/odometer/readings/{reading}', [OdometerController::class, 'updateReading'])->name('odometer.readings.update');
     Route::delete('/odometer/readings/{reading}', [OdometerController::class, 'destroyReading'])->name('odometer.readings.destroy');
+    Route::put('/odometer/groups/{group}', [OdometerController::class, 'updateGroup'])->name('odometer.groups.update');
     Route::delete('/odometer/groups/{group}', [OdometerController::class, 'destroyGroup'])->name('odometer.groups.destroy');
 
     // Mistakes & Lessons
