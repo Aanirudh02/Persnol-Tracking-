@@ -651,6 +651,9 @@ class ExpenseController extends Controller
         $registeredAmount = (float) $validated['amount'];
         $registeredGst = (float) ($validated['gst_amount'] ?? 0);
 
+        $cleanNotes = preg_replace('/(?:\r?\n)?Total bill:\s*₹?[^\r\n]+/i', '', $validated['notes'] ?? '');
+        $validated['notes'] = trim((string) $cleanNotes);
+
         if ($splitData !== null && $paidByFriends > 0) {
             $targetUserSpend = $hasExplicitShare && (float) ($splitData['my_share'] ?? 0) > 0
                 ? (float) $splitData['my_share']
@@ -674,8 +677,8 @@ class ExpenseController extends Controller
                     $friendPaidList[] = ($friend?->name ?? 'Friend').': ₹'.number_format($paidByFriends, 2);
                 }
                 $friendStr = ! empty($friendPaidList) ? implode(', ', $friendPaidList) : 'Friend: ₹'.number_format($paidByFriends, 2);
-                $cleanNotes = preg_replace('/(?:\r?\n)?Total bill:\s*₹?[^\r\n]+/i', '', $validated['notes'] ?? '');
-                $validated['notes'] = trim(trim((string) $cleanNotes)."\n".$payerNote);
+                $payerNote = 'Total bill: ₹'.number_format($totalBill, 2).' (You paid: ₹'.number_format($paidByMe ?? $registeredAmount, 2).', '.$friendStr.')';
+                $validated['notes'] = trim($validated['notes']."\n".$payerNote);
             }
         }
         $validated['amount'] = $registeredAmount;
@@ -822,20 +825,19 @@ class ExpenseController extends Controller
             }
         }
 
-        if ($request->boolean('record_as_combination')) {
-            $rawSplits = collect($request->input('splits', []))
-                ->filter(fn ($s) => ! empty($s['friend_id']) && (int) $s['friend_id'] > 0)
-                ->values();
-            $paidByMe = round((float) $request->input('split_paid_by_me_amount', 0), 2);
-            $friendsPaidTotal = $rawSplits->isNotEmpty()
-                ? round((float) $rawSplits->sum(fn ($s) => (float) ($s['paid_by_friend_amount'] ?? 0)), 2)
-                : round((float) $request->input('split_paid_by_friend_amount', 0), 2);
+        $rawSplits = collect($request->input('splits', []))
+            ->filter(fn ($s) => ! empty($s['friend_id']) && (int) $s['friend_id'] > 0)
+            ->values();
+        $paidByMe = round((float) $request->input('split_paid_by_me_amount', 0), 2);
+        $friendsPaidTotal = $rawSplits->isNotEmpty()
+            ? round((float) $rawSplits->sum(fn ($s) => (float) ($s['paid_by_friend_amount'] ?? 0)), 2)
+            : round((float) $request->input('split_paid_by_friend_amount', 0), 2);
 
-            $currentAmount = round((float) $request->input('amount', 0), 2);
-            if ($paidByMe > 0 && $friendsPaidTotal > 0) {
-                if (abs(($paidByMe + $friendsPaidTotal) - $currentAmount) > 0.05 && abs($paidByMe - $currentAmount) <= 0.05) {
-                    $request->merge(['amount' => round($paidByMe + $friendsPaidTotal, 2)]);
-                }
+        $currentAmount = round((float) $request->input('amount', 0), 2);
+        if ($friendsPaidTotal > 0) {
+            $totalPaid = round($paidByMe + $friendsPaidTotal, 2);
+            if ($currentAmount <= 0.05 || ($request->boolean('record_as_combination') && abs($totalPaid - $currentAmount) > 0.05 && abs($paidByMe - $currentAmount) <= 0.05)) {
+                $request->merge(['amount' => $totalPaid]);
             }
         }
 

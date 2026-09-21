@@ -537,8 +537,8 @@
             @foreach($splits as $s)
                 addFriendRow('{{ $s->friend_id }}', '{{ $s->friend_share }}', '{{ $s->paid_by_friend_amount }}');
             @endforeach
-        @elseif($expense->split_with_friend_id)
-            addFriendRow('{{ $expense->split_with_friend_id }}', '{{ $expense->split_friend_share }}', '{{ $expense->paid_by_type === "friend" ? $expense->totalAmount() : 0 }}');
+        @elseif($expense->split_with_friend_id || $expense->paid_by_friend_id)
+            addFriendRow('{{ $expense->split_with_friend_id ?: $expense->paid_by_friend_id }}', '{{ $expense->split_friend_share }}', '{{ $expense->paid_by_type === "friend" ? ($originalBillTotal ?: $expense->amount) : 0 }}');
         @endif
 
         if (isCombinationMode()) {

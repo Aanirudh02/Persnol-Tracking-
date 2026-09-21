@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\FamilyMember;
 use App\Models\PersonalExpense;
 use App\Models\PersonalExpenseCategory;
 use App\Models\PersonalExpenseGroup;
@@ -125,11 +126,16 @@ class PersonalExpenseController extends Controller
         }
 
         $paymentMethods = $options->names('payment_method');
+        $familyMembers = FamilyMember::query()
+            ->where('user_id', $user->id)
+            ->orderBy('name')
+            ->get();
 
         return view('finance.personal_expenses.index', compact(
             'expenses',
             'categories',
             'paymentMethods',
+            'familyMembers',
             'totalAmount',
             'monthAmount',
             'voluntaryAmount',

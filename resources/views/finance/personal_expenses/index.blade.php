@@ -100,12 +100,24 @@
 
                     <div>
                         <label class="block text-slate-400 mb-1">Done By</label>
-                        <input type="text" name="done_by" value="{{ request('done_by') }}" placeholder="e.g. Me" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                        <select name="done_by" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                            <option value="">All Payers</option>
+                            <option value="Me" {{ request('done_by') == 'Me' ? 'selected' : '' }}>Me</option>
+                            @foreach($familyMembers as $fm)
+                                <option value="{{ $fm->name }}" {{ request('done_by') == $fm->name ? 'selected' : '' }}>{{ $fm->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     <div>
                         <label class="block text-slate-400 mb-1">Done To</label>
-                        <input type="text" name="done_to" value="{{ request('done_to') }}" placeholder="e.g. Mom" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                        <select name="done_to" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
+                            <option value="">All Recipients</option>
+                            <option value="Me" {{ request('done_to') == 'Me' ? 'selected' : '' }}>Me</option>
+                            @foreach($familyMembers as $fm)
+                                <option value="{{ $fm->name }}" {{ request('done_to') == $fm->name ? 'selected' : '' }}>{{ $fm->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
                     <div>
@@ -514,11 +526,22 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Done By</label>
-                            <input type="text" name="done_by" id="personal-done-by-input" value="Me" placeholder="e.g. Me" class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                            <select name="done_by" id="personal-done-by-input" class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                                <option value="Me">Me</option>
+                                @foreach($familyMembers as $fm)
+                                    <option value="{{ $fm->name }}">{{ $fm->name }}{{ $fm->relationship ? ' ('.$fm->relationship.')' : '' }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Done To (Optional)</label>
-                            <input type="text" name="done_to" id="personal-done-to-input" placeholder="e.g. Mom, Brother, Self" class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                            <select name="done_to" id="personal-done-to-input" class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                                <option value="">None / Self</option>
+                                <option value="Me">Me (Self)</option>
+                                @foreach($familyMembers as $fm)
+                                    <option value="{{ $fm->name }}">{{ $fm->name }}{{ $fm->relationship ? ' ('.$fm->relationship.')' : '' }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
 
@@ -610,14 +633,36 @@
             modal.classList.remove('flex');
         }
 
+        function setSelectValueOrAdd(selectElement, val, defaultVal = '') {
+            if (!selectElement) return;
+            const targetVal = (val !== null && val !== undefined && val !== '') ? String(val).trim() : defaultVal;
+            if (!targetVal) {
+                selectElement.value = '';
+                return;
+            }
+            let found = false;
+            for (let i = 0; i < selectElement.options.length; i++) {
+                if (selectElement.options[i].value.toLowerCase() === targetVal.toLowerCase()) {
+                    selectElement.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && targetVal) {
+                const opt = new Option(targetVal, targetVal, true, true);
+                selectElement.add(opt);
+                selectElement.value = targetVal;
+            }
+        }
+
         function openPersonalModal() {
             document.getElementById('personal-modal-title').textContent = 'Add Personal Expense';
             document.getElementById('personal-expense-form').action = "{{ route('personal-expenses.store') }}";
             document.getElementById('personal-method-input').value = 'POST';
             document.getElementById('personal-amount-input').value = '';
             document.getElementById('personal-desc-input').value = '';
-            document.getElementById('personal-done-by-input').value = 'Me';
-            document.getElementById('personal-done-to-input').value = '';
+            setSelectValueOrAdd(document.getElementById('personal-done-by-input'), 'Me', 'Me');
+            setSelectValueOrAdd(document.getElementById('personal-done-to-input'), '', '');
             document.getElementById('personal-notes-input').value = '';
             document.getElementById('personal-date-input').value = "{{ date('Y-m-d') }}";
             document.getElementById('personal-time-input').value = "{{ date('H:i') }}";
@@ -645,8 +690,8 @@
             document.getElementById('personal-date-input').value = exp.date ? exp.date.substring(0, 10) : "{{ date('Y-m-d') }}";
             document.getElementById('personal-time-input').value = exp.time ? exp.time.substring(0, 5) : "{{ date('H:i') }}";
             document.getElementById('personal-desc-input').value = exp.description || '';
-            document.getElementById('personal-done-by-input').value = exp.done_by || 'Me';
-            document.getElementById('personal-done-to-input').value = exp.done_to || '';
+            setSelectValueOrAdd(document.getElementById('personal-done-by-input'), exp.done_by || 'Me', 'Me');
+            setSelectValueOrAdd(document.getElementById('personal-done-to-input'), exp.done_to || '', '');
             if (exp.payment_method) {
                 document.getElementById('personal-pm-input').value = exp.payment_method;
             }
