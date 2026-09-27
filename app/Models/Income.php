@@ -20,6 +20,7 @@ class Income extends Model
         'date',
         'time',
         'payment_method',
+        'tally_mode',
         'description',
         'notes',
         'is_locked',

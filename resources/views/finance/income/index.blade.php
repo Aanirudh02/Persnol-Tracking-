@@ -26,6 +26,7 @@
                                 <th class="py-3.5 px-4">Description</th>
                                 <th class="py-3.5 px-4">Amount</th>
                                 <th class="py-3.5 px-4">Method</th>
+                                <th class="py-3.5 px-4">Allocation / Tally</th>
                                 <th class="py-3.5 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -37,7 +38,17 @@
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->description ?? '--' }}</td>
                                     <td class="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400 text-sm whitespace-nowrap">₹{{ number_format($inc->amount, 2) }}</td>
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->payment_method }}</td>
-                                    <td class="py-3 px-4 text-right whitespace-nowrap">
+                                    <td class="py-3 px-4 whitespace-nowrap">
+                                        @if($inc->tally_mode === 'tally_current')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">Tally Current</span>
+                                        @elseif($inc->tally_mode === 'tally_future')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300">For Future</span>
+                                        @else
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300">Separate</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-4 text-right whitespace-nowrap space-x-2">
+                                        <a href="{{ route('income.edit', $inc) }}" class="text-indigo-600 hover:text-indigo-500 font-semibold cursor-pointer">Edit</a>
                                         <form action="{{ route('income.destroy', $inc) }}" method="POST" class="inline" onsubmit="return confirm('Delete this income record?');">
                                             @csrf
                                             @method('DELETE')

@@ -278,6 +278,7 @@
                                     </td>
                                     <td class="py-3 px-4 text-right whitespace-nowrap">
                                         @if($isGroup)
+                                            <button type="button" onclick="openAddExpensesToPersonalGroupModal('{{ $exp->personalExpenseGroup->id }}', @js($exp->personalExpenseGroup->name))" class="mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-pink-200 dark:border-pink-800 text-pink-600 hover:bg-pink-50 dark:hover:bg-slate-800 font-bold cursor-pointer" title="Add expenses to this group">+</button>
                                             <button type="button" onclick="openPersonalGroupNameModal('{{ $exp->personalExpenseGroup->id }}', @js($exp->personalExpenseGroup->name))" class="mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-pink-300 hover:text-pink-700 cursor-pointer" title="Edit group name">✎</button>
                                             @if(($status ?? 'active') === 'active')
                                                 <form action="{{ route('personal-expense-groups.destroy', $exp->personalExpenseGroup) }}" method="POST" class="inline" onsubmit="return confirm('Ungroup these expenses into individual rows?');">
@@ -323,7 +324,12 @@
                                                     <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                                                         <span>📋</span> Individual Entries in "{{ $exp->personalExpenseGroup->name }}" ({{ $groupExpenses->count() }})
                                                     </span>
-                                                    <span class="text-[11px] text-slate-400">Edit or detach any item directly</span>
+                                                    <div class="flex items-center gap-2">
+                                                        <button type="button" onclick="openAddExpensesToPersonalGroupModal('{{ $exp->personalExpenseGroup->id }}', @js($exp->personalExpenseGroup->name))" class="px-2.5 py-1 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-semibold text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
+                                                            <span>+</span> Add Expenses
+                                                        </button>
+                                                        <span class="text-[11px] text-slate-400">Edit or detach any item directly</span>
+                                                    </div>
                                                 </div>
                                                 <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xs">
                                                     <table class="w-full text-left text-xs">
@@ -469,6 +475,42 @@
             </div>
         </div>
 
+        <!-- ADD EXPENSES TO EXISTING PERSONAL GROUP MODAL (PULLS ACROSS ALL PAGES) -->
+        <div id="add-to-personal-group-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target === this) closeAddExpensesToPersonalGroupModal()">
+            <div class="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] flex flex-col" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span>➕</span> Add Personal Expenses to Group
+                        </h3>
+                        <p id="add-to-personal-group-sub" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"></p>
+                    </div>
+                    <button type="button" onclick="closeAddExpensesToPersonalGroupModal()" class="text-2xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">&times;</button>
+                </div>
+
+                <!-- Instant Search across all pages -->
+                <div class="relative">
+                    <input type="text" id="add-personal-group-search-input" oninput="debounceFetchPersonalGroupExpenses()" placeholder="Search unassigned personal expenses across all pages by name, date, category, amount..." class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                </div>
+
+                <!-- Form submitting to personal-expense-groups.expenses.attach -->
+                <form id="add-to-personal-group-form" action="" method="POST" class="flex-1 overflow-hidden flex flex-col space-y-3">
+                    @csrf
+                    <div id="add-personal-group-items-list" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px] max-h-[360px]">
+                        <div class="py-10 text-center text-slate-400 text-xs">Loading available unassigned personal expenses...</div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <span id="add-personal-group-selected-count" class="text-xs font-semibold text-slate-500">0 selected</span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="closeAddExpensesToPersonalGroupModal()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">Cancel</button>
+                            <button type="submit" id="add-personal-group-submit-btn" disabled class="px-4 py-2 rounded-xl bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-semibold text-xs transition cursor-pointer">Add to Group</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <!-- ADD/EDIT MODAL (VANILLA JS, NO OVERLAPPING) -->
         <div id="personal-expense-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target === this) closePersonalModal()">
             <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
@@ -487,8 +529,9 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
                         <select name="category_id" id="personal-category-input" required class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                            <option value="" disabled selected>-- Select Category --</option>
                             @foreach($categories as $cat)
-                                <option value="{{ $cat->id }}" {{ strcasecmp($cat->name, 'Me') === 0 ? 'selected' : '' }}>{{ $cat->name }}</option>
+                                <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -667,11 +710,7 @@
             document.getElementById('personal-date-input').value = "{{ date('Y-m-d') }}";
             document.getElementById('personal-time-input').value = "{{ date('H:i') }}";
             document.getElementById('personal-dual-input').checked = false;
-            
-            const meOption = Array.from(document.getElementById('personal-category-input').options).find(o => o.text.trim().toLowerCase() === 'me');
-            if (meOption) {
-                document.getElementById('personal-category-input').value = meOption.value;
-            }
+            document.getElementById('personal-category-input').value = '';
             
             const modal = document.getElementById('personal-expense-modal');
             modal.classList.remove('hidden');
@@ -707,6 +746,80 @@
             const modal = document.getElementById('personal-expense-modal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+        }
+
+        let currentActivePersonalGroupId = null;
+        let personalGroupFetchTimeout = null;
+
+        function openAddExpensesToPersonalGroupModal(groupId, groupName) {
+            currentActivePersonalGroupId = groupId;
+            document.getElementById('add-to-personal-group-sub').textContent = 'Target Group: ' + groupName;
+            document.getElementById('add-to-personal-group-form').action = '/personal-expense-groups/' + groupId + '/expenses/attach';
+            document.getElementById('add-personal-group-search-input').value = '';
+            document.getElementById('add-to-personal-group-modal').classList.remove('hidden');
+            document.getElementById('add-to-personal-group-modal').classList.add('flex');
+            fetchUnassignedPersonalGroupExpenses('');
+        }
+
+        function closeAddExpensesToPersonalGroupModal() {
+            document.getElementById('add-to-personal-group-modal').classList.add('hidden');
+            document.getElementById('add-to-personal-group-modal').classList.remove('flex');
+        }
+
+        function debounceFetchPersonalGroupExpenses() {
+            clearTimeout(personalGroupFetchTimeout);
+            personalGroupFetchTimeout = setTimeout(() => {
+                const q = document.getElementById('add-personal-group-search-input').value;
+                fetchUnassignedPersonalGroupExpenses(q);
+            }, 250);
+        }
+
+        function fetchUnassignedPersonalGroupExpenses(query) {
+            const list = document.getElementById('add-personal-group-items-list');
+            list.innerHTML = '<div class="py-10 text-center text-slate-400 text-xs">Searching unassigned personal expenses...</div>';
+            updatePersonalGroupSubmitState();
+
+            fetch('{{ route('personal-expense-groups.unassigned') }}?q=' + encodeURIComponent(query), {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(items => {
+                if (!items || items.length === 0) {
+                    list.innerHTML = '<div class="py-10 text-center text-slate-400 text-xs">No unassigned personal expenses found matching search.</div>';
+                    return;
+                }
+                list.innerHTML = items.map(item => `
+                    <label class="flex items-center justify-between p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-pink-50/60 dark:hover:bg-slate-800 cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" name="expense_ids[]" value="${item.id}" onchange="updatePersonalGroupSubmitState()" class="rounded border-slate-300 text-pink-600 focus:ring-pink-500">
+                            <div>
+                                <span class="font-bold text-xs text-slate-900 dark:text-white block">${item.description}</span>
+                                <div class="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                    <span>${item.date}</span>
+                                    <span>&bull;</span>
+                                    <span>${item.category}</span>
+                                    <span>&bull;</span>
+                                    <span class="font-semibold text-pink-700">${item.done_by}${item.done_to ? ' &rarr; ' + item.done_to : ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="font-extrabold text-sm text-pink-600 dark:text-pink-400">₹${item.amount}</span>
+                    </label>
+                `).join('');
+                updatePersonalGroupSubmitState();
+            })
+            .catch(err => {
+                list.innerHTML = '<div class="py-8 text-center text-rose-500 text-xs">Failed to load personal expenses. Please try again.</div>';
+            });
+        }
+
+        function updatePersonalGroupSubmitState() {
+            const checked = document.querySelectorAll('#add-personal-group-items-list input[type="checkbox"]:checked');
+            const count = checked.length;
+            const btn = document.getElementById('add-personal-group-submit-btn');
+            const label = document.getElementById('add-personal-group-selected-count');
+            if (btn) btn.disabled = count === 0;
+            if (label) label.textContent = count + ' selected';
         }
     </script>
 </x-app-layout>

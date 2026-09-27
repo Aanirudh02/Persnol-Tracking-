@@ -116,6 +116,33 @@
                     >{{ old('notes', $income->notes) }}</textarea>
                 </div>
 
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1.5">Tally / Allocation Option *</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <label class="relative flex flex-col p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40">
+                            <div class="flex items-center gap-2">
+                                <input type="radio" name="tally_mode" value="tally_current" {{ old('tally_mode', $income->tally_mode) === 'tally_current' ? 'checked' : '' }} class="text-emerald-600 focus:ring-emerald-500">
+                                <span class="font-bold text-slate-900 text-xs">Tally Current</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1">Offset against current expense</span>
+                        </label>
+                        <label class="relative flex flex-col p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-indigo-500 transition has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/40">
+                            <div class="flex items-center gap-2">
+                                <input type="radio" name="tally_mode" value="tally_future" {{ old('tally_mode', $income->tally_mode) === 'tally_future' ? 'checked' : '' }} class="text-indigo-600 focus:ring-indigo-500">
+                                <span class="font-bold text-slate-900 text-xs">Tally for Future</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1">Carry forward / reserve for future</span>
+                        </label>
+                        <label class="relative flex flex-col p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-slate-400 transition has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/30">
+                            <div class="flex items-center gap-2">
+                                <input type="radio" name="tally_mode" value="separate" {{ old('tally_mode', $income->tally_mode ?? 'separate') === 'separate' ? 'checked' : '' }} class="text-emerald-600 focus:ring-emerald-500">
+                                <span class="font-bold text-slate-900 text-xs">Have it Separate</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1">Independent standalone income</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="pt-2 flex items-center justify-end gap-3">
                     <a href="{{ route('income.index') }}" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-semibold shadow-sm transition active:scale-95">Save Changes</button>

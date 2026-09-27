@@ -53,6 +53,7 @@ class IncomeController extends Controller
             'date' => 'required|date',
             'time' => 'nullable',
             'payment_method' => 'required|string',
+            'tally_mode' => 'nullable|in:tally_current,tally_future,separate',
             'description' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
         ]);
@@ -65,12 +66,13 @@ class IncomeController extends Controller
         $income = Income::create([
             'user_id' => $request->user()->id,
             'daily_record_id' => $dailyRecord->id,
-            'category_id' => $validated['category_id'],
+            'category_id' => $validated['category_id'] ?? null,
             'amount' => $validated['amount'],
             'source' => $validated['source'],
             'date' => $validated['date'],
             'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
             'payment_method' => $validated['payment_method'],
+            'tally_mode' => $validated['tally_mode'] ?? 'separate',
             'description' => $validated['description'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -114,20 +116,31 @@ class IncomeController extends Controller
             'date' => 'required|date',
             'time' => 'nullable',
             'payment_method' => 'required|string',
+            'tally_mode' => 'nullable|in:tally_current,tally_future,separate',
             'description' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'reason' => 'nullable|string|max:255',
         ]);
 
-        $oldValues = $income->only(['amount', 'source', 'date', 'payment_method']);
-        $income->update($validated);
+        $oldValues = $income->only(['amount', 'source', 'date', 'payment_method', 'tally_mode']);
+        $income->update([
+            'amount' => $validated['amount'],
+            'category_id' => $validated['category_id'] ?? null,
+            'source' => $validated['source'],
+            'date' => $validated['date'],
+            'time' => $validated['time'] ?? $income->time,
+            'payment_method' => $validated['payment_method'],
+            'tally_mode' => $validated['tally_mode'] ?? 'separate',
+            'description' => $validated['description'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
 
         AuditService::log(
             module: 'income',
             recordId: $income->id,
             action: 'updated',
             oldValues: $oldValues,
-            newValues: $income->only(['amount', 'source', 'date', 'payment_method']),
+            newValues: $income->only(['amount', 'source', 'date', 'payment_method', 'tally_mode']),
             reason: $request->input('reason', 'Updated by user')
         );
 

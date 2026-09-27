@@ -102,6 +102,24 @@
                     <input type="text" name="description" placeholder="Optional notes" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white">
                 </div>
 
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Tally / Allocation Option</label>
+                    <div class="grid grid-cols-3 gap-2 text-center text-[11px]">
+                        <label class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50 dark:has-[:checked]:bg-emerald-950/30">
+                            <input type="radio" name="tally_mode" value="tally_current" class="sr-only">
+                            <span class="font-bold text-slate-800 dark:text-slate-200 block">Tally Current</span>
+                        </label>
+                        <label class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 dark:has-[:checked]:bg-indigo-950/30">
+                            <input type="radio" name="tally_mode" value="tally_future" class="sr-only">
+                            <span class="font-bold text-slate-800 dark:text-slate-200 block">For Future</span>
+                        </label>
+                        <label class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50 dark:has-[:checked]:bg-slate-700">
+                            <input type="radio" name="tally_mode" value="separate" checked class="sr-only">
+                            <span class="font-bold text-slate-800 dark:text-slate-200 block">Separate</span>
+                        </label>
+                    </div>
+                </div>
+
                 <button type="submit" class="w-full mt-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 transition">Save Income</button>
             </form>
 

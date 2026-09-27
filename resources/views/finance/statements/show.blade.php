@@ -97,6 +97,32 @@
                 </div>
             @endif
 
+            <!-- Personal Expense Done By & Done To Summary -->
+            @if($statement->isPersonal() && !empty($doneByBreakdown) && $doneByBreakdown->isNotEmpty())
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-pink-700 mb-3 flex items-center gap-1.5">
+                        <span>👤</span> Done By & Done To Breakdown
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        @foreach($doneByBreakdown as $doneByPerson => $personData)
+                            <div class="p-4 rounded-2xl bg-pink-50/70 border border-pink-100">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-800">Done by: <strong class="text-pink-700 font-extrabold">{{ $doneByPerson }}</strong></span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-white text-slate-500 font-semibold border border-pink-100">{{ $personData['count'] }} {{ Str::plural('item', $personData['count']) }}</span>
+                                </div>
+                                <div class="text-2xl font-black text-slate-900 mt-1.5">
+                                    ₹{{ number_format($personData['total'], 2) }}
+                                </div>
+                                <div class="mt-2 pt-2 border-t border-pink-200/60 text-[11px] text-slate-600 flex items-center gap-1">
+                                    <span class="font-semibold text-slate-500">Done to:</span>
+                                    <span class="font-bold text-pink-700">{{ $personData['done_to'] }}</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <!-- Line Items Table -->
             <div>
                 <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Statement Line Items</h3>
@@ -116,13 +142,22 @@
                             @forelse($items as $index => $item)
                                 @php
                                     $itemAmount = $statement->isNormal() ? $item->totalAmount() : (float) $item->amount;
-                                    $itemDate = $statement->isNormal() ? $item->date : ($item->expense_date ?? $item->created_at);
+                                    $itemDate = $statement->isNormal() ? $item->date : ($item->date ?? $item->created_at);
                                 @endphp
                                 <tr class="hover:bg-slate-50/70">
                                     <td class="py-3 px-4 text-slate-400 font-mono text-[10px]">{{ $index + 1 }}</td>
                                     <td class="py-3 px-4 font-mono text-slate-600 whitespace-nowrap">{{ $itemDate ? \Carbon\Carbon::parse($itemDate)->format('d M Y') : '-' }}</td>
                                     <td class="py-3 px-4">
                                         <span class="font-semibold text-slate-900">{{ $item->description ?: ($item->title ?? ($item->category?->name ?? 'Expense Item')) }}</span>
+                                        @if($statement->isPersonal())
+                                            <div class="flex items-center gap-2 mt-1 text-[11px]">
+                                                <span class="font-bold text-pink-700">Done by: {{ $item->done_by ?: 'Me' }}</span>
+                                                @if(!empty($item->done_to))
+                                                    <span class="text-slate-400">&bull;</span>
+                                                    <span class="font-medium text-slate-600">Done to: <strong class="font-bold text-slate-800">{{ $item->done_to }}</strong></span>
+                                                @endif
+                                            </div>
+                                        @endif
                                         @if(!empty($item->notes))
                                             @php
                                                 $rawNotes = $item->notes;

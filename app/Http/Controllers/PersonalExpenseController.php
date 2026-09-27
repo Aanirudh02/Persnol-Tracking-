@@ -11,6 +11,7 @@ use App\Models\PersonalExpenseCategory;
 use App\Models\PersonalExpenseGroup;
 use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -260,6 +261,64 @@ class PersonalExpenseController extends Controller
         });
 
         return redirect()->route('personal-expenses.index')->with('success', 'Personal expenses grouped successfully.');
+    }
+
+    public function unassignedExpenses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $q = trim((string) $request->input('q', ''));
+
+        $query = PersonalExpense::query()
+            ->where('user_id', $user->id)
+            ->whereNull('personal_expense_group_id')
+            ->where(fn ($sub) => $sub->whereNull('is_archived')->orWhere('is_archived', false))
+            ->with('category');
+
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q): void {
+                $sub->where('description', 'like', "%{$q}%")
+                    ->orWhere('amount', 'like', "%{$q}%")
+                    ->orWhere('done_by', 'like', "%{$q}%")
+                    ->orWhere('done_to', 'like', "%{$q}%")
+                    ->orWhere('payment_method', 'like', "%{$q}%")
+                    ->orWhereHas('category', fn ($c) => $c->where('name', 'like', "%{$q}%"));
+            });
+        }
+
+        $expenses = $query->orderByDesc('date')->orderByDesc('id')->take(60)->get();
+
+        return response()->json($expenses->map(fn ($exp) => [
+            'id' => $exp->id,
+            'description' => $exp->description ?: ($exp->category?->name ?? 'Personal Expense'),
+            'amount' => number_format((float) $exp->amount, 2),
+            'raw_amount' => (float) $exp->amount,
+            'date' => $exp->date->format('d M Y'),
+            'category' => $exp->category?->name ?? 'Personal',
+            'done_by' => $exp->done_by ?: 'Me',
+            'done_to' => $exp->done_to ?? '',
+            'payment_method' => $exp->payment_method ?: 'Cash',
+        ]));
+    }
+
+    public function attachExpenses(Request $request, PersonalExpenseGroup $personalExpenseGroup): RedirectResponse
+    {
+        abort_if($personalExpenseGroup->user_id !== $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'expense_ids' => 'required|array|min:1',
+            'expense_ids.*' => 'integer|exists:personal_expenses,id',
+        ]);
+
+        $expenses = PersonalExpense::query()
+            ->where('user_id', $request->user()->id)
+            ->whereIn('id', $validated['expense_ids'])
+            ->get();
+
+        DB::transaction(function () use ($personalExpenseGroup, $expenses): void {
+            $expenses->each->update(['personal_expense_group_id' => $personalExpenseGroup->id]);
+        });
+
+        return back()->with('success', count($expenses).' personal expense(s) added to group "'.$personalExpenseGroup->name.'".');
     }
 
     public function ungroup(Request $request, PersonalExpenseGroup $personalExpenseGroup): RedirectResponse

@@ -148,7 +148,7 @@ class StatementController extends Controller
             } else {
                 $q = PersonalExpense::query()->where('user_id', $user->id);
                 if ($startDate && $endDate) {
-                    $q->whereBetween('expense_date', [$startDate, $endDate]);
+                    $q->whereBetween('date', [$startDate, $endDate]);
                 }
                 if (! empty($validated['category_ids'])) {
                     $q->whereIn('category_id', $validated['category_ids']);
@@ -200,7 +200,7 @@ class StatementController extends Controller
                     ->where('user_id', $user->id)
                     ->whereIn('id', $ids)
                     ->with('category')
-                    ->orderByDesc('expense_date')
+                    ->orderByDesc('date')
                     ->get();
             }
         } else {
@@ -223,12 +223,12 @@ class StatementController extends Controller
                     ->where('created_at', '<=', $statement->created_at)
                     ->with('category');
                 if ($statement->start_date && $statement->end_date) {
-                    $q->whereBetween('expense_date', [$statement->start_date->toDateString(), $statement->end_date->toDateString()]);
+                    $q->whereBetween('date', [$statement->start_date->toDateString(), $statement->end_date->toDateString()]);
                 }
                 if (! empty($statement->category_ids)) {
                     $q->whereIn('category_id', $statement->category_ids);
                 }
-                $items = $q->orderByDesc('expense_date')->get();
+                $items = $q->orderByDesc('date')->get();
             }
         }
 
@@ -243,9 +243,24 @@ class StatementController extends Controller
                 ];
             });
 
+        // Personal expense Done By & Done To breakdown
+        $doneByBreakdown = collect();
+        if ($statement->isPersonal()) {
+            $doneByBreakdown = $items->groupBy(fn ($item) => $item->done_by ?: 'Me')
+                ->map(function ($group) {
+                    $doneToList = $group->pluck('done_to')->filter()->unique()->values();
+
+                    return [
+                        'count' => $group->count(),
+                        'total' => round($group->sum(fn ($i) => (float) $i->amount), 2),
+                        'done_to' => $doneToList->isNotEmpty() ? $doneToList->implode(', ') : 'Self',
+                    ];
+                });
+        }
+
         $allowStatementDeletion = (bool) Setting::getVal('allow_statement_deletion', true);
 
-        return view('finance.statements.show', compact('statement', 'items', 'categoryBreakdown', 'allowStatementDeletion'));
+        return view('finance.statements.show', compact('statement', 'items', 'categoryBreakdown', 'allowStatementDeletion', 'doneByBreakdown'));
     }
 
     public function update(Request $request, ExpenseStatement $statement): RedirectResponse

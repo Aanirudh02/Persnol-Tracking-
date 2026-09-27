@@ -78,10 +78,14 @@ class DailyPromptService
             }
         }
 
-        $nStart = Setting::getVal('night_prompt_start', '20:50');
-        $nEnd = Setting::getVal('night_prompt_end', '22:00');
+        $nStart = (string) Setting::getVal('night_prompt_start', '20:50');
+        $nEnd = (string) Setting::getVal('night_prompt_end', '22:00');
 
-        if ($currentTime >= $nStart && $currentTime <= $nEnd) {
+        $inNightWindow = $nStart <= $nEnd
+            ? ($currentTime >= $nStart && $currentTime <= $nEnd)
+            : ($currentTime >= $nStart || $currentTime <= $nEnd);
+
+        if ($inNightWindow) {
             if (! $dailyRecord->sleep_time && ! $dailyRecord->sleep_prompt_dismissed) {
                 $prompts[] = [
                     'id' => 'sleep',

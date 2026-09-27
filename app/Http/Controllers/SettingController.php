@@ -231,15 +231,38 @@ class SettingController extends Controller
                 continue;
             }
 
-            $storedValue = is_array($val) ? json_encode($val) : $val;
+            $storedValue = is_array($val) ? json_encode($val) : (string) $val;
+            $type = match (true) {
+                is_array($val) => 'json',
+                in_array($key, [
+                    'morning_prompt_start',
+                    'morning_prompt_end',
+                    'night_prompt_start',
+                    'night_prompt_end',
+                    'weekly_petrol_reminder_day',
+                    'weekly_petrol_reminder_time',
+                    'app_timezone',
+                    'app_currency',
+                    'currency_symbol',
+                ], true) => 'string',
+                in_array($key, [
+                    'food_default_expense_category_id',
+                    'snack_default_expense_category_id',
+                ], true) => 'integer',
+                default => 'boolean',
+            };
+
             if ($setting) {
-                $setting->update(['value' => $storedValue]);
+                $setting->update([
+                    'value' => $storedValue,
+                    'type' => $type,
+                ]);
             } elseif (in_array($key, $allowedForAll, true)) {
                 Setting::create([
                     'key' => $key,
                     'value' => $storedValue,
-                    'type' => is_array($val) ? 'json' : 'boolean',
-                    'group' => 'finance',
+                    'type' => $type,
+                    'group' => 'system',
                     'description' => $key,
                 ]);
             }

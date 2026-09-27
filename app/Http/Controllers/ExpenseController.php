@@ -489,6 +489,60 @@ class ExpenseController extends Controller
         return redirect()->route('expenses.index')->with('success', 'Expenses grouped successfully.');
     }
 
+    public function unassignedExpenses(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $q = trim((string) $request->input('q', ''));
+
+        $query = Expense::query()
+            ->where('user_id', $user->id)
+            ->whereNull('expense_group_id')
+            ->where(fn ($sub) => $sub->whereNull('is_archived')->orWhere('is_archived', false))
+            ->with('category');
+
+        if ($q !== '') {
+            $query->where(function ($sub) use ($q): void {
+                $sub->where('description', 'like', "%{$q}%")
+                    ->orWhere('amount', 'like', "%{$q}%")
+                    ->orWhere('payment_method', 'like', "%{$q}%")
+                    ->orWhereHas('category', fn ($c) => $c->where('name', 'like', "%{$q}%"));
+            });
+        }
+
+        $expenses = $query->orderByDesc('date')->orderByDesc('id')->take(60)->get();
+
+        return response()->json($expenses->map(fn ($exp) => [
+            'id' => $exp->id,
+            'description' => $exp->description ?: 'Expense',
+            'amount' => number_format($exp->totalAmount(), 2),
+            'raw_amount' => $exp->totalAmount(),
+            'date' => $exp->date->format('d M Y'),
+            'category' => $exp->category?->name ?? 'Uncategorized',
+            'payment_method' => $exp->payment_method ?: 'Cash',
+        ]));
+    }
+
+    public function attachExpenses(Request $request, ExpenseGroup $expenseGroup): RedirectResponse
+    {
+        abort_if($expenseGroup->user_id !== $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'expense_ids' => 'required|array|min:1',
+            'expense_ids.*' => 'integer|exists:expenses,id',
+        ]);
+
+        $expenses = Expense::query()
+            ->where('user_id', $request->user()->id)
+            ->whereIn('id', $validated['expense_ids'])
+            ->get();
+
+        DB::transaction(function () use ($expenseGroup, $expenses): void {
+            $expenses->each->update(['expense_group_id' => $expenseGroup->id]);
+        });
+
+        return back()->with('success', count($expenses).' expense(s) added to group "'.$expenseGroup->name.'".');
+    }
+
     public function ungroup(Request $request, ExpenseGroup $expenseGroup): RedirectResponse
     {
         if ($expenseGroup->user_id !== $request->user()->id) {

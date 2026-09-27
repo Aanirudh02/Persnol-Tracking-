@@ -376,6 +376,7 @@
                                     </td>
                                     <td class="py-3 px-4 text-right whitespace-nowrap">
                                         @if($isGroup)
+                                            <button type="button" onclick="openAddExpensesToGroupModal('{{ $exp->expenseGroup->id }}', @js($exp->expenseGroup->name))" class="mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-sky-200 dark:border-sky-800 text-sky-600 hover:bg-sky-50 dark:hover:bg-slate-800 font-bold cursor-pointer" title="Add expenses to this group">+</button>
                                             <button type="button" onclick="openGroupNameModal('{{ $exp->expenseGroup->id }}', @js($exp->expenseGroup->name))" class="mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-sky-300 hover:text-sky-700 cursor-pointer" title="Edit group name">✎</button>
                                             @if(($status ?? 'active') === 'active')
                                                 <form action="{{ route('expense-groups.destroy', $exp->expenseGroup) }}" method="POST" class="inline" onsubmit="return confirm('Ungroup these expenses into individual rows?');">
@@ -422,7 +423,12 @@
                                                     <span class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                                                         <span>📋</span> Individual Entries in "{{ $exp->expenseGroup->name }}" ({{ $groupExpenses->count() }})
                                                     </span>
-                                                    <span class="text-[11px] text-slate-400">Edit or detach any item directly</span>
+                                                    <div class="flex items-center gap-2">
+                                                        <button type="button" onclick="openAddExpensesToGroupModal('{{ $exp->expenseGroup->id }}', @js($exp->expenseGroup->name))" class="px-2.5 py-1 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
+                                                            <span>+</span> Add Expenses
+                                                        </button>
+                                                        <span class="text-[11px] text-slate-400">Edit or detach any item directly</span>
+                                                    </div>
                                                 </div>
                                                 <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xs">
                                                     <table class="w-full text-left text-xs">
@@ -513,6 +519,42 @@
                     @method('PUT')
                     <input id="group-name-input" type="text" name="name" required maxlength="255" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2.5 text-sm text-slate-900 dark:text-white">
                     <button type="submit" class="w-full rounded-xl bg-sky-600 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 cursor-pointer">Save group name</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ADD EXPENSES TO EXISTING GROUP MODAL (PULLS ACROSS ALL PAGES) -->
+        <div id="add-to-group-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target === this) closeAddExpensesToGroupModal()">
+            <div class="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] flex flex-col" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <span>➕</span> Add Expenses to Group
+                        </h3>
+                        <p id="add-to-group-sub" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5"></p>
+                    </div>
+                    <button type="button" onclick="closeAddExpensesToGroupModal()" class="text-2xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">&times;</button>
+                </div>
+
+                <!-- Instant Search across all pages -->
+                <div class="relative">
+                    <input type="text" id="add-group-search-input" oninput="debounceFetchGroupExpenses()" placeholder="Search unassigned expenses across all pages by name, date, category, amount..." class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-sky-500">
+                </div>
+
+                <!-- Form submitting to expense-groups.expenses.attach -->
+                <form id="add-to-group-form" action="" method="POST" class="flex-1 overflow-hidden flex flex-col space-y-3">
+                    @csrf
+                    <div id="add-group-items-list" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px] max-h-[360px]">
+                        <div class="py-10 text-center text-slate-400 text-xs">Loading available unassigned expenses...</div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <span id="add-group-selected-count" class="text-xs font-semibold text-slate-500">0 selected</span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="closeAddExpensesToGroupModal()" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">Cancel</button>
+                            <button type="submit" id="add-group-submit-btn" disabled class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold text-xs transition cursor-pointer">Add to Group</button>
+                        </div>
+                    </div>
                 </form>
             </div>
         </div>
@@ -820,6 +862,80 @@
                     results.classList.remove('hidden');
                     document.getElementById('calc-breakdown-list').innerHTML = '<div class="text-rose-500 text-xs py-4 text-center">Failed to load calculations. Please try again.</div>';
                 });
+        }
+
+        let currentActiveGroupId = null;
+        let groupFetchTimeout = null;
+
+        function openAddExpensesToGroupModal(groupId, groupName) {
+            currentActiveGroupId = groupId;
+            document.getElementById('add-to-group-sub').textContent = 'Target Group: ' + groupName;
+            document.getElementById('add-to-group-form').action = '/expense-groups/' + groupId + '/expenses/attach';
+            document.getElementById('add-group-search-input').value = '';
+            document.getElementById('add-to-group-modal').classList.remove('hidden');
+            document.getElementById('add-to-group-modal').classList.add('flex');
+            fetchUnassignedGroupExpenses('');
+        }
+
+        function closeAddExpensesToGroupModal() {
+            document.getElementById('add-to-group-modal').classList.add('hidden');
+            document.getElementById('add-to-group-modal').classList.remove('flex');
+        }
+
+        function debounceFetchGroupExpenses() {
+            clearTimeout(groupFetchTimeout);
+            groupFetchTimeout = setTimeout(() => {
+                const q = document.getElementById('add-group-search-input').value;
+                fetchUnassignedGroupExpenses(q);
+            }, 250);
+        }
+
+        function fetchUnassignedGroupExpenses(query) {
+            const list = document.getElementById('add-group-items-list');
+            list.innerHTML = '<div class="py-10 text-center text-slate-400 text-xs">Searching unassigned expenses...</div>';
+            updateGroupSubmitState();
+
+            fetch('{{ route('expense-groups.unassigned') }}?q=' + encodeURIComponent(query), {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(items => {
+                if (!items || items.length === 0) {
+                    list.innerHTML = '<div class="py-10 text-center text-slate-400 text-xs">No unassigned expenses found matching search.</div>';
+                    return;
+                }
+                list.innerHTML = items.map(item => `
+                    <label class="flex items-center justify-between p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-sky-50/60 dark:hover:bg-slate-800 cursor-pointer transition">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" name="expense_ids[]" value="${item.id}" onchange="updateGroupSubmitState()" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                            <div>
+                                <span class="font-bold text-xs text-slate-900 dark:text-white block">${item.description}</span>
+                                <div class="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
+                                    <span>${item.date}</span>
+                                    <span>&bull;</span>
+                                    <span>${item.category}</span>
+                                    <span>&bull;</span>
+                                    <span>${item.payment_method}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <span class="font-extrabold text-sm text-slate-900 dark:text-white">₹${item.amount}</span>
+                    </label>
+                `).join('');
+                updateGroupSubmitState();
+            })
+            .catch(err => {
+                list.innerHTML = '<div class="py-8 text-center text-rose-500 text-xs">Failed to load expenses. Please try again.</div>';
+            });
+        }
+
+        function updateGroupSubmitState() {
+            const checked = document.querySelectorAll('#add-group-items-list input[type="checkbox"]:checked');
+            const count = checked.length;
+            const btn = document.getElementById('add-group-submit-btn');
+            const label = document.getElementById('add-group-selected-count');
+            if (btn) btn.disabled = count === 0;
+            if (label) label.textContent = count + ' selected';
         }
     </script>
 </x-app-layout>

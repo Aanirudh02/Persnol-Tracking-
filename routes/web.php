@@ -67,6 +67,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/all-expenses', [AllExpensesController::class, 'index'])->name('all-expenses.index');
 
         // Personal Expenses
+        Route::get('/personal-expense-groups/unassigned-expenses', [PersonalExpenseController::class, 'unassignedExpenses'])->name('personal-expense-groups.unassigned');
+        Route::post('/personal-expense-groups/{personalExpenseGroup}/expenses/attach', [PersonalExpenseController::class, 'attachExpenses'])->name('personal-expense-groups.expenses.attach');
         Route::post('/personal-expenses/{personalExpense}/convert-to-normal', [PersonalExpenseController::class, 'convertToNormal'])->name('personal-expenses.convert-to-normal');
         Route::post('/personal-expenses/group', [PersonalExpenseController::class, 'group'])->name('personal-expenses.group');
         Route::put('/personal-expense-groups/{personalExpenseGroup}', [PersonalExpenseController::class, 'renameGroup'])->name('personal-expense-groups.update');
@@ -80,6 +82,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('statements', StatementController::class)->names('statements');
 
         // Expenses
+        Route::get('/expense-groups/unassigned-expenses', [ExpenseController::class, 'unassignedExpenses'])->name('expense-groups.unassigned');
+        Route::post('/expense-groups/{expenseGroup}/expenses/attach', [ExpenseController::class, 'attachExpenses'])->name('expense-groups.expenses.attach');
         Route::get('/expenses/breakdown', [ExpenseController::class, 'breakdown'])->name('expenses.breakdown');
         Route::get('/expenses/calculate-category', [ExpenseController::class, 'calculateByCategory'])->name('expenses.calculate-category');
         Route::resource('expenses', ExpenseController::class)->withTrashed(['show', 'edit', 'update', 'restore', 'destroy'])->names('expenses');

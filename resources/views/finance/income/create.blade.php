@@ -51,8 +51,30 @@
                 </div>
 
                 <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Notes</label>
-                    <textarea name="notes" rows="2" placeholder="Any special notes..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"></textarea>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Tally / Allocation Option *</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <label class="relative flex flex-col p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/40 dark:has-[:checked]:bg-emerald-950/20">
+                            <div class="flex items-center gap-2">
+                                <input type="radio" name="tally_mode" value="tally_current" {{ old('tally_mode') === 'tally_current' ? 'checked' : '' }} class="text-emerald-600 focus:ring-emerald-500">
+                                <span class="font-bold text-slate-900 dark:text-white text-xs">Tally Current</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1">Offset against current expense</span>
+                        </label>
+                        <label class="relative flex flex-col p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:border-indigo-500 transition has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50/40 dark:has-[:checked]:bg-indigo-950/20">
+                            <div class="flex items-center gap-2">
+                                <input type="radio" name="tally_mode" value="tally_future" {{ old('tally_mode') === 'tally_future' ? 'checked' : '' }} class="text-indigo-600 focus:ring-indigo-500">
+                                <span class="font-bold text-slate-900 dark:text-white text-xs">Tally for Future</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1">Carry forward / reserve for future</span>
+                        </label>
+                        <label class="relative flex flex-col p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 cursor-pointer hover:border-slate-400 transition has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/30 dark:has-[:checked]:bg-slate-800">
+                            <div class="flex items-center gap-2">
+                                <input type="radio" name="tally_mode" value="separate" {{ old('tally_mode', 'separate') === 'separate' ? 'checked' : '' }} class="text-emerald-600 focus:ring-emerald-500">
+                                <span class="font-bold text-slate-900 dark:text-white text-xs">Have it Separate</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1">Independent standalone income</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="pt-2">
