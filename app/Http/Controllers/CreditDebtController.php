@@ -499,7 +499,7 @@ class CreditDebtController extends Controller
             $creditDebt->amount_paid = (float) $creditDebt->payments()->sum('amount');
             $creditDebt->status = 'fully_paid';
             $creditDebt->fully_paid_at = Carbon::now();
-            $ifNote = $validated['notes'] ? "\nSettlement Note: ".$validated['notes'] : '';
+            $ifNote = ! empty($validated['notes']) ? "\nSettlement Note: ".$validated['notes'] : '';
             $creditDebt->notes = trim(($creditDebt->notes ?? '').$ifNote);
             $creditDebt->save();
         });

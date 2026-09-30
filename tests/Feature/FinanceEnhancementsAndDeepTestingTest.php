@@ -203,6 +203,31 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         $this->assertEquals(150.0, (float) $credit->amount_paid);
         $this->assertEquals(50.0, (float) $credit->settled_discount_amount);
         $this->assertStringContainsString('Settlement Note', $credit->notes);
+
+        // Test settling with 0 payment and no notes field submitted (exact Render scenario)
+        $credit2 = CreditDebt::create([
+            'user_id' => $user->id,
+            'friend_id' => $friend->id,
+            'type' => 'credit',
+            'amount' => 200,
+            'amount_paid' => 150,
+            'status' => 'partially_paid',
+            'date' => '2026-09-30',
+            'description' => 'Remaining 50 forgiven',
+            'source' => 'manual',
+        ]);
+
+        $response2 = $this->actingAs($user)->post(route('credits.settle-discounted', $credit2), [
+            'settled_amount' => 0,
+            'discount_amount' => 50,
+            'paid_on' => '2026-09-30',
+        ]);
+
+        $response2->assertRedirect();
+        $credit2->refresh();
+        $this->assertSame('fully_paid', $credit2->status);
+        $this->assertTrue((bool) $credit2->is_settled_discounted);
+        $this->assertEquals(50.0, (float) $credit2->settled_discount_amount);
     }
 
     public function test_savings_module_full_lifecycle(): void
