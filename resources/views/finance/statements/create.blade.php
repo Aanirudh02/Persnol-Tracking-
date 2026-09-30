@@ -123,11 +123,14 @@
                         </div>
 
                         <!-- Normal Categories Grid -->
-                        <div id="create-normal-cats" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
+                        <div id="create-normal-cats" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
                             @foreach($normalCategories as $nCat)
                                 <label class="cat-card flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 cursor-pointer text-xs transition select-none">
                                     <input type="checkbox" name="category_ids[]" value="{{ $nCat->id }}" data-name="{{ strtolower($nCat->name) }}" onchange="updateSelectedCount()" class="cat-checkbox rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer">
-                                    <span class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ $nCat->name }}</span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ $nCat->name }}</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">{{ $nCat->expenses_count ?? 0 }} items · ₹{{ number_format((float) ($nCat->expenses_sum_amount ?? 0), 2) }}</div>
+                                    </div>
                                 </label>
                             @endforeach
                             <div id="no-normal-cats-match" class="hidden col-span-full py-4 text-center text-xs text-slate-400">
@@ -136,12 +139,15 @@
                         </div>
 
                         <!-- Personal Categories Grid -->
-                        <div id="create-personal-cats" class="hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-1">
+                        <div id="create-personal-cats" class="hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
                             @foreach($personalCategories as $pCat)
                                 <label class="cat-card flex items-center gap-2.5 p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-pink-300 dark:hover:border-pink-800 cursor-pointer text-xs transition select-none">
                                     <input type="checkbox" name="category_ids[]" value="{{ $pCat->id }}" data-name="{{ strtolower($pCat->name) }}" onchange="updateSelectedCount()" class="cat-checkbox rounded border-slate-300 text-pink-600 focus:ring-pink-500 cursor-pointer">
                                     <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: {{ $pCat->color ?? '#ec4899' }}"></span>
-                                    <span class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ $pCat->name }}</span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-medium text-slate-800 dark:text-slate-200 truncate">{{ $pCat->name }}</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">{{ $pCat->personal_expenses_count ?? 0 }} items · ₹{{ number_format((float) ($pCat->personal_expenses_sum_amount ?? 0), 2) }}</div>
+                                    </div>
                                 </label>
                             @endforeach
                             <div id="no-personal-cats-match" class="hidden col-span-full py-4 text-center text-xs text-slate-400">
@@ -382,6 +388,17 @@
             setCreateStatementType('personal');
         @else
             updateSelectedCount();
+        @endif
+
+        @if(request('category_id'))
+            document.getElementById('category-mode-select').value = 'manual';
+            onCategoryModeChange('manual');
+            selectAllCategories(false);
+            const specificCb = document.querySelector(`input[name="category_ids[]"][value="{{ request('category_id') }}"]`);
+            if (specificCb) {
+                specificCb.checked = true;
+                updateSelectedCount();
+            }
         @endif
     </script>
 </x-app-layout>

@@ -46,6 +46,10 @@
                                             <a href="{{ route('income.show', $inc) }}" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100">
                                                 ₹{{ number_format($tallied, 0) }} Tallied
                                             </a>
+                                        @elseif($inc->tally_mode === 'separate')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                                Standalone
+                                            </span>
                                         @else
                                             <a href="{{ route('income.show', $inc) }}" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200">
                                                 + Tally Expenses
@@ -53,7 +57,9 @@
                                         @endif
                                     </td>
                                     <td class="py-3 px-4 text-right whitespace-nowrap space-x-2">
-                                        <a href="{{ route('income.show', $inc) }}" class="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer">Tally</a>
+                                        @if($inc->tally_mode !== 'separate' || $tallied > 0)
+                                            <a href="{{ route('income.show', $inc) }}" class="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer">Tally</a>
+                                        @endif
                                         <a href="{{ route('income.edit', $inc) }}" class="text-indigo-600 hover:text-indigo-500 font-semibold cursor-pointer">Edit</a>
                                         <form action="{{ route('income.destroy', $inc) }}" method="POST" class="inline" onsubmit="return confirm('Delete this income record?');">
                                             @csrf

@@ -33,8 +33,18 @@ class StatementController extends Controller
             ->latest()
             ->get();
 
-        $normalCategories = ExpenseCategory::query()->orderBy('name')->get();
-        $personalCategories = PersonalExpenseCategory::query()->where('is_archived', false)->orderBy('name')->get();
+        $normalCategories = ExpenseCategory::query()
+            ->withCount(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')])
+            ->withSum(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')], 'amount')
+            ->orderBy('name')
+            ->get();
+
+        $personalCategories = PersonalExpenseCategory::query()
+            ->where('is_archived', false)
+            ->withCount(['personalExpenses' => fn ($q) => $q->where('user_id', $user->id)])
+            ->withSum(['personalExpenses' => fn ($q) => $q->where('user_id', $user->id)], 'amount')
+            ->orderBy('name')
+            ->get();
 
         // Sample expenses for custom picker dialogs
         $recentNormalExpenses = Expense::query()
@@ -71,8 +81,18 @@ class StatementController extends Controller
         $user = $request->user();
         $type = $request->get('type', 'normal');
 
-        $normalCategories = ExpenseCategory::query()->orderBy('name')->get();
-        $personalCategories = PersonalExpenseCategory::query()->where('is_archived', false)->orderBy('name')->get();
+        $normalCategories = ExpenseCategory::query()
+            ->withCount(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')])
+            ->withSum(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')], 'amount')
+            ->orderBy('name')
+            ->get();
+
+        $personalCategories = PersonalExpenseCategory::query()
+            ->where('is_archived', false)
+            ->withCount(['personalExpenses' => fn ($q) => $q->where('user_id', $user->id)])
+            ->withSum(['personalExpenses' => fn ($q) => $q->where('user_id', $user->id)], 'amount')
+            ->orderBy('name')
+            ->get();
 
         $recentNormalExpenses = Expense::query()
             ->where('user_id', $user->id)

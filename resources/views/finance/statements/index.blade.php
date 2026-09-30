@@ -66,6 +66,35 @@
 
         <!-- Normal Statements Tab Content -->
         <div id="tab-content-normal" class="space-y-4">
+            <!-- Category Quick Statement Generator -->
+            @if($normalCategories->isNotEmpty())
+                <div class="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🏷️</span>
+                            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Classify by Normal Category & Take Statement</h2>
+                        </div>
+                        <a href="{{ route('statements.create', ['type' => 'normal']) }}" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+                            + Custom Statement &rarr;
+                        </a>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        @foreach($normalCategories as $nCat)
+                            <a href="{{ route('statements.create', ['type' => 'normal', 'category_id' => $nCat->id]) }}" class="group flex flex-col justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 hover:shadow-xs transition cursor-pointer">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 transition">{{ $nCat->name }}</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">{{ $nCat->expenses_count ?? 0 }} items</div>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                    <span>₹{{ number_format((float) ($nCat->expenses_sum_amount ?? 0), 0) }}</span>
+                                    <span class="text-[10px] text-indigo-600 opacity-0 group-hover:opacity-100 transition">&rarr;</span>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @if($normalStatements->isEmpty())
                 <div class="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center shadow-sm">
                     <div class="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
@@ -117,6 +146,38 @@
 
         <!-- Personal Statements Tab Content -->
         <div id="tab-content-personal" class="hidden space-y-4">
+            <!-- Category Quick Statement Generator -->
+            @if($personalCategories->isNotEmpty())
+                <div class="rounded-3xl border border-pink-100 dark:border-pink-950/40 bg-white dark:bg-slate-900 p-5 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-base">🛍️</span>
+                            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Classify by Personal Category & Take Statement</h2>
+                        </div>
+                        <a href="{{ route('statements.create', ['type' => 'personal']) }}" class="text-xs font-bold text-pink-600 dark:text-pink-400 hover:underline">
+                            + Custom Personal Statement &rarr;
+                        </a>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        @foreach($personalCategories as $pCat)
+                            <a href="{{ route('statements.create', ['type' => 'personal', 'category_id' => $pCat->id]) }}" class="group flex flex-col justify-between p-3 rounded-2xl border border-pink-50 dark:border-pink-950/30 bg-pink-50/30 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 hover:border-pink-300 hover:shadow-xs transition cursor-pointer">
+                                <div>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {{ $pCat->color ?? '#ec4899' }}"></span>
+                                        <div class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-pink-600 transition">{{ $pCat->name }}</div>
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">{{ $pCat->personal_expenses_count ?? 0 }} items</div>
+                                </div>
+                                <div class="mt-2 flex items-center justify-between pt-1 border-t border-pink-100 dark:border-pink-950/40 text-[11px] font-bold text-pink-700 dark:text-pink-300">
+                                    <span>₹{{ number_format((float) ($pCat->personal_expenses_sum_amount ?? 0), 0) }}</span>
+                                    <span class="text-[10px] text-pink-600 opacity-0 group-hover:opacity-100 transition">&rarr;</span>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             @if($personalStatements->isEmpty())
                 <div class="rounded-3xl border border-pink-100 dark:border-pink-950/40 bg-white dark:bg-slate-900 p-12 text-center shadow-sm">
                     <div class="w-14 h-14 rounded-2xl bg-pink-50 dark:bg-pink-950/40 text-pink-600 flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
