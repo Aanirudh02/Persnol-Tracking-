@@ -31,6 +31,7 @@ class CreditDebt extends Model
         'settled_discount_amount',
         'is_settled_discounted',
         'linked_expense_id',
+        'linked_personal_expense_id',
         'linked_income_id',
     ];
 
@@ -47,6 +48,11 @@ class CreditDebt extends Model
     public function linkedExpense(): BelongsTo
     {
         return $this->belongsTo(Expense::class, 'linked_expense_id');
+    }
+
+    public function linkedPersonalExpense(): BelongsTo
+    {
+        return $this->belongsTo(PersonalExpense::class, 'linked_personal_expense_id');
     }
 
     public function linkedIncome(): BelongsTo

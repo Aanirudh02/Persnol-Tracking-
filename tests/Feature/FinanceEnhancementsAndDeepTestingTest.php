@@ -230,6 +230,64 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         $this->assertEquals(50.0, (float) $credit2->settled_discount_amount);
     }
 
+    public function test_credit_can_be_filed_as_personal_expense_and_renders_warning_if_deleted(): void
+    {
+        $user = $this->createAdminUser();
+        $friend = Friend::create([
+            'user_id' => $user->id,
+            'name' => 'Divakar',
+            'role' => 'Friend',
+        ]);
+
+        $credit = CreditDebt::create([
+            'user_id' => $user->id,
+            'friend_id' => $friend->id,
+            'type' => 'credit',
+            'amount' => 200,
+            'amount_paid' => 150,
+            'status' => 'partially_paid',
+            'date' => '2026-09-28',
+            'description' => 'Review lunch',
+            'source' => 'manual',
+        ]);
+
+        $category = PersonalExpenseCategory::create([
+            'name' => 'Food & Dining',
+            'user_id' => $user->id,
+        ]);
+
+        // File as personal expense
+        $response = $this->actingAs($user)->post(route('credits.record-as-personal-expense', $credit), [
+            'amount' => 150,
+            'date' => '2026-09-28',
+            'category_id' => $category->id,
+            'classification' => 'necessary',
+            'payment_method' => 'UPI',
+        ]);
+
+        $response->assertRedirect();
+        $credit->refresh();
+        $this->assertNotNull($credit->linked_personal_expense_id);
+
+        $personalExpense = PersonalExpense::find($credit->linked_personal_expense_id);
+        $this->assertNotNull($personalExpense);
+        $this->assertEquals('2026-09-28', $personalExpense->date->toDateString());
+        $this->assertEquals(150.0, (float) $personalExpense->amount);
+
+        // View index - verify it shows "Recorded as Personal Expense"
+        $indexResponse = $this->actingAs($user)->get(route('credits.index', ['type' => 'credit']));
+        $indexResponse->assertOk();
+        $indexResponse->assertSee('Recorded as Personal Expense');
+
+        // Delete the personal expense to simulate user deleting the expense
+        $personalExpense->delete();
+
+        // View index again - verify warning badge is shown
+        $indexResponseAfterDelete = $this->actingAs($user)->get(route('credits.index', ['type' => 'credit']));
+        $indexResponseAfterDelete->assertOk();
+        $indexResponseAfterDelete->assertSee('was deleted!');
+    }
+
     public function test_savings_module_full_lifecycle(): void
     {
         $user = $this->createAdminUser();

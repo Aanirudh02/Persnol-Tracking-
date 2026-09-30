@@ -83,8 +83,11 @@ return new class extends Migration
             if (! Schema::hasColumn('credit_debts', 'linked_expense_id')) {
                 $table->foreignId('linked_expense_id')->nullable()->after('is_settled_discounted')->constrained('expenses')->nullOnDelete();
             }
+            if (! Schema::hasColumn('credit_debts', 'linked_personal_expense_id')) {
+                $table->foreignId('linked_personal_expense_id')->nullable()->after('linked_expense_id')->constrained('personal_expenses')->nullOnDelete();
+            }
             if (! Schema::hasColumn('credit_debts', 'linked_income_id')) {
-                $table->foreignId('linked_income_id')->nullable()->after('linked_expense_id')->constrained('incomes')->nullOnDelete();
+                $table->foreignId('linked_income_id')->nullable()->after('linked_personal_expense_id')->constrained('incomes')->nullOnDelete();
             }
         });
     }

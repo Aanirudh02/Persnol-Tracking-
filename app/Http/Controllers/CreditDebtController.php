@@ -34,7 +34,7 @@ class CreditDebtController extends Controller
         $items = CreditDebt::query()
             ->where('user_id', $request->user()->id)
             ->where('type', $type)
-            ->with(['friend', 'payments'])
+            ->with(['friend', 'payments', 'linkedExpense', 'linkedPersonalExpense'])
             ->orderByDesc('date')
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -405,6 +405,7 @@ class CreditDebtController extends Controller
                 ]);
             }
 
+            $creditDebt->linked_personal_expense_id = $personalExpense->id;
             $this->refreshCreditDebtAmounts($creditDebt);
         });
 
