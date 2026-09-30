@@ -68,6 +68,18 @@
             <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">
                 Payments & Reconcile
             </x-nav-link>
+            <x-nav-link href="{{ route('savings.index') }}" :active="request()->routeIs('savings.*')" icon="trending-up">
+                Savings & Funds
+            </x-nav-link>
+            <x-nav-link href="{{ route('daily-balances.index') }}" :active="request()->routeIs('daily-balances.*')" icon="layers">
+                Daily Cash Register
+            </x-nav-link>
+            <x-nav-link href="{{ route('credits.index', ['type' => 'credit']) }}" :active="request()->routeIs('credits.*') && request('type', 'credit') === 'credit'" icon="users">
+                Credits (I owe)
+            </x-nav-link>
+            <x-nav-link href="{{ route('credits.index', ['type' => 'debt']) }}" :active="request()->routeIs('credits.*') && request('type') === 'debt'" icon="users">
+                Debts (owe me)
+            </x-nav-link>
             <x-nav-link href="{{ route('friends.index') }}" :active="request()->routeIs('friends.*')" icon="users">
                 Friends & Splits
             </x-nav-link>

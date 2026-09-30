@@ -7,11 +7,13 @@
             </div>
 
             <div class="flex flex-wrap gap-2 text-xs">
-                <a href="{{ route('expenses.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700">Expenses</a>
-                <a href="{{ route('income.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700">Income</a>
-                <a href="{{ route('payments.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700">Payments</a>
-                <a href="{{ route('friends.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700">Friends & Splits</a>
-                <a href="{{ route('settings.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700">Settings</a>
+                <a href="{{ route('expenses.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Expenses</a>
+                <a href="{{ route('income.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Income</a>
+                <a href="{{ route('savings.index') }}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 font-bold text-emerald-800 hover:bg-emerald-100">🏦 Savings & Funds</a>
+                <a href="{{ route('daily-balances.index') }}" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 font-bold text-amber-800 hover:bg-amber-100">🧾 Daily Cash Register</a>
+                <a href="{{ route('payments.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Payments</a>
+                <a href="{{ route('friends.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Friends & Splits</a>
+                <a href="{{ route('settings.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Settings</a>
             </div>
         </div>
 

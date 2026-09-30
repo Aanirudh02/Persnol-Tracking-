@@ -242,6 +242,85 @@
                     </div>
                 </div>
             </div>
+        <!-- 2.8 SAVINGS, INCOME TALLY SURPLUS & DAILY CASH REGISTER -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <!-- Savings Card -->
+            <div class="p-4 rounded-3xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-slate-900 dark:to-slate-900 border border-emerald-200/80 dark:border-emerald-800/60 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-emerald-950 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🏦</span> Total Savings Fund
+                        </span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/80 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+                            Available
+                        </span>
+                    </div>
+                    <div class="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-2">
+                        ₹{{ number_format($totalSavingsAvailable, 2) }}
+                    </div>
+                    <p class="text-[11px] text-emerald-800/80 dark:text-emerald-400/80 mt-0.5">
+                        Net reserves allocated across all savings goals
+                    </p>
+                </div>
+                <div class="pt-3 mt-3 border-t border-emerald-100 dark:border-emerald-900/50">
+                    <a href="{{ route('savings.index') }}" class="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200 flex items-center justify-between">
+                        <span>Manage Savings & Funds</span>
+                        <span>&rarr;</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Income Surplus Card -->
+            <div class="p-4 rounded-3xl bg-gradient-to-br from-indigo-50 via-sky-50/40 to-white dark:from-indigo-950/40 dark:via-slate-900 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-800/60 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-indigo-950 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📈</span> Income Surplus
+                        </span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-200/80 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                            Untallied
+                        </span>
+                    </div>
+                    <div class="text-2xl font-black text-indigo-700 dark:text-indigo-400 mt-2">
+                        ₹{{ number_format($totalIncomeSurplus, 2) }}
+                    </div>
+                    <p class="text-[11px] text-indigo-800/80 dark:text-indigo-400/80 mt-0.5">
+                        Income remaining after all expense tallies
+                    </p>
+                </div>
+                <div class="pt-3 mt-3 border-t border-indigo-100 dark:border-indigo-900/50">
+                    <a href="{{ route('income.index') }}" class="text-xs font-bold text-indigo-700 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-200 flex items-center justify-between">
+                        <span>Income & Expense Tally</span>
+                        <span>&rarr;</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Daily Cash Register Card -->
+            <div class="p-4 rounded-3xl bg-gradient-to-br from-amber-50 via-orange-50/40 to-white dark:from-amber-950/40 dark:via-slate-900 dark:to-slate-900 border border-amber-200/80 dark:border-amber-800/60 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-amber-950 dark:text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🧾</span> Today's Closing Cash
+                        </span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+                            Register
+                        </span>
+                    </div>
+                    <div class="text-2xl font-black text-amber-700 dark:text-amber-400 mt-2">
+                        ₹{{ number_format($todayDailyBalance?->closing_balance ?? $currentBalance, 2) }}
+                    </div>
+                    <p class="text-[11px] text-amber-800/80 dark:text-amber-400/80 mt-0.5">
+                        Rolls forward automatically into tomorrow's opening
+                    </p>
+                </div>
+                <div class="pt-3 mt-3 border-t border-amber-100 dark:border-amber-900/50">
+                    <a href="{{ route('daily-balances.index') }}" class="text-xs font-bold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 flex items-center justify-between">
+                        <span>Daily Balance & Roll-Forward</span>
+                        <span>&rarr;</span>
+                    </a>
+                </div>
+            </div>
         </div>
 
         <!-- 3. PRIMARY METRIC CARDS -->
