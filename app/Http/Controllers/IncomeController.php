@@ -158,21 +158,50 @@ class IncomeController extends Controller
         }
 
         $income->load(['category', 'tallies.expense.category']);
-        $talliedExpenseIds = $income->tallies->pluck('expense_id')->all();
 
-        $availableExpenses = Expense::query()
+        $allExpenses = Expense::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('parent_id')
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-            ->whereNotIn('id', $talliedExpenseIds)
+            ->with(['incomeTallies.income'])
             ->orderByDesc('date')
-            ->take(40)
+            ->take(60)
             ->get();
+
+        $allExpenses->each(function (Expense $exp) use ($income): void {
+            $totalTallied = (float) $exp->incomeTallies->sum('allocated_amount');
+            $thisTally = $exp->incomeTallies->firstWhere('income_id', $income->id);
+            $otherTallies = $exp->incomeTallies->where('income_id', '!=', $income->id);
+            $untalliedExpAmount = max(0, $exp->totalAmount() - $totalTallied);
+
+            $exp->total_tallied_amount = $totalTallied;
+            $exp->available_to_tally = $untalliedExpAmount;
+
+            if ($thisTally) {
+                $exp->is_selectable = false;
+                $exp->tally_badge = 'Already tallied in this income (₹'.number_format((float) $thisTally->allocated_amount, 2).')';
+            } elseif ($totalTallied >= $exp->totalAmount() && $exp->totalAmount() > 0) {
+                $exp->is_selectable = false;
+                $otherSource = $otherTallies->first()?->income?->source ?? 'another income';
+                $exp->tally_badge = 'Fully tallied under '.$otherSource.' (₹'.number_format($totalTallied, 2).')';
+            } elseif ($totalTallied > 0) {
+                $exp->is_selectable = true;
+                $exp->tally_badge = 'Partially tallied (₹'.number_format($totalTallied, 2).' / ₹'.number_format($exp->totalAmount(), 2).')';
+            } else {
+                $exp->is_selectable = true;
+                $exp->tally_badge = 'Untallied';
+            }
+        });
 
         $talliedTotal = $income->talliedAmount();
         $untalliedTotal = $income->untalliedAmount();
 
-        return view('finance.income.show', compact('income', 'availableExpenses', 'talliedTotal', 'untalliedTotal'));
+        return view('finance.income.show', [
+            'income' => $income,
+            'availableExpenses' => $allExpenses,
+            'talliedTotal' => $talliedTotal,
+            'untalliedTotal' => $untalliedTotal,
+        ]);
     }
 
     public function tallyExpense(Request $request, Income $income): RedirectResponse
@@ -188,7 +217,16 @@ class IncomeController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $expense = Expense::query()->where('user_id', $request->user()->id)->findOrFail($validated['expense_id']);
+        $expense = Expense::query()->where('user_id', $request->user()->id)->with(['incomeTallies'])->findOrFail($validated['expense_id']);
+
+        if (IncomeExpenseTally::where('income_id', $income->id)->where('expense_id', $expense->id)->exists()) {
+            return back()->with('error', 'This expense is already tallied under this income stream.');
+        }
+
+        $expUntallied = $expense->untalliedAmount();
+        if ((float) $validated['allocated_amount'] > $expUntallied + 0.01) {
+            return back()->with('error', 'The selected expense only has ₹'.number_format($expUntallied, 2).' available to tally.');
+        }
 
         IncomeExpenseTally::create([
             'user_id' => $request->user()->id,

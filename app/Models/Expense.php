@@ -102,6 +102,25 @@ class Expense extends Model
         return $this->hasMany(FriendSplit::class);
     }
 
+    public function incomeTallies(): HasMany
+    {
+        return $this->hasMany(IncomeExpenseTally::class);
+    }
+
+    public function totalTalliedAmount(): float
+    {
+        if ($this->relationLoaded('incomeTallies')) {
+            return (float) $this->incomeTallies->sum('allocated_amount');
+        }
+
+        return (float) $this->incomeTallies()->sum('allocated_amount');
+    }
+
+    public function untalliedAmount(): float
+    {
+        return max(0, $this->totalAmount() - $this->totalTalliedAmount());
+    }
+
     public function isSplit(): bool
     {
         return $this->split_with_friend_id !== null || $this->friendSplits->isNotEmpty() || $this->friendSplit !== null;

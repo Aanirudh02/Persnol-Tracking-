@@ -87,9 +87,15 @@
                             <select name="expense_id" id="tally_expense_select" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold">
                                 <option value="">Choose an expense...</option>
                                 @foreach($availableExpenses as $exp)
-                                    <option value="{{ $exp->id }}" data-amount="{{ $exp->totalAmount() }}">
-                                        {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }})
-                                    </option>
+                                    @if($exp->is_selectable)
+                                        <option value="{{ $exp->id }}" data-amount="{{ $exp->available_to_tally }}" data-total="{{ $exp->totalAmount() }}">
+                                            {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }})@if($exp->total_tallied_amount > 0) · [₹{{ number_format($exp->available_to_tally, 2) }} unallocated]@endif
+                                        </option>
+                                    @else
+                                        <option value="{{ $exp->id }}" disabled class="text-slate-400 bg-slate-100 italic">
+                                            {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }}) — [{{ $exp->tally_badge }}]
+                                        </option>
+                                    @endif
                                 @endforeach
                             </select>
                         </div>
@@ -120,6 +126,7 @@
             const amt = opt ? Number(opt.dataset.amount || 0) : 0;
             if (amt > 0) {
                 amountInput.value = Math.min(amt, maxUntallied).toFixed(2);
+                amountInput.max = Math.min(amt, maxUntallied).toFixed(2);
             }
         });
     </script>
