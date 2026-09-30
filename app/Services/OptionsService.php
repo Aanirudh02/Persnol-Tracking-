@@ -73,4 +73,36 @@ class OptionsService
 
         return $option;
     }
+
+    public function ensureClassifications(?int $userId = null): Collection
+    {
+        $existing = $this->for('expense_classification', $userId);
+        if ($existing->isNotEmpty()) {
+            return $existing;
+        }
+
+        $defaults = [
+            ['name' => 'Necessary', 'color' => '#10b981', 'icon' => '🟢', 'sort_order' => 1],
+            ['name' => 'Unnecessary', 'color' => '#f59e0b', 'icon' => '🟡', 'sort_order' => 2],
+            ['name' => 'Luxury', 'color' => '#8b5cf6', 'icon' => '🟣', 'sort_order' => 3],
+            ['name' => 'Emergency', 'color' => '#ef4444', 'icon' => '🔴', 'sort_order' => 4],
+        ];
+
+        foreach ($defaults as $def) {
+            LookupOption::create([
+                'user_id' => $userId,
+                'type' => 'expense_classification',
+                'name' => $def['name'],
+                'color' => $def['color'],
+                'icon' => $def['icon'],
+                'sort_order' => $def['sort_order'],
+                'is_active' => true,
+                'is_system' => false,
+            ]);
+        }
+
+        LookupOption::clearCache($userId, 'expense_classification');
+
+        return $this->for('expense_classification', $userId);
+    }
 }

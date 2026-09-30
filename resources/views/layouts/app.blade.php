@@ -65,6 +65,9 @@
             <x-nav-link href="{{ route('statements.create') }}" :active="request()->routeIs('statements.create')" icon="file-plus">
                 Take Statement
             </x-nav-link>
+            <x-nav-link href="{{ route('classification.index') }}" :active="request()->routeIs('classification.*')" icon="tag">
+                Classifications
+            </x-nav-link>
             <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">
                 Money Received
             </x-nav-link>
@@ -284,6 +287,9 @@
                 </a>
                 <a href="{{ route('statements.create') }}" class="p-3 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">📑</span> Take Statement
+                </a>
+                <a href="{{ route('classification.index') }}" class="p-3 rounded-2xl bg-violet-50/70 hover:bg-violet-100 border border-violet-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
+                    <span class="text-xl">🏷️</span> Classifications
                 </a>
                 <a href="{{ route('food.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">🍔</span> Food & Snacks

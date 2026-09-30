@@ -145,6 +145,7 @@ class SettingController extends Controller
         $wallets = PaymentWallet::where('user_id', $user->id)->orderBy('payment_method')->get();
         $friendRoles = $options->names('friend_role');
         $paymentMethods = $options->for('payment_method', $user->id);
+        $expenseClassifications = $options->ensureClassifications($user->id);
         $financeDashboardSections = array_merge([
             'show_wallet_balances' => true,
             'show_total_expense' => true,
@@ -162,7 +163,7 @@ class SettingController extends Controller
         return view('settings.index', compact(
             'user', 'settings', 'customQuestions', 'auditLogs', 'users', 'roles', 'permissions',
             'expenseCategories', 'personalExpenseCategories', 'incomeCategories', 'foodCategories', 'activityCategories', 'wallets', 'friendRoles',
-            'paymentMethods', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId',
+            'paymentMethods', 'expenseClassifications', 'financeDashboardSections', 'foodDefaultExpenseCategoryId', 'snackDefaultExpenseCategoryId',
             'friendsResyncedAt', 'showPersonalInDashboard', 'allowStatementDeletion'
         ));
     }

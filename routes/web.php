@@ -9,6 +9,7 @@ use App\Http\Controllers\CreditDebtController;
 use App\Http\Controllers\DailyBalanceController;
 use App\Http\Controllers\DailyRecordController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExpenseClassificationController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\FamilyMemberController;
 use App\Http\Controllers\FinanceDashboardController;
@@ -84,6 +85,11 @@ Route::middleware('auth')->group(function () {
         // Statements Module
         Route::resource('statements', StatementController::class)->names('statements');
 
+        // Expense Classification Module
+        Route::get('/classification', [ExpenseClassificationController::class, 'index'])->name('classification.index');
+        Route::post('/classification/save', [ExpenseClassificationController::class, 'save'])->name('classification.save');
+        Route::get('/classification/print', [ExpenseClassificationController::class, 'printReport'])->name('classification.print');
+
         // Expenses
         Route::get('/expense-groups/unassigned-expenses', [ExpenseController::class, 'unassignedExpenses'])->name('expense-groups.unassigned');
         Route::post('/expense-groups/{expenseGroup}/expenses/attach', [ExpenseController::class, 'attachExpenses'])->name('expense-groups.expenses.attach');
@@ -154,6 +160,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/categories/{type}/{id}/archive', [SettingController::class, 'archiveCategory'])->name('categories.archive');
 
     Route::post('/options', [OptionController::class, 'store'])->name('options.store');
+    Route::put('/options/{option}', [OptionController::class, 'update'])->name('options.update');
     Route::delete('/options/{option}', [OptionController::class, 'destroy'])->name('options.destroy');
     Route::post('/wallets', [WalletController::class, 'update'])->name('wallets.update');
 

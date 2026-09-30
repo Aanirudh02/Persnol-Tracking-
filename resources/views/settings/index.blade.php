@@ -224,7 +224,40 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h2 class="text-lg font-semibold text-slate-900">Expense Classifications</h2>
+                <p class="text-sm text-slate-500 mt-1">Manage dynamic classification tags (e.g. Necessary, Unnecessary, Luxury, Emergency) used on the dedicated classification page.</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <form action="{{ route('options.store') }}" method="POST" class="flex gap-2">
+                    @csrf
+                    <input type="hidden" name="type" value="expense_classification">
+                    <input type="text" name="name" required placeholder="New classification tag (e.g. Fixed, Variable)..." class="flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
+                    <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add</button>
+                </form>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    @foreach($expenseClassifications as $cls)
+                        <div class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $cls['color'] ?? '#6366f1' }}"></span>
+                                <span class="font-medium text-slate-800">{{ $cls['name'] }}</span>
+                                @if(!empty($cls['is_system']))
+                                    <span class="ml-2 text-[10px] text-slate-400">System</span>
+                                @endif
+                            </div>
+                            @if(empty($cls['is_system']))
+                                <form action="{{ route('options.destroy', $cls['id']) }}" method="POST" onsubmit="return confirm('Delete this classification?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-xs font-semibold text-rose-600 hover:underline">Delete</button>
+                                </form>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Finance Dashboard</h2>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Choose which sections show on the finance dashboard.</p>
@@ -643,7 +676,101 @@
                 </div>
 
             </div>
-        </div>
 
+            {{-- ======================================================== --}}
+            {{-- EXPENSE CLASSIFICATION TYPES (CRUD) --}}
+            {{-- ======================================================== --}}
+            <div class="col-span-full lg:col-span-1">
+                <div class="rounded-2xl border border-violet-200 dark:border-violet-900/40 bg-violet-50 dark:bg-violet-950/30 p-5 shadow-sm h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-violet-950 dark:text-violet-100">🏷️ Expense Classification Types</h2>
+                            <p class="mt-0.5 text-xs text-violet-700 dark:text-violet-300">Manage tags used to classify Normal &amp; Personal expenses. Used on the <a href="{{ route('classification.index') }}" class="underline font-semibold">Classifications page</a>.</p>
+                        </div>
+                    </div>
+
+                    {{-- Add new classification --}}
+                    <form action="{{ route('options.store') }}" method="POST" class="flex gap-2 mb-4">
+                        @csrf
+                        <input type="hidden" name="type" value="expense_classification">
+                        <input type="text" name="name" placeholder="New tag name…" required maxlength="100"
+                               class="flex-1 px-3 py-2 text-sm border border-violet-200 dark:border-violet-700 dark:bg-slate-800 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-violet-400 focus:outline-none">
+                        <button type="submit"
+                                class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition active:scale-95">
+                            + Add
+                        </button>
+                    </form>
+
+                    {{-- Check which classifications are in use --}}
+                    @php
+                        $usedInExpenses = \App\Models\Expense::whereNotNull('classification')->pluck('classification')->unique()->toArray();
+                        $usedInPersonal = \App\Models\PersonalExpense::whereNotNull('classification')->pluck('classification')->unique()->toArray();
+                        $usedClassifications = array_unique(array_merge($usedInExpenses, $usedInPersonal));
+                    @endphp
+
+                    <div class="space-y-2">
+                        @forelse($expenseClassifications as $cls)
+                            @php $isUsed = in_array($cls['name'], $usedClassifications); @endphp
+                            <div class="flex items-center gap-2 bg-white dark:bg-slate-800 border border-violet-100 dark:border-violet-900/30 rounded-xl px-3 py-2.5"
+                                 x-data="{ editing: false }">
+
+                                {{-- Color dot --}}
+                                <div class="w-3 h-3 rounded-full shrink-0" style="background-color: {{ $cls['color'] ?? '#6b7280' }}"></div>
+
+                                {{-- View mode --}}
+                                <span class="flex-1 text-sm font-semibold text-slate-800 dark:text-slate-200" x-show="!editing">
+                                    {{ $cls['icon'] ?? '' }} {{ $cls['name'] }}
+                                </span>
+
+                                {{-- Edit mode (inline rename) --}}
+                                <form action="{{ route('options.update', $cls['id']) }}" method="POST" class="flex-1 flex gap-1" x-show="editing" x-cloak>
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="text" name="name" value="{{ $cls['name'] }}" required maxlength="100"
+                                           class="flex-1 px-2 py-1 text-sm border border-violet-300 dark:border-violet-600 dark:bg-slate-700 rounded-lg focus:ring-1 focus:ring-violet-400 focus:outline-none">
+                                    <button type="submit" class="px-2 py-1 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition">Save</button>
+                                    <button type="button" @click="editing = false" class="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 transition">✕</button>
+                                </form>
+
+                                {{-- Action buttons --}}
+                                <div class="flex items-center gap-1.5 ml-auto shrink-0" x-show="!editing">
+                                    @if($isUsed)
+                                        <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full">In use</span>
+                                    @endif
+                                    <button type="button" @click="editing = true"
+                                            class="px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300 transition">
+                                        ✏️ Edit
+                                    </button>
+                                    @if($isUsed)
+                                        <span title="In use on expenses — remove classification from all expenses first"
+                                              class="px-2 py-1 text-[11px] font-semibold text-slate-300 dark:text-slate-600 cursor-not-allowed select-none">
+                                            🗑️
+                                        </span>
+                                    @else
+                                        <form action="{{ route('options.destroy', $cls['id']) }}" method="POST"
+                                              onsubmit="return confirm('Delete classification \'{{ addslashes($cls['name']) }}\'?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                    class="px-2 py-1 text-[11px] font-semibold text-rose-400 hover:text-rose-600 dark:text-rose-500 dark:hover:text-rose-400 transition">
+                                                🗑️ Delete
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-xs text-violet-400 italic">No classification types yet. Add one above — defaults will be seeded on next visit to Classifications.</p>
+                        @endforelse
+                    </div>
+
+                    <p class="mt-3 text-[10px] text-violet-400 dark:text-violet-500">
+                        Classifications marked "In use" cannot be deleted until cleared from all matching expenses.
+                    </p>
+                </div>
+            </div>
+
+        </div>
     </div>
+
 </x-app-layout>

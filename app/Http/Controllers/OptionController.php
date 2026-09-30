@@ -24,6 +24,22 @@ class OptionController extends Controller
         return back()->with('success', 'Option added.');
     }
 
+    public function update(Request $request, LookupOption $option)
+    {
+        if ($option->is_system || ($option->user_id && $option->user_id !== $request->user()->id)) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+        ]);
+
+        $option->update(['name' => $validated['name']]);
+        LookupOption::clearCache($option->user_id, $option->type);
+
+        return back()->with('success', 'Option renamed.');
+    }
+
     public function destroy(Request $request, LookupOption $option)
     {
         if ($option->is_system || ($option->user_id && $option->user_id !== $request->user()->id)) {
