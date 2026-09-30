@@ -12,6 +12,8 @@ use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\IncomeCategory;
 use App\Models\IncomeExpenseTally;
+use App\Models\PersonalExpense;
+use App\Models\PersonalExpenseCategory;
 use App\Models\Role;
 use App\Models\Saving;
 use App\Models\User;
@@ -76,6 +78,49 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         $this->assertNotNull($expense);
         $this->assertEquals(200.0, (float) $expense->amount);
         $this->assertSame('UPI', $expense->payment_method);
+    }
+
+    public function test_credit_can_be_recorded_as_personal_expense(): void
+    {
+        $user = $this->createAdminUser();
+        $friend = Friend::create([
+            'user_id' => $user->id,
+            'name' => 'Divakar',
+            'role' => 'Friend',
+        ]);
+        $pcat = PersonalExpenseCategory::create([
+            'user_id' => $user->id,
+            'name' => 'Personal Repayment',
+            'icon' => 'user',
+            'color' => '#8b5cf6',
+        ]);
+
+        $credit = CreditDebt::create([
+            'user_id' => $user->id,
+            'friend_id' => $friend->id,
+            'type' => 'credit',
+            'amount' => 200,
+            'amount_paid' => 150,
+            'status' => 'partially_paid',
+            'date' => '2026-09-30',
+            'description' => 'Borrowed for lunch',
+            'source' => 'manual',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('credits.record-as-personal-expense', $credit), [
+            'amount' => 150,
+            'category_id' => $pcat->id,
+            'classification' => 'necessary',
+            'date' => '2026-09-30',
+            'payment_method' => 'UPI',
+        ]);
+
+        $response->assertRedirect();
+        $personalExp = PersonalExpense::where('user_id', $user->id)->first();
+        $this->assertNotNull($personalExp);
+        $this->assertEquals(150.0, (float) $personalExp->amount);
+        $this->assertSame('UPI', $personalExp->payment_method);
+        $this->assertSame($pcat->id, $personalExp->category_id);
     }
 
     public function test_debit_can_be_recorded_as_income(): void

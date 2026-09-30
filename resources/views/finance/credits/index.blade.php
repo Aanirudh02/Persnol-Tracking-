@@ -118,21 +118,23 @@
 
                         <div class="flex flex-wrap items-center gap-3 text-xs">
                             <a href="{{ route('credits.edit', $item) }}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
-                            
-                            @if($item->type === 'credit' && $item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden')" class="font-semibold text-emerald-600 hover:underline flex items-center gap-1">
-                                    <span>💸</span> File as Normal Expense
+                                                @if($item->type === 'credit')
+                                <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+                                    <span>📗</span> File as Normal Expense
+                                </button>
+                                <button type="button" onclick="document.getElementById('record-personal-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-purple-700 hover:underline flex items-center gap-1">
+                                    <span>💜</span> File as Personal Expense
                                 </button>
                             @endif
 
                             @if($item->type === 'debt' && $item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden')" class="font-semibold text-teal-600 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-teal-700 hover:underline flex items-center gap-1">
                                     <span>💰</span> Record as Income
                                 </button>
                             @endif
 
                             @if($item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden')" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
                                     <span>🤝</span> Settle with Discount / Forgiven
                                 </button>
                             @endif
@@ -144,20 +146,76 @@
                             </form>
                         </div>
 
-                        <!-- Record as Expense Inline Form (Credit) -->
-                        @if($item->type === 'credit' && $item->remaining() > 0)
+                        <!-- Record as Normal Expense Inline Form (Credit) -->
+                        @if($item->type === 'credit')
+                            @php
+                                $suggestedRepay = (float) $item->amount_paid > 0 ? (float) $item->amount_paid : (float) $item->remaining();
+                            @endphp
                             <form id="record-expense-{{ $item->id }}" action="{{ route('credits.record-as-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs space-y-2">
                                 @csrf
                                 <div class="font-bold text-emerald-900">Record Credit Repayment as Normal Expense</div>
+                                <p class="text-slate-600">Files this repayment under standard / college expenses. Pre-filled with your paid amount (₹{{ number_format($suggestedRepay, 2) }}).</p>
                                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
-                                    <input type="number" step="0.01" name="amount" value="{{ $item->remaining() }}" max="{{ $item->remaining() }}" min="0.01" required placeholder="Repay Amount" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
-                                    <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
-                                    <select name="payment_method" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
-                                        @foreach($paymentMethods as $method)
-                                            <option value="{{ $method }}">{{ $method }}</option>
-                                        @endforeach
-                                    </select>
-                                    <button class="rounded-xl bg-emerald-700 px-3 py-1.5 font-bold text-white hover:bg-emerald-800">Submit Expense</button>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Repay Amount (₹)</label>
+                                        <input type="number" step="0.01" name="amount" value="{{ $suggestedRepay }}" max="{{ $item->amount }}" min="0.01" required placeholder="Repay Amount" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Repayment Date</label>
+                                        <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Payment Method</label>
+                                        <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                            @foreach($paymentMethods as $method)
+                                                <option value="{{ $method }}">{{ $method }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="flex items-end">
+                                        <button class="w-full rounded-xl bg-emerald-700 px-3 py-2 font-bold text-white hover:bg-emerald-800">Submit Normal Expense</button>
+                                    </div>
+                                </div>
+                            </form>
+
+                            <!-- Record as Personal Expense Inline Form (Credit) -->
+                            <form id="record-personal-expense-{{ $item->id }}" action="{{ route('credits.record-as-personal-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-purple-200 bg-purple-50/60 p-3 text-xs space-y-2">
+                                @csrf
+                                <div class="font-bold text-purple-900">Record Credit Repayment as Personal Expense</div>
+                                <p class="text-slate-600">Files this repayment under personal & family domain. Pre-filled with your paid amount (₹{{ number_format($suggestedRepay, 2) }}).</p>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-5">
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Repay Amount (₹)</label>
+                                        <input type="number" step="0.01" name="amount" value="{{ $suggestedRepay }}" max="{{ $item->amount }}" min="0.01" required placeholder="Repay Amount" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-purple-800">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Category</label>
+                                        <select name="category_id" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                            @foreach($personalCategories as $pcat)
+                                                <option value="{{ $pcat->id }}">{{ $pcat->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Classification</label>
+                                        <select name="classification" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                            <option value="necessary">Necessary</option>
+                                            <option value="discretionary">Discretionary</option>
+                                            <option value="luxury">Luxury</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Payment Method</label>
+                                        <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                            @foreach($paymentMethods as $method)
+                                                <option value="{{ $method }}">{{ $method }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="flex items-end">
+                                        <input type="hidden" name="date" value="{{ date('Y-m-d') }}">
+                                        <button class="w-full rounded-xl bg-purple-700 px-3 py-2 font-bold text-white hover:bg-purple-800">Submit Personal</button>
+                                    </div>
                                 </div>
                             </form>
                         @endif
@@ -189,11 +247,11 @@
                                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
                                     <div>
                                         <label class="font-semibold text-slate-700 block">Paid Amount (₹)</label>
-                                        <input type="number" step="0.01" min="0" name="settled_amount" value="{{ max(0, $item->remaining() - 50) }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
+                                        <input type="number" step="0.01" min="0" name="settled_amount" value="0.00" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
                                     </div>
                                     <div>
                                         <label class="font-semibold text-slate-700 block">Forgiven / Discount (₹)</label>
-                                        <input type="number" step="0.01" min="0.01" name="discount_amount" value="50.00" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-700">
+                                        <input type="number" step="0.01" min="0.01" name="discount_amount" value="{{ number_format($item->remaining(), 2, '.', '') }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-700">
                                     </div>
                                     <div>
                                         <label class="font-semibold text-slate-700 block">Settled On Date</label>

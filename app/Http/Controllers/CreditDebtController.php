@@ -10,6 +10,8 @@ use App\Models\ExpenseCategory;
 use App\Models\Friend;
 use App\Models\Income;
 use App\Models\IncomeCategory;
+use App\Models\PersonalExpense;
+use App\Models\PersonalExpenseCategory;
 use App\Services\FinanceLinkService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
@@ -39,6 +41,12 @@ class CreditDebtController extends Controller
             ->withQueryString();
 
         $friends = Friend::query()->where('user_id', $request->user()->id)->orderBy('name')->get();
+        $personalCategories = PersonalExpenseCategory::query()
+            ->where(fn ($q) => $q->where('user_id', $request->user()->id)->orWhereNull('user_id'))
+            ->where('is_archived', false)
+            ->orderBy('name')
+            ->get();
+
         $openTotal = (float) CreditDebt::query()
             ->where('user_id', $request->user()->id)
             ->where('type', $type)
@@ -49,7 +57,7 @@ class CreditDebtController extends Controller
         $statuses = $options->for('credit_status');
         $paymentMethods = $options->names('payment_method');
 
-        return view('finance.credits.index', compact('items', 'friends', 'type', 'openTotal', 'statuses', 'paymentMethods'));
+        return view('finance.credits.index', compact('items', 'friends', 'type', 'openTotal', 'statuses', 'paymentMethods', 'personalCategories'));
     }
 
     public function store(Request $request, FinanceLinkService $linkService): RedirectResponse
@@ -301,9 +309,8 @@ class CreditDebtController extends Controller
             abort(403);
         }
 
-        $remaining = $creditDebt->remaining();
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, $remaining + 0.01)],
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, (float) $creditDebt->amount + 0.01)],
             'date' => ['required', 'date'],
             'payment_method' => ['required', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
@@ -336,13 +343,15 @@ class CreditDebtController extends Controller
                 'is_voluntary' => false,
             ]);
 
-            CreditDebtPayment::create([
-                'credit_debt_id' => $creditDebt->id,
-                'amount' => $validated['amount'],
-                'paid_on' => $validated['date'],
-                'payment_method' => $validated['payment_method'],
-                'notes' => 'Filed as expense #'.$expense->id,
-            ]);
+            if ($creditDebt->remaining() > 0) {
+                CreditDebtPayment::create([
+                    'credit_debt_id' => $creditDebt->id,
+                    'amount' => min((float) $validated['amount'], (float) $creditDebt->remaining()),
+                    'paid_on' => $validated['date'],
+                    'payment_method' => $validated['payment_method'],
+                    'notes' => 'Filed as expense #'.$expense->id,
+                ]);
+            }
 
             $creditDebt->linked_expense_id = $expense->id;
             $this->refreshCreditDebtAmounts($creditDebt);
@@ -351,6 +360,57 @@ class CreditDebtController extends Controller
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
         return back()->with('success', 'Credit repayment of ₹'.number_format($validated['amount'], 2).' filed as Normal Expense.');
+    }
+
+    public function recordAsPersonalExpense(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id || $creditDebt->type !== 'credit') {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, (float) $creditDebt->amount + 0.01)],
+            'category_id' => ['nullable', 'exists:personal_expense_categories,id'],
+            'classification' => ['nullable', 'in:necessary,discretionary,luxury'],
+            'date' => ['required', 'date'],
+            'payment_method' => ['required', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $defaultCat = PersonalExpenseCategory::where(fn ($q) => $q->where('user_id', $request->user()->id)->orWhereNull('user_id'))->first();
+
+        DB::transaction(function () use ($request, $creditDebt, $validated, $defaultCat): void {
+            $personalExpense = PersonalExpense::create([
+                'user_id' => $request->user()->id,
+                'category_id' => $validated['category_id'] ?? $defaultCat?->id,
+                'classification' => $validated['classification'] ?? 'necessary',
+                'amount' => $validated['amount'],
+                'date' => $validated['date'],
+                'time' => Carbon::now()->format('H:i'),
+                'description' => 'Credit Repayment to '.($creditDebt->friend?->name ?? 'Friend'),
+                'payment_method' => $validated['payment_method'],
+                'done_by' => 'Me',
+                'done_to' => $creditDebt->friend?->name ?? 'Friend',
+                'notes' => trim(($validated['notes'] ?? '')."\nLinked to Credit #".$creditDebt->id),
+                'is_voluntary' => false,
+            ]);
+
+            if ($creditDebt->remaining() > 0) {
+                CreditDebtPayment::create([
+                    'credit_debt_id' => $creditDebt->id,
+                    'amount' => min((float) $validated['amount'], (float) $creditDebt->remaining()),
+                    'paid_on' => $validated['date'],
+                    'payment_method' => $validated['payment_method'],
+                    'notes' => 'Filed as personal expense #'.$personalExpense->id,
+                ]);
+            }
+
+            $this->refreshCreditDebtAmounts($creditDebt);
+        });
+
+        $linkService->syncCreditDebtToFriend($creditDebt->fresh());
+
+        return back()->with('success', 'Credit repayment of ₹'.number_format($validated['amount'], 2).' filed as Personal Expense.');
     }
 
     public function recordAsIncome(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse

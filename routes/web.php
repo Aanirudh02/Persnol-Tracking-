@@ -132,8 +132,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/credits/{creditDebt}/payments', [CreditDebtController::class, 'addPayment'])->name('credits.payments');
         Route::put('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'updatePayment'])->name('credits.payments.update');
         Route::delete('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'deletePayment'])->name('credits.payments.destroy');
-        Route::post('/credits/{creditDebt}/status', [CreditDebtController::class, 'updateStatus'])->name('credits.status');
         Route::post('/credits/{creditDebt}/record-as-expense', [CreditDebtController::class, 'recordAsExpense'])->name('credits.record-as-expense');
+        Route::post('/credits/{creditDebt}/record-as-personal-expense', [CreditDebtController::class, 'recordAsPersonalExpense'])->name('credits.record-as-personal-expense');
         Route::post('/credits/{creditDebt}/record-as-income', [CreditDebtController::class, 'recordAsIncome'])->name('credits.record-as-income');
         Route::post('/credits/{creditDebt}/settle-discounted', [CreditDebtController::class, 'settleDiscounted'])->name('credits.settle-discounted');
     });
