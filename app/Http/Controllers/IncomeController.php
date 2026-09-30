@@ -196,9 +196,13 @@ class IncomeController extends Controller
         $talliedTotal = $income->talliedAmount();
         $untalliedTotal = $income->untalliedAmount();
 
+        $availableList = $allExpenses->where('is_selectable', true)->values();
+        $talliedList = $allExpenses->where('is_selectable', false)->values();
+
         return view('finance.income.show', [
             'income' => $income,
-            'availableExpenses' => $allExpenses,
+            'availableExpenses' => $availableList,
+            'talliedExpenses' => $talliedList,
             'talliedTotal' => $talliedTotal,
             'untalliedTotal' => $untalliedTotal,
         ]);

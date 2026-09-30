@@ -77,7 +77,7 @@
             @endif
 
             <!-- Attach New Expense Tally Form -->
-            @if($untalliedTotal > 0 && $availableExpenses->isNotEmpty())
+            @if($untalliedTotal > 0 && ($availableExpenses->isNotEmpty() || $talliedExpenses->isNotEmpty()))
                 <form action="{{ route('income.tally', $income) }}" method="POST" class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 text-xs space-y-3">
                     @csrf
                     <div class="font-bold text-indigo-950">Tally Another Expense against this Income</div>
@@ -86,17 +86,26 @@
                             <label class="font-semibold text-slate-700 block mb-1">Select Expense</label>
                             <select name="expense_id" id="tally_expense_select" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold">
                                 <option value="">Choose an expense...</option>
-                                @foreach($availableExpenses as $exp)
-                                    @if($exp->is_selectable)
-                                        <option value="{{ $exp->id }}" data-amount="{{ $exp->available_to_tally }}" data-total="{{ $exp->totalAmount() }}">
-                                            {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }})@if($exp->total_tallied_amount > 0) · [₹{{ number_format($exp->available_to_tally, 2) }} unallocated]@endif
-                                        </option>
-                                    @else
-                                        <option value="{{ $exp->id }}" disabled class="text-slate-400 bg-slate-100 italic">
-                                            {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }}) — [{{ $exp->tally_badge }}]
-                                        </option>
-                                    @endif
-                                @endforeach
+
+                                @if($availableExpenses->isNotEmpty())
+                                    <optgroup label="✅ Available to Tally">
+                                        @foreach($availableExpenses as $exp)
+                                            <option value="{{ $exp->id }}" data-amount="{{ $exp->available_to_tally }}" data-total="{{ $exp->totalAmount() }}">
+                                                {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }})@if($exp->total_tallied_amount > 0) · [₹{{ number_format($exp->available_to_tally, 2) }} available]@endif
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+
+                                @if($talliedExpenses->isNotEmpty())
+                                    <optgroup label="🔒 Already Tallied (Cannot Re-Tally)">
+                                        @foreach($talliedExpenses as $exp)
+                                            <option value="{{ $exp->id }}" disabled class="text-slate-400 bg-slate-100 italic">
+                                                {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }}) — [{{ $exp->tally_badge }}]
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
                             </select>
                         </div>
                         <div>
