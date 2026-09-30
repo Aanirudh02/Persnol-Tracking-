@@ -2,17 +2,71 @@
     <div class="space-y-6">
 
         {{-- Page Header --}}
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">🏷️ Expense Classification</h1>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review and classify your expenses one by one. Export a PDF report without storing extra data.</p>
+        <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 mb-1">
+                        <a href="{{ route('finance.index') }}" class="hover:text-violet-600 transition">Finance</a>
+                        <span>/</span>
+                        <span class="text-slate-600 dark:text-slate-300 font-medium">Classifications</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-900 dark:text-white">🏷️ Expense Classification</h1>
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Tag your expenses one by one. Export a PDF report — zero extra storage.</p>
+                </div>
+                <a href="{{ route('classification.print', array_filter(['domain' => $domain, 'period' => $period, 'from_date' => $fromDate, 'to_date' => $toDate, 'category_id' => $categoryId])) }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-violet-500/20 transition active:scale-95 shrink-0">
+                    <span>📄</span> Quick PDF Preview
+                </a>
             </div>
-            <a href="{{ route('classification.print', array_filter(['domain' => $domain, 'period' => $period, 'from_date' => $fromDate, 'to_date' => $toDate, 'category_id' => $categoryId])) }}"
-               target="_blank"
-               class="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-violet-500/20 transition active:scale-95">
-                <span>📄</span> Quick PDF Preview
-            </a>
+
+            {{-- Inline Add Classification Type --}}
+            <div class="bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/40 rounded-2xl p-4"
+                 x-data="{ open: false }">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-violet-800 dark:text-violet-200">Classification Types</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach($classifications as $cls)
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold text-white"
+                                      style="background-color: {{ $cls['color'] ?? '#6b7280' }}">
+                                    {{ $cls['icon'] ?? '' }} {{ $cls['name'] }}
+                                </span>
+                            @endforeach
+                            @if($classifications->isEmpty())
+                                <span class="text-xs text-violet-400 italic">No types yet — add one below</span>
+                            @endif
+                        </div>
+                    </div>
+                    <button type="button" @click="open = !open"
+                            class="text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition shrink-0">
+                        <span x-show="!open">+ Add Type</span>
+                        <span x-show="open" x-cloak>✕ Close</span>
+                    </button>
+                </div>
+
+                {{-- Quick Add Form --}}
+                <div x-show="open" x-cloak x-transition class="mt-3 pt-3 border-t border-violet-200 dark:border-violet-800/40">
+                    <form action="{{ route('options.store') }}" method="POST" class="flex gap-2 items-end flex-wrap">
+                        @csrf
+                        <input type="hidden" name="type" value="expense_classification">
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="block text-xs font-semibold text-violet-700 dark:text-violet-300 mb-1">Tag Name</label>
+                            <input type="text" name="name" placeholder="e.g. Emergency, Fun…" required maxlength="100"
+                                   class="w-full px-3 py-2 text-sm border border-violet-200 dark:border-violet-700 dark:bg-slate-800 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-violet-400 focus:outline-none">
+                        </div>
+                        <button type="submit"
+                                class="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition active:scale-95">
+                            Add
+                        </button>
+                        <a href="{{ route('settings.index') }}#classifications" class="px-3 py-2 text-xs text-violet-600 dark:text-violet-300 hover:underline font-semibold">
+                            Manage all →
+                        </a>
+                    </form>
+                </div>
+            </div>
         </div>
+
 
         {{-- Filter Bar --}}
         <form method="GET" action="{{ route('classification.index') }}" id="filter-form"

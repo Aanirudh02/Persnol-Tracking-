@@ -20,7 +20,7 @@ class ExpenseClassificationController extends Controller
         $classifications = $options->ensureClassifications($user->id);
 
         $domain = $request->get('domain', 'normal');
-        $period = $request->get('period', 'month');
+        $period = $request->get('period', 'all');
         $fromDate = $request->get('from_date');
         $toDate = $request->get('to_date');
         $categoryId = $request->get('category_id');

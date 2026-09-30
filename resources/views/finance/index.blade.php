@@ -13,6 +13,7 @@
                 <a href="{{ route('daily-balances.index') }}" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 font-bold text-amber-800 hover:bg-amber-100">🧾 Daily Cash Register</a>
                 <a href="{{ route('payments.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Payments</a>
                 <a href="{{ route('friends.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Friends & Splits</a>
+                <a href="{{ route('classification.index') }}" class="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 font-bold text-violet-700 hover:bg-violet-100">🏷️ Classifications</a>
                 <a href="{{ route('settings.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Settings</a>
             </div>
         </div>
