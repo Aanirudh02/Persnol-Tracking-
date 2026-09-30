@@ -14,19 +14,23 @@
             @csrf
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="flex items-center gap-2">
-                    <div class="flex-1">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Number of Items</label>
-                        <input id="item_count" name="item_count" type="number" min="1" step="1" value="1" inputmode="numeric" placeholder="e.g. 1, 2, 3..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-indigo-700">
-                    </div>
-                    <button type="button" onclick="addItemRow()" class="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer">+ Add Item</button>
-                </div>
-                <label class="flex items-center gap-2 pt-6 font-medium text-slate-700 cursor-pointer select-none">
-                    <input type="checkbox" name="is_snack" value="1" @checked(request()->boolean('is_snack')) class="rounded border-slate-300 text-indigo-600">
-                    <span>Mark as snack / tea</span>
-                </label>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Date (Auto-synced with Expense)</label>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Number of Items</label>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="changeItemCount(-1)" class="w-10 h-10 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center cursor-pointer transition select-none text-base">&minus;</button>
+                        <input id="item_count" name="item_count" type="number" min="1" max="50" step="1" value="1" placeholder="1" class="w-20 text-center px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-indigo-700 text-base">
+                        <button type="button" onclick="changeItemCount(1)" class="w-10 h-10 rounded-xl border border-slate-300 bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 flex items-center justify-center cursor-pointer transition select-none text-base">&plus;</button>
+                        <button type="button" onclick="changeItemCount(1)" class="ml-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer whitespace-nowrap">+ Add Row</button>
+                    </div>
+                </div>
+                <div class="flex items-center pt-6">
+                    <label class="flex items-center gap-2 font-medium text-slate-700 cursor-pointer select-none">
+                        <input type="checkbox" name="is_snack" value="1" @checked(request()->boolean('is_snack')) class="rounded border-slate-300 text-indigo-600">
+                        <span>Mark as snack / tea</span>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Date (Auto-synced with Expense)</label>
                     <input type="date" id="food_date_input" name="date" value="{{ date('Y-m-d') }}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-semibold">
                 </div>
             </div>
@@ -35,33 +39,64 @@
             <div id="food-item-rows" class="space-y-2"></div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input type="text" name="location" placeholder="Location / Restaurant (optional)" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                 <div>
-                    <input type="number" name="gst_amount" step="0.01" min="0" value="0" placeholder="GST ₹ (optional)" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Location / Restaurant (Optional)</label>
+                    <input type="text" name="location" placeholder="e.g. Mario, Canteen, Chai Point..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                 </div>
-                <select name="expense_mode" id="expense_mode" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    <option value="none">No new expense (habit only)</option>
-                    <option value="separate">Create separate expense (total)</option>
-                    <option value="sub_item">Sub-item under existing expense / group</option>
-                    <option value="voluntary">Voluntary spend</option>
-                </select>
-                <select name="parent_expense_id" id="parent_expense_id" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    <option value="">Link to existing expense / group…</option>
-                    @foreach($parentExpenses as $pe)
-                        <option value="{{ $pe->id }}"
-                            data-date="{{ $pe->date->toDateString() }}"
-                            data-amount="{{ $pe->totalAmount() }}"
-                            data-remaining="{{ $pe->remaining_amount }}"
-                            data-desc="{{ $pe->expenseGroup ? '['.$pe->expenseGroup->name.'] ' : '' }}{{ $pe->description }}"
-                            @disabled($pe->remaining_amount <= 0)>
-                            {{ $pe->expenseGroup ? '👥 [Group: '.$pe->expenseGroup->name.'] ' : '' }}{{ $pe->description }} · Total Spent: ₹{{ number_format($pe->totalAmount(), 2) }} (₹{{ number_format($pe->remaining_amount, 2) }} remaining) · {{ $pe->date->format('d M Y') }}
-                        </option>
-                    @endforeach
-                </select>
-                <select name="payment_method" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    @foreach($paymentMethods as $m)<option value="{{ $m }}">{{ $m }}</option>@endforeach
-                </select>
-                <textarea name="notes" rows="2" placeholder="Details & notes (optional)" class="sm:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl"></textarea>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Total GST ₹ (Optional)</label>
+                    <input type="number" id="food_gst_input" name="gst_amount" step="0.01" min="0" placeholder="e.g. 18.00 (leave blank if none)" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-800">
+                </div>
+            </div>
+
+            <!-- Live Calculation Summary Bar -->
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div class="flex items-center gap-4 text-slate-600">
+                    <span>Items Subtotal: <strong id="summary-subtotal" class="text-slate-900 font-bold">₹0.00</strong></span>
+                    <span>+</span>
+                    <span>Total GST: <strong id="summary-gst" class="text-slate-900 font-bold">₹0.00</strong></span>
+                </div>
+                <div class="text-sm font-bold text-slate-900">
+                    Grand Total Spend: <span id="summary-grand-total" class="text-indigo-600 font-black text-base">₹0.00</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Expense Tracking Mode</label>
+                    <select name="expense_mode" id="expense_mode" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        <option value="none">No new expense (habit only)</option>
+                        <option value="separate">Create separate expense (total)</option>
+                        <option value="sub_item">Sub-item under existing expense / group</option>
+                        <option value="voluntary">Voluntary spend</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Link to Expense / Group</label>
+                    <select name="parent_expense_id" id="parent_expense_id" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        <option value="">Link to existing expense / group…</option>
+                        @foreach($parentExpenses as $pe)
+                            <option value="{{ $pe->id }}"
+                                data-date="{{ $pe->date->toDateString() }}"
+                                data-amount="{{ $pe->totalAmount() }}"
+                                data-remaining="{{ $pe->remaining_amount }}"
+                                data-desc="{{ $pe->expenseGroup ? '['.$pe->expenseGroup->name.'] ' : '' }}{{ $pe->description }}"
+                                @disabled($pe->remaining_amount <= 0)>
+                                {{ $pe->expenseGroup ? '👥 [Group: '.$pe->expenseGroup->name.'] ' : '' }}{{ $pe->description }} · Total Spent: ₹{{ number_format($pe->totalAmount(), 2) }} (₹{{ number_format($pe->remaining_amount, 2) }} remaining) · {{ $pe->date->format('d M Y') }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Payment Method</label>
+                    <select name="payment_method" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        @foreach($paymentMethods as $m)<option value="{{ $m }}">{{ $m }}</option>@endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Notes (Optional)</label>
+                    <input type="text" name="notes" placeholder="Details & notes (optional)" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                </div>
             </div>
 
             <!-- Live Selected Expense Information Banner -->
@@ -177,7 +212,11 @@
         const parentSel = document.getElementById('parent_expense_id');
         const modeSel = document.getElementById('expense_mode');
         const dateInput = document.getElementById('food_date_input');
+        const gstInput = document.getElementById('food_gst_input');
         const infoBox = document.getElementById('selected-expense-info');
+        const subtotalSpan = document.getElementById('summary-subtotal');
+        const gstSpan = document.getElementById('summary-gst');
+        const grandTotalSpan = document.getElementById('summary-grand-total');
 
         function getCurrentRowData() {
             const data = [];
@@ -192,11 +231,32 @@
             return data;
         }
 
-        function renderRows() {
+        function calculateTotals() {
+            let subtotal = 0;
+            const rows = rowsBox.querySelectorAll('.food-item-row');
+            rows.forEach((row, i) => {
+                const amtVal = parseFloat(row.querySelector(`input[name="items[${i}][amount]"]`)?.value || '0');
+                if (!isNaN(amtVal) && amtVal > 0) {
+                    subtotal += amtVal;
+                }
+            });
+            const gstVal = parseFloat(gstInput?.value || '0') || 0;
+            const grandTotal = subtotal + gstVal;
+
+            if (subtotalSpan) subtotalSpan.textContent = `₹${subtotal.toFixed(2)}`;
+            if (gstSpan) gstSpan.textContent = `₹${gstVal.toFixed(2)}`;
+            if (grandTotalSpan) grandTotalSpan.textContent = `₹${grandTotal.toFixed(2)}`;
+        }
+
+        function renderRows(targetCount, updateCountInput = true) {
             const existing = getCurrentRowData();
-            let n = parseInt(countSel.value || '1', 10);
+            let n = parseInt(targetCount || countSel.value || '1', 10);
             if (isNaN(n) || n < 1) n = 1;
-            countSel.value = n;
+            if (n > 50) n = 50;
+
+            if (updateCountInput && countSel) {
+                countSel.value = n;
+            }
 
             let html = '';
             for (let i = 0; i < n; i++) {
@@ -204,33 +264,35 @@
                 const catOpts = foodCategories.map(c => `<option value="${c.id}" ${String(c.id) === String(prev.cat) ? 'selected' : ''}>${c.name}</option>`).join('');
                 html += `<div class="food-item-row grid grid-cols-12 gap-2 items-end">
                     <div class="col-span-12 sm:col-span-4">
-                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Item name *</label>' : ''}
+                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Item name *</label>' : ''}
                         <input type="text" name="items[${i}][item_name]" value="${prev.name}" ${i === 0 ? 'required' : ''} placeholder="e.g. Dosa, Coffee, Sandwich..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     </div>
                     <div class="col-span-6 sm:col-span-3">
-                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Food category</label>' : ''}
+                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Food category</label>' : ''}
                         <select name="items[${i}][category_id]" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl"><option value="">—</option>${catOpts}</select>
                     </div>
                     <div class="col-span-3 sm:col-span-2">
-                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Qty</label>' : ''}
+                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Qty</label>' : ''}
                         <input type="number" name="items[${i}][quantity]" value="${prev.qty}" min="1" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     </div>
                     <div class="col-span-3 sm:col-span-3">
-                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Amount ₹</label>' : ''}
+                        ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Amount ₹</label>' : ''}
                         <div class="flex items-center gap-1">
-                            <input type="number" step="0.01" name="items[${i}][amount]" value="${prev.amt}" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900">
-                            ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-1.5 py-1 text-base hover:text-rose-700 cursor-pointer" title="Remove item">&times;</button>` : ''}
+                            <input type="number" step="0.01" name="items[${i}][amount]" value="${prev.amt}" min="0" placeholder="0.00" class="item-amount-input w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900">
+                            ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-2 py-1 text-lg hover:text-rose-700 cursor-pointer" title="Remove row">&times;</button>` : ''}
                         </div>
                     </div>
                 </div>`;
             }
             rowsBox.innerHTML = html;
+            calculateTotals();
         }
 
-        function addItemRow() {
+        function changeItemCount(delta) {
             const current = parseInt(countSel.value || '1', 10);
-            countSel.value = current + 1;
-            renderRows();
+            const next = Math.max(1, Math.min(50, (isNaN(current) ? 1 : current) + delta));
+            countSel.value = next;
+            renderRows(next, true);
         }
 
         function removeItemRow(index) {
@@ -244,32 +306,55 @@
                     const catOpts = foodCategories.map(c => `<option value="${c.id}" ${String(c.id) === String(prev.cat) ? 'selected' : ''}>${c.name}</option>`).join('');
                     html += `<div class="food-item-row grid grid-cols-12 gap-2 items-end">
                         <div class="col-span-12 sm:col-span-4">
-                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Item name *</label>' : ''}
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Item name *</label>' : ''}
                             <input type="text" name="items[${i}][item_name]" value="${prev.name}" ${i === 0 ? 'required' : ''} placeholder="Item ${i + 1}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                         </div>
                         <div class="col-span-6 sm:col-span-3">
-                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Food category</label>' : ''}
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Food category</label>' : ''}
                             <select name="items[${i}][category_id]" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl"><option value="">—</option>${catOpts}</select>
                         </div>
                         <div class="col-span-3 sm:col-span-2">
-                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Qty</label>' : ''}
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Qty</label>' : ''}
                             <input type="number" name="items[${i}][quantity]" value="${prev.qty}" min="1" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                         </div>
                         <div class="col-span-3 sm:col-span-3">
-                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Amount ₹</label>' : ''}
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-700 mb-1">Amount ₹</label>' : ''}
                             <div class="flex items-center gap-1">
-                                <input type="number" step="0.01" name="items[${i}][amount]" value="${prev.amt}" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900">
-                                ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-1.5 py-1 text-base hover:text-rose-700 cursor-pointer" title="Remove item">&times;</button>` : ''}
+                                <input type="number" step="0.01" name="items[${i}][amount]" value="${prev.amt}" min="0" placeholder="0.00" class="item-amount-input w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900">
+                                ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-2 py-1 text-lg hover:text-rose-700 cursor-pointer" title="Remove row">&times;</button>` : ''}
                             </div>
                         </div>
                     </div>`;
                 }
                 rowsBox.innerHTML = html;
+                calculateTotals();
             }
         }
 
-        countSel?.addEventListener('input', renderRows);
-        countSel?.addEventListener('change', renderRows);
+        countSel?.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            if (val !== '') {
+                const parsed = parseInt(val, 10);
+                if (!isNaN(parsed) && parsed >= 1) {
+                    renderRows(parsed, false);
+                }
+            }
+        });
+
+        countSel?.addEventListener('blur', (e) => {
+            const val = e.target.value.trim();
+            if (val === '' || isNaN(parseInt(val, 10)) || parseInt(val, 10) < 1) {
+                countSel.value = 1;
+                renderRows(1, true);
+            }
+        });
+
+        gstInput?.addEventListener('input', calculateTotals);
+        rowsBox?.addEventListener('input', (e) => {
+            if (e.target.matches('.item-amount-input') || e.target.name?.includes('[amount]')) {
+                calculateTotals();
+            }
+        });
 
         parentSel?.addEventListener('change', () => {
             const opt = parentSel.options[parentSel.selectedIndex];
@@ -291,6 +376,6 @@
             }
         });
 
-        renderRows();
+        renderRows(1, true);
     </script>
 </x-app-layout>
