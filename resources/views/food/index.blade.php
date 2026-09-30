@@ -231,6 +231,47 @@
             return data;
         }
 
+        function updateExpenseBanner() {
+            if (!parentSel || !infoBox) return;
+            const opt = parentSel.options[parentSel.selectedIndex];
+            if (parentSel.value && opt) {
+                modeSel.value = 'sub_item';
+                const expDate = opt.dataset.date;
+                const expAmount = parseFloat(opt.dataset.amount || '0');
+                const expDesc = opt.dataset.desc;
+
+                if (expDate && dateInput) {
+                    dateInput.value = expDate;
+                }
+
+                let subtotal = 0;
+                const rows = rowsBox.querySelectorAll('.food-item-row');
+                rows.forEach((row, i) => {
+                    const amtVal = parseFloat(row.querySelector(`input[name="items[${i}][amount]"]`)?.value || '0');
+                    if (!isNaN(amtVal) && amtVal > 0) {
+                        subtotal += amtVal;
+                    }
+                });
+                const gstVal = parseFloat(gstInput?.value || '0') || 0;
+                const currentFoodTotal = subtotal + gstVal;
+                const remainingDiff = expAmount - currentFoodTotal;
+
+                let statusBadge = '';
+                if (remainingDiff > 0) {
+                    statusBadge = `<span class="text-emerald-700 font-bold">₹${remainingDiff.toFixed(2)} remaining unallocated</span>`;
+                } else if (remainingDiff === 0) {
+                    statusBadge = `<span class="text-indigo-700 font-bold">100% matched exactly</span>`;
+                } else {
+                    statusBadge = `<span class="text-rose-600 font-bold">⚠️ Exceeds parent by ₹${Math.abs(remainingDiff).toFixed(2)}</span>`;
+                }
+
+                infoBox.innerHTML = `📌 Linked to: <strong>${expDesc}</strong> · Linking <strong class="text-indigo-700 font-black">₹${currentFoodTotal.toFixed(2)}</strong> out of <strong class="text-slate-900 font-black">₹${expAmount.toFixed(2)}</strong> (${statusBadge}) · Date auto-set to <strong>${expDate}</strong>`;
+                infoBox.classList.remove('hidden');
+            } else {
+                infoBox.classList.add('hidden');
+            }
+        }
+
         function calculateTotals() {
             let subtotal = 0;
             const rows = rowsBox.querySelectorAll('.food-item-row');
@@ -246,7 +287,11 @@
             if (subtotalSpan) subtotalSpan.textContent = `₹${subtotal.toFixed(2)}`;
             if (gstSpan) gstSpan.textContent = `₹${gstVal.toFixed(2)}`;
             if (grandTotalSpan) grandTotalSpan.textContent = `₹${grandTotal.toFixed(2)}`;
+
+            updateExpenseBanner();
         }
+
+        parentSel?.addEventListener('change', updateExpenseBanner);
 
         function renderRows(targetCount, updateCountInput = true) {
             const existing = getCurrentRowData();
@@ -353,26 +398,6 @@
         rowsBox?.addEventListener('input', (e) => {
             if (e.target.matches('.item-amount-input') || e.target.name?.includes('[amount]')) {
                 calculateTotals();
-            }
-        });
-
-        parentSel?.addEventListener('change', () => {
-            const opt = parentSel.options[parentSel.selectedIndex];
-            if (parentSel.value && opt) {
-                modeSel.value = 'sub_item';
-                const expDate = opt.dataset.date;
-                const expAmount = opt.dataset.amount;
-                const expRemaining = opt.dataset.remaining;
-                const expDesc = opt.dataset.desc;
-                if (expDate && dateInput) {
-                    dateInput.value = expDate;
-                }
-                if (infoBox) {
-                    infoBox.innerHTML = `📌 Linked to: <strong>${expDesc}</strong> · Total Spent: <strong class="text-rose-600">₹${Number(expAmount).toFixed(2)}</strong> (Remaining: <strong class="text-emerald-600">₹${Number(expRemaining).toFixed(2)}</strong>) · Date auto-set to <strong>${expDate}</strong>`;
-                    infoBox.classList.remove('hidden');
-                }
-            } else {
-                if (infoBox) infoBox.classList.add('hidden');
             }
         });
 
