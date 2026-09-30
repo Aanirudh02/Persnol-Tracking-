@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Income extends Model
@@ -45,6 +46,21 @@ class Income extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(IncomeCategory::class, 'category_id');
+    }
+
+    public function tallies(): HasMany
+    {
+        return $this->hasMany(IncomeExpenseTally::class);
+    }
+
+    public function talliedAmount(): float
+    {
+        return (float) $this->tallies()->sum('allocated_amount');
+    }
+
+    public function untalliedAmount(): float
+    {
+        return max(0, (float) $this->amount - $this->talliedAmount());
     }
 
     public function isEditableByUser(?User $user = null): bool

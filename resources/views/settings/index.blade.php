@@ -35,7 +35,7 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                 <div class="flex items-start justify-between gap-4">
                     <div>
@@ -57,6 +57,30 @@
                         <a href="{{ route('settings.export.csv', ['module' => $module]) }}" class="rounded-xl border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-800 transition hover:bg-sky-100">{{ $label }} CSV</a>
                     @endforeach
                 </div>
+            </div>
+
+            <!-- Cloudinary Tester -->
+            <div class="rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50/50 p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-bold text-purple-950 flex items-center gap-1.5">
+                            <span>☁️</span> Cloudinary Service
+                        </h2>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200 text-purple-800">
+                            {{ config('services.cloudinary.cloud_name') ? 'Configured' : 'Not Set' }}
+                        </span>
+                    </div>
+                    <p class="mt-1 text-xs leading-5 text-purple-800">
+                        Cloud: <strong class="font-mono text-purple-950">{{ config('services.cloudinary.cloud_name', 'None') }}</strong> · Folder: <span class="font-mono">{{ config('services.cloudinary.folder', 'odometer') }}</span>
+                    </p>
+                    <p class="text-[11px] text-purple-600 mt-0.5">Test real API connection and sample upload.</p>
+                </div>
+                <form action="{{ route('settings.test-cloudinary') }}" method="POST" class="mt-4">
+                    @csrf
+                    <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-purple-700 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-800 active:scale-95 cursor-pointer">
+                        <span>⚡</span> Test Cloudinary Upload
+                    </button>
+                </form>
             </div>
         </div>
 

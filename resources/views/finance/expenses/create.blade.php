@@ -196,10 +196,22 @@
                     </select>
                 </div>
 
-                <label class="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="is_voluntary" value="1" class="rounded border-slate-300 text-slate-900">
-                    Voluntary spend
-                </label>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Classification</label>
+                        <select name="classification" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                            <option value="necessary" @selected(old('classification', 'necessary') === 'necessary')>🟢 Necessary (Essential)</option>
+                            <option value="unwanted" @selected(old('classification') === 'unwanted')>🔴 Unwanted / Avoidable</option>
+                            <option value="emergency" @selected(old('classification') === 'emergency')>🟡 Emergency / Urgent</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center pt-6">
+                        <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-slate-700 select-none">
+                            <input type="checkbox" name="is_voluntary" value="1" @checked(old('is_voluntary')) class="rounded border-slate-300 text-slate-900">
+                            <span>Voluntary spend</span>
+                        </label>
+                    </div>
+                </div>
 
                 <div>
                     <label class="mb-1 block font-semibold text-slate-700">Receipt Image</label>
@@ -624,9 +636,14 @@
 
         groupToggle.addEventListener('change', () => {
             groupLines.classList.toggle('hidden', !groupToggle.checked);
-            if (groupToggle.checked && groupList.children.length === 0) {
-                addGroupLine();
-                addGroupLine();
+            groupList.querySelectorAll('input, select').forEach(el => el.disabled = !groupToggle.checked);
+            if (groupToggle.checked) {
+                if (groupList.children.length === 0) {
+                    addGroupLine();
+                    addGroupLine();
+                } else {
+                    groupList.querySelectorAll('input, select').forEach(el => el.disabled = false);
+                }
             }
         });
         document.getElementById('add-group-line').addEventListener('click', () => addGroupLine());

@@ -754,7 +754,7 @@
         function openAddExpensesToPersonalGroupModal(groupId, groupName) {
             currentActivePersonalGroupId = groupId;
             document.getElementById('add-to-personal-group-sub').textContent = 'Target Group: ' + groupName;
-            document.getElementById('add-to-personal-group-form').action = '/personal-expense-groups/' + groupId + '/expenses/attach';
+            document.getElementById('add-to-personal-group-form').action = '/finance/personal-expense-groups/' + groupId + '/expenses/attach';
             document.getElementById('add-personal-group-search-input').value = '';
             document.getElementById('add-to-personal-group-modal').classList.remove('hidden');
             document.getElementById('add-to-personal-group-modal').classList.add('flex');

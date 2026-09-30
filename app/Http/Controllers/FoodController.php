@@ -84,8 +84,8 @@ class FoodController extends Controller
     public function store(Request $request, OptionsService $options)
     {
         $validated = $request->validate([
-            'item_count' => 'nullable|integer|min:1|max:4',
-            'items' => 'required|array|min:1|max:4',
+            'item_count' => 'nullable|integer|min:1',
+            'items' => 'required|array|min:1',
             'items.*.item_name' => 'nullable|string|max:100',
             'items.*.category_id' => 'nullable|exists:food_categories,id',
             'items.*.quantity' => 'nullable|integer|min:1',
@@ -168,6 +168,14 @@ class FoodController extends Controller
                     $expCat = ExpenseCategory::query()
                         ->where('is_archived', false)
                         ->find($categoryId);
+                }
+                if (! $expCat) {
+                    $catName = $request->boolean('is_snack') ? 'Snacks' : 'Food';
+                    $expCat = ExpenseCategory::whereRaw('LOWER(name) = ?', [strtolower($catName)])->first()
+                        ?? ExpenseCategory::firstOrCreate(
+                            ['name' => $catName, 'user_id' => null],
+                            ['icon' => $request->boolean('is_snack') ? 'cookie' : 'utensils', 'color' => '#f97316', 'is_archived' => false, 'is_voluntary' => false]
+                        );
                 }
             }
 

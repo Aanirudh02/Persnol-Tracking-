@@ -6,6 +6,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CreditDebtController;
+use App\Http\Controllers\DailyBalanceController;
 use App\Http\Controllers\DailyRecordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PersonalExpenseController;
 use App\Http\Controllers\PetrolController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SavingsController;
 use App\Http\Controllers\ScooterController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingController;
@@ -51,6 +53,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middl
 Route::middleware('auth')->group(function () {
     Route::get('/', fn () => redirect()->route('dashboard'));
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('permission:dashboard.view');
+    Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart-data')->middleware('permission:dashboard.view');
 
     // Daily Life & Prompts
     Route::post('/daily/wakeup', [DailyRecordController::class, 'recordWakeup'])->name('daily.wakeup');
@@ -96,8 +99,18 @@ Route::middleware('auth')->group(function () {
         Route::put('/expense-groups/{expenseGroup}/expenses/{expense}/payment-method', [ExpenseController::class, 'updateGroupPaymentMethod'])->name('expense-groups.expenses.payment-method');
         Route::post('/expenses/{expense}/link-food', [ExpenseController::class, 'linkFood'])->name('expenses.link-food');
 
+        // Savings Module
+        Route::resource('savings', SavingsController::class)->names('savings');
+        Route::post('/savings/{saving}/withdraw', [SavingsController::class, 'withdraw'])->name('savings.withdraw');
+
+        // Daily Balances & Cash Register
+        Route::get('/daily-balances', [DailyBalanceController::class, 'index'])->name('daily-balances.index');
+        Route::post('/daily-balances', [DailyBalanceController::class, 'update'])->name('daily-balances.update');
+
         // Income
         Route::resource('income', IncomeController::class)->names('income');
+        Route::post('/income/{income}/tally', [IncomeController::class, 'tallyExpense'])->name('income.tally');
+        Route::delete('/income/{income}/tally/{tally}', [IncomeController::class, 'untallyExpense'])->name('income.untally');
 
         // Payments & Reconciliation
         Route::resource('payments', PaymentController::class)->names('payments');
@@ -120,7 +133,13 @@ Route::middleware('auth')->group(function () {
         Route::put('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'updatePayment'])->name('credits.payments.update');
         Route::delete('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'deletePayment'])->name('credits.payments.destroy');
         Route::post('/credits/{creditDebt}/status', [CreditDebtController::class, 'updateStatus'])->name('credits.status');
+        Route::post('/credits/{creditDebt}/record-as-expense', [CreditDebtController::class, 'recordAsExpense'])->name('credits.record-as-expense');
+        Route::post('/credits/{creditDebt}/record-as-income', [CreditDebtController::class, 'recordAsIncome'])->name('credits.record-as-income');
+        Route::post('/credits/{creditDebt}/settle-discounted', [CreditDebtController::class, 'settleDiscounted'])->name('credits.settle-discounted');
     });
+
+    // Petrol Statement Route
+    Route::get('/petrol/statement', [PetrolController::class, 'statement'])->name('petrol.statement');
 
     // Categories (user-defined)
     Route::post('/categories/expense', [CategoryController::class, 'storeExpense'])->name('categories.expense.store');
@@ -212,6 +231,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/profile', [SettingController::class, 'updateProfile'])->name('settings.profile');
         Route::post('/password', [SettingController::class, 'updatePassword'])->name('settings.password');
         Route::post('/system', [SettingController::class, 'updateSettings'])->name('settings.system');
+        Route::post('/test-cloudinary', [SettingController::class, 'testCloudinary'])->name('settings.test-cloudinary');
         Route::post('/resync-friends', [SettingController::class, 'resyncFriends'])->name('settings.resync-friends');
         Route::post('/custom-answer/{question}', [SettingController::class, 'saveCustomAnswer'])->name('settings.custom-answer');
         Route::post('/users', [SettingController::class, 'storeUser'])->name('settings.users')->middleware('role:Admin');

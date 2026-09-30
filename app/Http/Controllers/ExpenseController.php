@@ -380,6 +380,7 @@ class ExpenseController extends Controller
                     'notes' => $combinedNotes,
                     'receipt_image' => $imagePath,
                     'is_voluntary' => $isVoluntary,
+                    'classification' => $validated['classification'] ?? 'necessary',
                 ]);
 
                 AuditService::log('expense', $expense->id, 'created', null, $expense->toArray(), 'Expense created with friend split');
@@ -439,6 +440,7 @@ class ExpenseController extends Controller
                     'notes' => $validated['notes'] ?? null,
                     'receipt_image' => $imagePath,
                     'is_voluntary' => $isVoluntary,
+                    'classification' => $validated['classification'] ?? 'necessary',
                 ]);
 
                 AuditService::log('expense', $expense->id, 'created', null, $expense->toArray(), 'Expense created');
@@ -905,6 +907,7 @@ class ExpenseController extends Controller
             'payment_method' => ['required', 'string', 'max:50'],
             'receipt_image' => ['nullable', 'image', 'max:5120'],
             'notes' => ['nullable', 'string'],
+            'classification' => ['nullable', 'string', 'in:necessary,unwanted,emergency'],
             'is_voluntary' => ['nullable', 'boolean'],
             'record_as_combination' => ['nullable', 'boolean'],
             'split_with_friend_id' => ['nullable', 'integer'],
@@ -920,11 +923,23 @@ class ExpenseController extends Controller
         ];
 
         if ($isCreate) {
-            $rules['parent_id'] = ['nullable', 'integer', 'exists:expenses,id'];
-            $rules['add_group_expense'] = ['nullable', 'boolean'];
-            $rules['group_expenses'] = ['nullable', 'array', 'min:2'];
-            $rules['group_expenses.*.amount'] = ['required_with:add_group_expense', 'numeric', 'min:0.01'];
-            $rules['group_expenses.*.payment_method'] = ['required_with:add_group_expense', 'string', 'max:50'];
+            if (! $request->boolean('add_group_expense')) {
+                $request->request->remove('group_expenses');
+                $request->request->remove('add_group_expense');
+                $rules['parent_id'] = ['nullable', 'integer', 'exists:expenses,id'];
+            } else {
+                $filteredGroup = collect($request->input('group_expenses', []))
+                    ->filter(fn ($row) => is_array($row) && (filled($row['amount'] ?? null) || filled($row['payment_method'] ?? null)))
+                    ->values()
+                    ->all();
+                $request->merge(['group_expenses' => $filteredGroup]);
+
+                $rules['parent_id'] = ['nullable', 'integer', 'exists:expenses,id'];
+                $rules['add_group_expense'] = ['nullable', 'boolean'];
+                $rules['group_expenses'] = ['required', 'array', 'min:2'];
+                $rules['group_expenses.*.amount'] = ['required', 'numeric', 'min:0.01'];
+                $rules['group_expenses.*.payment_method'] = ['required', 'string', 'max:50'];
+            }
         }
 
         $validator = Validator::make($request->all(), $rules);

@@ -25,6 +25,7 @@ class PersonalExpense extends Model
         'notes',
         'is_voluntary',
         'is_archived',
+        'classification',
     ];
 
     protected $casts = [

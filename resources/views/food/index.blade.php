@@ -14,9 +14,12 @@
             @csrf
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">How many items? (1–4)</label>
-                    <input id="item_count" name="item_count" type="number" min="1" max="4" step="1" value="1" inputmode="numeric" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                <div class="flex items-center gap-2">
+                    <div class="flex-1">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Number of Items</label>
+                        <input id="item_count" name="item_count" type="number" min="1" step="1" value="1" inputmode="numeric" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                    </div>
+                    <button type="button" onclick="addItemRow()" class="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100">+ Add</button>
                 </div>
                 <label class="flex items-center gap-2 pt-6">
                     <input type="checkbox" name="is_snack" value="1" @checked(request()->boolean('is_snack'))>
@@ -161,7 +164,7 @@
         const modeSel = document.getElementById('expense_mode');
 
         function renderRows() {
-            const n = Math.min(4, Math.max(1, parseInt(countSel.value || '1', 10)));
+            const n = Math.max(1, parseInt(countSel.value || '1', 10));
             countSel.value = n;
             let html = '';
             for (let i = 0; i < n; i++) {
@@ -181,11 +184,28 @@
                     </div>
                     <div class="col-span-3 sm:col-span-3">
                         ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Amount ₹</label>' : ''}
-                        <input type="number" step="0.01" name="items[${i}][amount]" value="0" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        <div class="flex items-center gap-1">
+                            <input type="number" step="0.01" name="items[${i}][amount]" value="0" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                            ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-1.5 py-1 text-base hover:text-rose-700" title="Remove item">&times;</button>` : ''}
+                        </div>
                     </div>
                 </div>`;
             }
             rowsBox.innerHTML = html;
+        }
+
+        function addItemRow() {
+            const current = parseInt(countSel.value || '1', 10);
+            countSel.value = current + 1;
+            renderRows();
+        }
+
+        function removeItemRow(index) {
+            const current = parseInt(countSel.value || '1', 10);
+            if (current > 1) {
+                countSel.value = current - 1;
+                renderRows();
+            }
         }
 
         countSel?.addEventListener('input', renderRows);

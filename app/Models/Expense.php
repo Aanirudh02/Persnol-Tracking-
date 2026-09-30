@@ -38,6 +38,7 @@ class Expense extends Model
         'is_locked',
         'is_voluntary',
         'is_archived',
+        'classification',
     ];
 
     protected $casts = [

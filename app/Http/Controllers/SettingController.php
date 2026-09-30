@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -390,5 +391,45 @@ class SettingController extends Controller
         );
 
         return back()->with('success', 'Friend balances and split records successfully resynced!')->with('resync_output', $output);
+    }
+
+    public function testCloudinary(Request $request)
+    {
+        $cloudName = config('services.cloudinary.cloud_name');
+        $apiKey = config('services.cloudinary.api_key');
+        $apiSecret = config('services.cloudinary.api_secret');
+
+        if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
+            return back()->with('error', 'Cloudinary credentials missing in .env (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).');
+        }
+
+        try {
+            $timestamp = time();
+            $paramsToSign = "folder=test_connection&timestamp={$timestamp}";
+            $signature = sha1($paramsToSign.$apiSecret);
+
+            $testPixelBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+            $response = Http::timeout(15)->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                'file' => $testPixelBase64,
+                'api_key' => $apiKey,
+                'timestamp' => $timestamp,
+                'folder' => 'test_connection',
+                'signature' => $signature,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $url = $data['secure_url'] ?? $data['url'] ?? 'Success';
+
+                return back()->with('success', "✅ Cloudinary connection successful! Cloud: {$cloudName}. Test image URL: {$url}");
+            }
+
+            $errMsg = $response->json('error.message') ?? $response->body();
+
+            return back()->with('error', "❌ Cloudinary test failed: {$errMsg}");
+        } catch (\Throwable $e) {
+            return back()->with('error', "❌ Cloudinary exception: {$e->getMessage()}");
+        }
     }
 }

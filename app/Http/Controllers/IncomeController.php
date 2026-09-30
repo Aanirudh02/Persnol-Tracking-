@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\DailyRecord;
+use App\Models\Expense;
 use App\Models\Income;
 use App\Models\IncomeCategory;
+use App\Models\IncomeExpenseTally;
 use App\Services\AuditService;
 use App\Services\FinanceService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class IncomeController extends Controller
@@ -147,7 +150,68 @@ class IncomeController extends Controller
         return redirect()->route('income.index')->with('success', 'Income record updated!');
     }
 
-    public function destroy(Request $request, Income $income)
+    public function show(Request $request, Income $income): View
+    {
+        if ($income->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $income->load(['category', 'tallies.expense.category']);
+        $talliedExpenseIds = $income->tallies->pluck('expense_id')->all();
+
+        $availableExpenses = Expense::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNull('parent_id')
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereNotIn('id', $talliedExpenseIds)
+            ->orderByDesc('date')
+            ->take(40)
+            ->get();
+
+        $talliedTotal = $income->talliedAmount();
+        $untalliedTotal = $income->untalliedAmount();
+
+        return view('finance.income.show', compact('income', 'availableExpenses', 'talliedTotal', 'untalliedTotal'));
+    }
+
+    public function tallyExpense(Request $request, Income $income): RedirectResponse
+    {
+        if ($income->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $untallied = $income->untalliedAmount();
+        $validated = $request->validate([
+            'expense_id' => ['required', 'exists:expenses,id'],
+            'allocated_amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, $untallied + 0.01)],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $expense = Expense::query()->where('user_id', $request->user()->id)->findOrFail($validated['expense_id']);
+
+        IncomeExpenseTally::create([
+            'user_id' => $request->user()->id,
+            'income_id' => $income->id,
+            'expense_id' => $expense->id,
+            'allocated_amount' => $validated['allocated_amount'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return back()->with('success', 'Expense tallied against income for ₹'.number_format((float) $validated['allocated_amount'], 2).'.');
+    }
+
+    public function untallyExpense(Request $request, Income $income, IncomeExpenseTally $tally): RedirectResponse
+    {
+        if ($income->user_id !== $request->user()->id || $tally->income_id !== $income->id) {
+            abort(403);
+        }
+
+        $tally->delete();
+
+        return back()->with('success', 'Expense tally removed.');
+    }
+
+    public function destroy(Request $request, Income $income): RedirectResponse
     {
         if ($income->user_id !== auth()->id()) {
             abort(403);

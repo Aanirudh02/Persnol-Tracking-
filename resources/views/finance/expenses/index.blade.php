@@ -870,7 +870,7 @@
         function openAddExpensesToGroupModal(groupId, groupName) {
             currentActiveGroupId = groupId;
             document.getElementById('add-to-group-sub').textContent = 'Target Group: ' + groupName;
-            document.getElementById('add-to-group-form').action = '/expense-groups/' + groupId + '/expenses/attach';
+            document.getElementById('add-to-group-form').action = '/finance/expense-groups/' + groupId + '/expenses/attach';
             document.getElementById('add-group-search-input').value = '';
             document.getElementById('add-to-group-modal').classList.remove('hidden');
             document.getElementById('add-to-group-modal').classList.add('flex');

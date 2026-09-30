@@ -474,17 +474,43 @@
 
             <!-- SPENDING CHART & QUICK ACTIONS (5 cols) -->
             <div class="lg:col-span-5 space-y-6">
-                <!-- 7-Day Expense Trend Chart -->
+                <!-- Dynamic Spending Trend Chart -->
                 <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                         <div>
-                            <h2 class="font-bold text-sm text-slate-900 dark:text-white">7-Day Spending</h2>
-                            <p class="text-xs text-slate-500">Daily expenses breakdown</p>
+                            <h2 class="font-bold text-sm text-slate-900 dark:text-white" id="chart-title">7-Day Spending</h2>
+                            <p class="text-xs text-slate-500" id="chart-sub">Daily expenses breakdown</p>
                         </div>
-                        <a href="{{ route('expenses.index') }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Expenses &rarr;</a>
+                        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
+                            <button type="button" onclick="switchChartRange('7d', this)" class="chart-range-btn px-2.5 py-1 rounded-lg bg-white shadow-xs text-indigo-600">7D</button>
+                            <button type="button" onclick="switchChartRange('week', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">Week</button>
+                            <button type="button" onclick="switchChartRange('month', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">Month</button>
+                            <button type="button" onclick="switchChartRange('year', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">Year</button>
+                        </div>
                     </div>
                     <div class="h-52 w-full">
                         <canvas id="weeklyExpenseChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Savings & Income Tally Snapshot Card -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="p-4 rounded-3xl bg-emerald-50/70 border border-emerald-100 shadow-sm space-y-1">
+                        <div class="flex items-center justify-between text-emerald-800">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">Net Savings Pool</span>
+                            <span class="text-base">💰</span>
+                        </div>
+                        <div class="text-xl font-black text-emerald-900">₹{{ number_format($totalSavingsAvailable, 2) }}</div>
+                        <a href="{{ route('savings.index') }}" class="text-[11px] font-bold text-emerald-700 hover:underline block pt-1">Manage Savings &rarr;</a>
+                    </div>
+                    <div class="p-4 rounded-3xl bg-indigo-50/70 border border-indigo-100 shadow-sm space-y-1">
+                        <div class="flex items-center justify-between text-indigo-800">
+                            <span class="text-[11px] font-bold uppercase tracking-wider">Income Tallying</span>
+                            <span class="text-base">🧾</span>
+                        </div>
+                        <div class="text-xl font-black text-indigo-900">₹{{ number_format($totalIncomeTallied, 2) }}</div>
+                        <span class="text-[11px] text-slate-500 block">₹{{ number_format($totalIncomeSurplus, 2) }} untallied surplus</span>
+                        <a href="{{ route('income.index') }}" class="text-[11px] font-bold text-indigo-700 hover:underline block">View Tallies &rarr;</a>
                     </div>
                 </div>
 
@@ -492,6 +518,15 @@
                 <div class="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
                     <h2 class="font-bold text-sm text-slate-900 dark:text-white">Quick Access</h2>
                     <div class="grid grid-cols-2 gap-2 text-xs">
+                        <a href="{{ route('daily-balances.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                            <span>📅</span> Cash Register
+                        </a>
+                        <a href="{{ route('savings.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                            <span>💰</span> Savings
+                        </a>
+                        <a href="{{ route('petrol.statement') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                            <span>⛽</span> Petrol Statement
+                        </a>
                         <a href="{{ route('friends.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
                             <span>👥</span> Friend Debts
                         </a>
@@ -501,9 +536,6 @@
                         <a href="{{ route('petrol.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
                             <span>⛽</span> Petrol Log
                         </a>
-                        <a href="{{ route('mistakes.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
-                            <span>⚠️</span> Lessons
-                        </a>
                     </div>
                 </div>
             </div>
@@ -512,8 +544,10 @@
 
     </div>
 
-    <!-- Chart.js Init Script -->
+    <!-- Chart.js Init & Dynamic Switcher Script -->
     <script>
+        let expenseChartInstance = null;
+
         document.addEventListener('DOMContentLoaded', function () {
             const ctx = document.getElementById('weeklyExpenseChart');
             if (!ctx) return;
@@ -521,7 +555,7 @@
             const labels = @json($last7Days);
             const data = @json($expenseChartData);
 
-            new Chart(ctx, {
+            expenseChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -554,6 +588,31 @@
                 }
             });
         });
+
+        function switchChartRange(range, btn) {
+            document.querySelectorAll('.chart-range-btn').forEach(b => {
+                b.className = 'chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900';
+            });
+            btn.className = 'chart-range-btn px-2.5 py-1 rounded-lg bg-white shadow-xs text-indigo-600 font-bold';
+
+            fetch(`/dashboard/chart-data?range=${range}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (!expenseChartInstance) return;
+                    expenseChartInstance.data.labels = res.labels;
+                    expenseChartInstance.data.datasets[0].data = res.data;
+                    expenseChartInstance.update();
+
+                    const titleMap = {
+                        '7d': '7-Day Spending',
+                        'week': 'This Week Spending',
+                        'month': 'This Month Daily Spending',
+                        'year': 'This Year Monthly Spending'
+                    };
+                    document.getElementById('chart-title').textContent = titleMap[range] || 'Spending Trend';
+                    document.getElementById('chart-sub').textContent = `Total: ₹${Number(res.total).toFixed(2)}`;
+                });
+        }
     </script>
 
     <!-- Monthly Breakdown Modal -->

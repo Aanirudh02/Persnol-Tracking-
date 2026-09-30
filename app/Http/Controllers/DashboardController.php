@@ -3,19 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Models\Activity;
+use App\Models\DailyBalance;
 use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\FoodEntry;
 use App\Models\FuelEntry;
 use App\Models\Income;
+use App\Models\IncomeExpenseTally;
 use App\Models\Mistake;
 use App\Models\PersonalExpense;
+use App\Models\Saving;
 use App\Models\ScooterTrip;
 use App\Models\Setting;
 use App\Services\DailyPromptService;
 use App\Services\DayTimelineService;
 use App\Services\WalletService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -207,6 +211,16 @@ class DashboardController extends Controller
             ->whereBetween('date', [$startOfMonth, $endOfMonth])
             ->sum('amount');
 
+        $totalSavingsAvailable = (float) Saving::query()->where('user_id', $user->id)->get()->sum(fn ($s) => $s->netAvailable());
+        $totalIncomeTallied = (float) IncomeExpenseTally::query()->where('user_id', $user->id)->sum('allocated_amount');
+        $totalIncomeAll = (float) Income::query()->where('user_id', $user->id)->sum('amount');
+        $totalIncomeSurplus = max(0, $totalIncomeAll - $totalIncomeTallied);
+
+        $todayDailyBalance = DailyBalance::query()
+            ->where('user_id', $user->id)
+            ->where('record_date', $today)
+            ->first();
+
         return view('dashboard.index', compact(
             'todayRecord',
             'yesterdayRecord',
@@ -243,7 +257,76 @@ class DashboardController extends Controller
             'startDate',
             'endDate',
             'wallets',
-            'currentBalance'
+            'currentBalance',
+            'totalSavingsAvailable',
+            'totalIncomeTallied',
+            'totalIncomeSurplus',
+            'todayDailyBalance'
         ));
+    }
+
+    public function chartData(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $range = $request->get('range', '7d');
+        $labels = [];
+        $data = [];
+
+        if ($range === 'week') {
+            $start = Carbon::today()->startOfWeek();
+            for ($i = 0; $i < 7; $i++) {
+                $d = $start->copy()->addDays($i);
+                $labels[] = $d->format('D (d M)');
+                $sum = (float) Expense::where('user_id', $user->id)
+                    ->whereNull('parent_id')
+                    ->where('date', $d->toDateString())
+                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+                    ->sum(DB::raw('amount + gst_amount'));
+                $data[] = $sum;
+            }
+        } elseif ($range === 'month') {
+            $start = Carbon::today()->startOfMonth();
+            $daysInMonth = Carbon::today()->daysInMonth;
+            for ($i = 1; $i <= $daysInMonth; $i++) {
+                $d = Carbon::today()->startOfMonth()->day($i);
+                $labels[] = $d->format('d M');
+                $sum = (float) Expense::where('user_id', $user->id)
+                    ->whereNull('parent_id')
+                    ->where('date', $d->toDateString())
+                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+                    ->sum(DB::raw('amount + gst_amount'));
+                $data[] = $sum;
+            }
+        } elseif ($range === 'year') {
+            for ($m = 1; $m <= 12; $m++) {
+                $d = Carbon::today()->month($m)->startOfMonth();
+                $labels[] = $d->format('M Y');
+                $sum = (float) Expense::where('user_id', $user->id)
+                    ->whereNull('parent_id')
+                    ->whereBetween('date', [$d->toDateString(), $d->copy()->endOfMonth()->toDateString()])
+                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+                    ->sum(DB::raw('amount + gst_amount'));
+                $data[] = $sum;
+            }
+        } else {
+            // Default 7 days
+            for ($i = 6; $i >= 0; $i--) {
+                $d = Carbon::today()->subDays($i);
+                $labels[] = $d->format('D, M j');
+                $sum = (float) Expense::where('user_id', $user->id)
+                    ->whereNull('parent_id')
+                    ->where('date', $d->toDateString())
+                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+                    ->sum(DB::raw('amount + gst_amount'));
+                $data[] = $sum;
+            }
+        }
+
+        return response()->json([
+            'range' => $range,
+            'labels' => $labels,
+            'data' => $data,
+            'total' => round(array_sum($data), 2),
+        ]);
     }
 }

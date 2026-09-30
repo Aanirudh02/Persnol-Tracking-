@@ -163,6 +163,7 @@ class PersonalExpenseController extends Controller
             'done_by' => 'nullable|string|max:100',
             'done_to' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'classification' => 'nullable|string|in:necessary,unwanted,emergency',
             'is_voluntary' => 'nullable|boolean',
             'record_as_normal_expense' => 'nullable|boolean',
         ]);
@@ -178,6 +179,7 @@ class PersonalExpenseController extends Controller
             'done_by' => ! empty($validated['done_by']) ? $validated['done_by'] : 'Me',
             'done_to' => $validated['done_to'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'classification' => $validated['classification'] ?? 'necessary',
             'is_voluntary' => $request->boolean('is_voluntary'),
             'is_archived' => false,
         ]);
@@ -203,6 +205,7 @@ class PersonalExpenseController extends Controller
             'done_by' => 'nullable|string|max:100',
             'done_to' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'classification' => 'nullable|string|in:necessary,unwanted,emergency',
             'is_voluntary' => 'nullable|boolean',
             'record_as_normal_expense' => 'nullable|boolean',
         ]);
@@ -217,6 +220,7 @@ class PersonalExpenseController extends Controller
             'done_by' => ! empty($validated['done_by']) ? $validated['done_by'] : 'Me',
             'done_to' => $validated['done_to'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'classification' => $validated['classification'] ?? $personalExpense->classification ?? 'necessary',
             'is_voluntary' => $request->boolean('is_voluntary'),
         ]);
 

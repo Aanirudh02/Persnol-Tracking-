@@ -10,8 +10,10 @@ use App\Models\Vehicle;
 use App\Services\AuditService;
 use App\Services\FinanceService;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class PetrolController extends Controller
 {
@@ -269,7 +271,7 @@ class PetrolController extends Controller
         ]);
     }
 
-    public function linkExpense(Request $request, FuelEntry $petrol)
+    public function linkExpense(Request $request, FuelEntry $petrol): RedirectResponse
     {
         if ($petrol->user_id !== auth()->id()) {
             abort(403);
@@ -285,5 +287,80 @@ class PetrolController extends Controller
         });
 
         return back()->with('success', '⛽ Petrol fill logged as Normal Expense successfully!');
+    }
+
+    public function statement(Request $request): View
+    {
+        $user = $request->user();
+        $period = $request->get('period', 'month');
+        $fromDate = $request->get('from_date');
+        $toDate = $request->get('to_date');
+        $vehicleId = $request->get('vehicle_id');
+
+        $today = Carbon::today();
+        [$startDate, $endDate] = match ($period) {
+            'week' => [$today->copy()->startOfWeek()->toDateString(), $today->copy()->endOfWeek()->toDateString()],
+            'month' => [$today->copy()->startOfMonth()->toDateString(), $today->copy()->endOfMonth()->toDateString()],
+            'year' => [$today->copy()->startOfYear()->toDateString(), $today->copy()->endOfYear()->toDateString()],
+            'custom' => [$fromDate ?: $today->copy()->startOfMonth()->toDateString(), $toDate ?: $today->toDateString()],
+            default => [null, null],
+        };
+
+        $query = FuelEntry::query()
+            ->where('user_id', $user->id)
+            ->with(['vehicle', 'expense']);
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('date', [$startDate, $endDate]);
+        }
+        if (! empty($vehicleId) && $vehicleId !== 'all') {
+            $query->where('vehicle_id', (int) $vehicleId);
+        }
+
+        $entries = $query->orderBy('date')->orderBy('odometer')->get();
+        $vehicles = Vehicle::where('user_id', $user->id)->orderBy('name')->get();
+
+        $totalSpent = round((float) $entries->sum('amount'), 2);
+        $totalLitres = round((float) $entries->sum('litres'), 2);
+        $avgPricePerLitre = $totalLitres > 0 ? round($totalSpent / $totalLitres, 2) : 0.0;
+
+        // Compute mileage between consecutive fill-ups
+        $enhancedEntries = collect();
+        $lastOdometer = null;
+        foreach ($entries as $entry) {
+            $distance = null;
+            $mileage = null;
+            if ($entry->odometer && $lastOdometer && $entry->odometer > $lastOdometer) {
+                $distance = $entry->odometer - $lastOdometer;
+                if ($entry->litres > 0) {
+                    $mileage = round($distance / $entry->litres, 1);
+                }
+            }
+            if ($entry->odometer) {
+                $lastOdometer = $entry->odometer;
+            }
+
+            $enhancedEntries->push([
+                'entry' => $entry,
+                'distance' => $distance,
+                'mileage' => $mileage,
+            ]);
+        }
+
+        $entriesDesc = $enhancedEntries->reverse()->values();
+
+        return view('scooter.petrol.statement', compact(
+            'entriesDesc',
+            'vehicles',
+            'totalSpent',
+            'totalLitres',
+            'avgPricePerLitre',
+            'period',
+            'fromDate',
+            'toDate',
+            'startDate',
+            'endDate',
+            'vehicleId'
+        ));
     }
 }

@@ -4,7 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\CreditDebt;
 use App\Models\CreditDebtPayment;
+use App\Models\DailyRecord;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Friend;
+use App\Models\Income;
+use App\Models\IncomeCategory;
 use App\Services\FinanceLinkService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
@@ -288,6 +293,160 @@ class CreditDebtController extends Controller
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
         return back()->with('success', 'Status updated to '.$creditDebt->statusLabel());
+    }
+
+    public function recordAsExpense(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id || $creditDebt->type !== 'credit') {
+            abort(403);
+        }
+
+        $remaining = $creditDebt->remaining();
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, $remaining + 0.01)],
+            'date' => ['required', 'date'],
+            'payment_method' => ['required', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $category = ExpenseCategory::firstOrCreate(
+            ['name' => 'Debt Repayment', 'user_id' => null],
+            ['icon' => 'hand-coins', 'color' => '#6366f1', 'is_archived' => false, 'is_voluntary' => false]
+        );
+
+        DB::transaction(function () use ($request, $creditDebt, $validated, $category): void {
+            $dailyRecord = DailyRecord::firstOrCreate([
+                'user_id' => $request->user()->id,
+                'record_date' => $validated['date'],
+            ]);
+
+            $expense = Expense::create([
+                'user_id' => $request->user()->id,
+                'daily_record_id' => $dailyRecord->id,
+                'category_id' => $category->id,
+                'amount' => $validated['amount'],
+                'gst_amount' => 0,
+                'date' => $validated['date'],
+                'time' => Carbon::now()->format('H:i'),
+                'description' => 'Credit Repayment to '.($creditDebt->friend?->name ?? 'Friend'),
+                'payment_method' => $validated['payment_method'],
+                'paid_by' => 'Me',
+                'paid_by_type' => 'me',
+                'notes' => trim(($validated['notes'] ?? '')."\nLinked to Credit #".$creditDebt->id),
+                'is_voluntary' => false,
+            ]);
+
+            CreditDebtPayment::create([
+                'credit_debt_id' => $creditDebt->id,
+                'amount' => $validated['amount'],
+                'paid_on' => $validated['date'],
+                'payment_method' => $validated['payment_method'],
+                'notes' => 'Filed as expense #'.$expense->id,
+            ]);
+
+            $creditDebt->linked_expense_id = $expense->id;
+            $this->refreshCreditDebtAmounts($creditDebt);
+        });
+
+        $linkService->syncCreditDebtToFriend($creditDebt->fresh());
+
+        return back()->with('success', 'Credit repayment of ₹'.number_format($validated['amount'], 2).' filed as Normal Expense.');
+    }
+
+    public function recordAsIncome(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id || $creditDebt->type !== 'debt') {
+            abort(403);
+        }
+
+        $remaining = $creditDebt->remaining();
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, $remaining + 0.01)],
+            'date' => ['required', 'date'],
+            'payment_method' => ['required', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $category = IncomeCategory::firstOrCreate(
+            ['name' => 'Debt Recovery', 'user_id' => null],
+            ['icon' => 'wallet', 'color' => '#10b981', 'is_archived' => false]
+        );
+
+        DB::transaction(function () use ($request, $creditDebt, $validated, $category): void {
+            $dailyRecord = DailyRecord::firstOrCreate([
+                'user_id' => $request->user()->id,
+                'record_date' => $validated['date'],
+            ]);
+
+            $income = Income::create([
+                'user_id' => $request->user()->id,
+                'daily_record_id' => $dailyRecord->id,
+                'category_id' => $category->id,
+                'amount' => $validated['amount'],
+                'source' => 'Debt Collection: '.($creditDebt->friend?->name ?? 'Friend'),
+                'date' => $validated['date'],
+                'time' => Carbon::now()->format('H:i'),
+                'payment_method' => $validated['payment_method'],
+                'description' => 'Received from '.($creditDebt->friend?->name ?? 'Friend'),
+                'notes' => trim(($validated['notes'] ?? '')."\nLinked to Debt #".$creditDebt->id),
+            ]);
+
+            CreditDebtPayment::create([
+                'credit_debt_id' => $creditDebt->id,
+                'amount' => $validated['amount'],
+                'paid_on' => $validated['date'],
+                'payment_method' => $validated['payment_method'],
+                'notes' => 'Recorded as Income #'.$income->id,
+            ]);
+
+            $creditDebt->linked_income_id = $income->id;
+            $this->refreshCreditDebtAmounts($creditDebt);
+        });
+
+        $linkService->syncCreditDebtToFriend($creditDebt->fresh());
+
+        return back()->with('success', 'Debt recovery of ₹'.number_format($validated['amount'], 2).' recorded as Income.');
+    }
+
+    public function settleDiscounted(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'settled_amount' => ['required', 'numeric', 'min:0'],
+            'discount_amount' => ['required', 'numeric', 'min:0.01'],
+            'paid_on' => ['required', 'date'],
+            'payment_method' => ['nullable', 'string', 'max:50'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        DB::transaction(function () use ($creditDebt, $validated): void {
+            $settledPaid = (float) $validated['settled_amount'];
+            if ($settledPaid > 0) {
+                CreditDebtPayment::create([
+                    'credit_debt_id' => $creditDebt->id,
+                    'amount' => $settledPaid,
+                    'paid_on' => $validated['paid_on'],
+                    'payment_method' => $validated['payment_method'] ?? null,
+                    'notes' => 'Settlement final payment (Discount/Forgiven: ₹'.number_format((float) $validated['discount_amount'], 2).')',
+                ]);
+            }
+
+            $creditDebt->settled_discount_amount = (float) $validated['discount_amount'];
+            $creditDebt->is_settled_discounted = true;
+            $creditDebt->amount_paid = (float) $creditDebt->payments()->sum('amount');
+            $creditDebt->status = 'fully_paid';
+            $creditDebt->fully_paid_at = Carbon::now();
+            $ifNote = $validated['notes'] ? "\nSettlement Note: ".$validated['notes'] : '';
+            $creditDebt->notes = trim(($creditDebt->notes ?? '').$ifNote);
+            $creditDebt->save();
+        });
+
+        $linkService->syncCreditDebtToFriend($creditDebt->fresh());
+
+        return back()->with('success', 'Marked as settled with ₹'.number_format($validated['discount_amount'], 2).' forgiven/discounted.');
     }
 
     private function refreshCreditDebtAmounts(CreditDebt $creditDebt, bool $allowManualOverride = true): void

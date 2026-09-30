@@ -124,7 +124,7 @@
                                     <div class="text-xs text-slate-400 mt-0.5">{{ $payment->notes }}</div>
                                 @endif
                             </div>
-                            <form action="{{ route('credits.payments.delete', [$creditDebt, $payment]) }}" method="POST" onsubmit="return confirm('Delete this payment of ₹{{ number_format($payment->amount, 2) }}?');">
+                            <form action="{{ route('credits.payments.destroy', [$creditDebt, $payment]) }}" method="POST" onsubmit="return confirm('Delete this payment of ₹{{ number_format($payment->amount, 2) }}?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-xs text-rose-600 hover:text-rose-800 font-semibold px-2 py-1 rounded-lg hover:bg-rose-50 transition">

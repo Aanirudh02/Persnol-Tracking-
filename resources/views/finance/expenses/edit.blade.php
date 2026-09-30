@@ -172,10 +172,22 @@
                     <input type="text" name="reason" required placeholder="Why is this being updated?" class="w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">
                 </div>
 
-                <label class="flex items-center gap-2 font-semibold text-slate-700">
-                    <input type="checkbox" name="is_voluntary" value="1" @checked(old('is_voluntary', $expense->is_voluntary)) class="rounded border-slate-300">
-                    Voluntary spend
-                </label>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block font-semibold text-slate-700">Classification</label>
+                        <select name="classification" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                            <option value="necessary" @selected(old('classification', $expense->classification ?? 'necessary') === 'necessary')>🟢 Necessary (Essential)</option>
+                            <option value="unwanted" @selected(old('classification', $expense->classification) === 'unwanted')>🔴 Unwanted / Avoidable</option>
+                            <option value="emergency" @selected(old('classification', $expense->classification) === 'emergency')>🟡 Emergency / Urgent</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center pt-6">
+                        <label class="inline-flex items-center gap-2 cursor-pointer font-semibold text-slate-700 select-none">
+                            <input type="checkbox" name="is_voluntary" value="1" @checked(old('is_voluntary', $expense->is_voluntary)) class="rounded border-slate-300">
+                            <span>Voluntary spend</span>
+                        </label>
+                    </div>
+                </div>
 
                 <div>
                     <label class="mb-1 block font-semibold text-slate-700">Receipt</label>

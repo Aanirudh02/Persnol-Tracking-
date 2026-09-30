@@ -28,15 +28,31 @@ class CreditDebt extends Model
         'friend_transaction_id',
         'due_date',
         'fully_paid_at',
+        'settled_discount_amount',
+        'is_settled_discounted',
+        'linked_expense_id',
+        'linked_income_id',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'amount_paid' => 'decimal:2',
+        'settled_discount_amount' => 'decimal:2',
+        'is_settled_discounted' => 'boolean',
         'date' => 'date',
         'due_date' => 'date',
         'fully_paid_at' => 'datetime',
     ];
+
+    public function linkedExpense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class, 'linked_expense_id');
+    }
+
+    public function linkedIncome(): BelongsTo
+    {
+        return $this->belongsTo(Income::class, 'linked_income_id');
+    }
 
     public function user(): BelongsTo
     {
@@ -65,11 +81,22 @@ class CreditDebt extends Model
 
     public function remaining(): float
     {
-        return max(0, (float) $this->amount - (float) $this->amount_paid);
+        if ($this->is_settled_discounted) {
+            return 0.0;
+        }
+
+        return max(0, (float) $this->amount - (float) $this->amount_paid - (float) $this->settled_discount_amount);
     }
 
     public function syncStatusFromPayments(bool $allowManualOverride = true): void
     {
+        if ($this->is_settled_discounted) {
+            $this->status = 'fully_paid';
+            $this->fully_paid_at = $this->fully_paid_at ?? Carbon::now();
+
+            return;
+        }
+
         $paid = (float) $this->amount_paid;
         $total = (float) $this->amount;
 
@@ -91,6 +118,10 @@ class CreditDebt extends Model
 
     public function statusLabel(): string
     {
+        if ($this->is_settled_discounted) {
+            return 'Settled (₹'.number_format((float) $this->settled_discount_amount, 2).' forgiven)';
+        }
+
         return match ($this->status) {
             'yet_to_pay' => 'Yet to pay',
             'partially_paid' => 'Partially paid',

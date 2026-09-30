@@ -118,12 +118,93 @@
 
                         <div class="flex flex-wrap items-center gap-3 text-xs">
                             <a href="{{ route('credits.edit', $item) }}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
+                            
+                            @if($item->type === 'credit' && $item->remaining() > 0)
+                                <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden')" class="font-semibold text-emerald-600 hover:underline flex items-center gap-1">
+                                    <span>💸</span> File as Normal Expense
+                                </button>
+                            @endif
+
+                            @if($item->type === 'debt' && $item->remaining() > 0)
+                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden')" class="font-semibold text-teal-600 hover:underline flex items-center gap-1">
+                                    <span>💰</span> Record as Income
+                                </button>
+                            @endif
+
+                            @if($item->remaining() > 0)
+                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden')" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
+                                    <span>🤝</span> Settle with Discount / Forgiven
+                                </button>
+                            @endif
+
                             <form action="{{ route('credits.destroy', $item) }}" method="POST" onsubmit="return confirm('Delete this {{ $item->type }} record?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="font-semibold text-rose-600 hover:underline">Delete</button>
                             </form>
                         </div>
+
+                        <!-- Record as Expense Inline Form (Credit) -->
+                        @if($item->type === 'credit' && $item->remaining() > 0)
+                            <form id="record-expense-{{ $item->id }}" action="{{ route('credits.record-as-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs space-y-2">
+                                @csrf
+                                <div class="font-bold text-emerald-900">Record Credit Repayment as Normal Expense</div>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                    <input type="number" step="0.01" name="amount" value="{{ $item->remaining() }}" max="{{ $item->remaining() }}" min="0.01" required placeholder="Repay Amount" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
+                                    <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                    <select name="payment_method" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                        @foreach($paymentMethods as $method)
+                                            <option value="{{ $method }}">{{ $method }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button class="rounded-xl bg-emerald-700 px-3 py-1.5 font-bold text-white hover:bg-emerald-800">Submit Expense</button>
+                                </div>
+                            </form>
+                        @endif
+
+                        <!-- Record as Income Inline Form (Debt) -->
+                        @if($item->type === 'debt' && $item->remaining() > 0)
+                            <form id="record-income-{{ $item->id }}" action="{{ route('credits.record-as-income', $item) }}" method="POST" class="hidden rounded-2xl border border-teal-200 bg-teal-50/60 p-3 text-xs space-y-2">
+                                @csrf
+                                <div class="font-bold text-teal-900">Record Recovered Debt as Income Entry</div>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                    <input type="number" step="0.01" name="amount" value="{{ $item->remaining() }}" max="{{ $item->remaining() }}" min="0.01" required placeholder="Collected Amount" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
+                                    <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                    <select name="payment_method" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                        @foreach($paymentMethods as $method)
+                                            <option value="{{ $method }}">{{ $method }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button class="rounded-xl bg-teal-700 px-3 py-1.5 font-bold text-white hover:bg-teal-800">Submit Income</button>
+                                </div>
+                            </form>
+                        @endif
+
+                        <!-- Settle with Discount Inline Form -->
+                        @if($item->remaining() > 0)
+                            <form id="settle-discount-{{ $item->id }}" action="{{ route('credits.settle-discounted', $item) }}" method="POST" class="hidden rounded-2xl border border-amber-200 bg-amber-50/60 p-3 text-xs space-y-2">
+                                @csrf
+                                <div class="font-bold text-amber-900">Settle with Discount (Forgive remaining portion)</div>
+                                <p class="text-slate-600">Remaining ₹{{ number_format($item->remaining(), 2) }}. Enter how much was actually paid/received and how much is forgiven/discounted.</p>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block">Paid Amount (₹)</label>
+                                        <input type="number" step="0.01" min="0" name="settled_amount" value="{{ max(0, $item->remaining() - 50) }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block">Forgiven / Discount (₹)</label>
+                                        <input type="number" step="0.01" min="0.01" name="discount_amount" value="50.00" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-700">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block">Settled On Date</label>
+                                        <input type="date" name="paid_on" value="{{ date('Y-m-d') }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                    </div>
+                                    <div class="flex items-end">
+                                        <button class="w-full rounded-xl bg-amber-600 px-3 py-2 font-bold text-white hover:bg-amber-700">Mark Settled</button>
+                                    </div>
+                                </div>
+                            </form>
+                        @endif
 
                         @if($item->payments->isNotEmpty())
                             <div class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
