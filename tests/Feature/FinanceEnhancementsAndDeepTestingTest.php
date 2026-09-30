@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\CreditDebt;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\FoodCategory;
+use App\Models\FoodEntry;
 use App\Models\Friend;
 use App\Models\FuelEntry;
 use App\Models\Income;
@@ -227,6 +229,11 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
             'payment_method' => 'UPI',
         ]);
 
+        // Verify income show page renders 200 OK (no 500 error)
+        $showResponse = $this->actingAs($user)->get(route('income.show', $income));
+        $showResponse->assertOk();
+        $showResponse->assertSee('Income Stream');
+
         // Tally expense against income
         $response = $this->actingAs($user)->post(route('income.tally', $income), [
             'expense_id' => $expense->id,
@@ -245,6 +252,33 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         $response = $this->actingAs($user)->delete(route('income.untally', [$income, $tally]));
         $response->assertRedirect();
         $this->assertEquals(0.0, $income->talliedAmount());
+    }
+
+    public function test_food_store_with_dynamic_items_and_gst(): void
+    {
+        $user = $this->createAdminUser();
+        $foodCat = FoodCategory::create([
+            'user_id' => $user->id,
+            'name' => 'Breakfast',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('food.store'), [
+            'item_count' => 2,
+            'items' => [
+                ['item_name' => 'Masala Dosa', 'category_id' => $foodCat->id, 'quantity' => 2, 'amount' => 120],
+                ['item_name' => 'Filter Coffee', 'category_id' => $foodCat->id, 'quantity' => 1, 'amount' => 30],
+            ],
+            'gst_amount' => 7.50,
+            'date' => '2026-09-30',
+            'expense_mode' => 'separate',
+            'payment_method' => 'UPI',
+        ]);
+
+        $response->assertRedirect();
+        $entries = FoodEntry::where('user_id', $user->id)->get();
+        $this->assertCount(2, $entries);
+        $this->assertEquals(150.0, (float) $entries->sum('amount'));
+        $this->assertEquals(7.50, (float) $entries->sum('gst_amount'));
     }
 
     public function test_daily_balance_manual_adjustment(): void

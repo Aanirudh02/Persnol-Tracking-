@@ -58,6 +58,7 @@ class FoodController extends Controller
         $paymentMethods = $options->names('payment_method');
         $parentExpenses = Expense::where('user_id', $user->id)
             ->whereNull('parent_id')
+            ->with(['expenseGroup'])
             ->withSum('subItems as sub_items_total', 'amount')
             ->withSum('subItems as sub_items_gst_total', 'gst_amount')
             ->withSum('foodEntries as food_entries_total', 'amount')

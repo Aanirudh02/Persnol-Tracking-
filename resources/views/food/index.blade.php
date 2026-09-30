@@ -17,45 +17,59 @@
                 <div class="flex items-center gap-2">
                     <div class="flex-1">
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Number of Items</label>
-                        <input id="item_count" name="item_count" type="number" min="1" step="1" value="1" inputmode="numeric" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        <input id="item_count" name="item_count" type="number" min="1" step="1" value="1" inputmode="numeric" placeholder="e.g. 1, 2, 3..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-indigo-700">
                     </div>
-                    <button type="button" onclick="addItemRow()" class="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100">+ Add</button>
+                    <button type="button" onclick="addItemRow()" class="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 cursor-pointer">+ Add Item</button>
                 </div>
-                <label class="flex items-center gap-2 pt-6">
-                    <input type="checkbox" name="is_snack" value="1" @checked(request()->boolean('is_snack'))>
-                    Mark as snack
+                <label class="flex items-center gap-2 pt-6 font-medium text-slate-700 cursor-pointer select-none">
+                    <input type="checkbox" name="is_snack" value="1" @checked(request()->boolean('is_snack')) class="rounded border-slate-300 text-indigo-600">
+                    <span>Mark as snack / tea</span>
                 </label>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-                    <input type="date" name="date" value="{{ date('Y-m-d') }}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Date (Auto-synced with Expense)</label>
+                    <input type="date" id="food_date_input" name="date" value="{{ date('Y-m-d') }}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-semibold">
                 </div>
             </div>
 
+            <!-- Dynamic Items Rows Container -->
             <div id="food-item-rows" class="space-y-2"></div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input type="text" name="location" placeholder="Location" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                <input type="number" name="gst_amount" step="0.01" min="0" value="0" placeholder="GST total (₹, optional)" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                <input type="text" name="location" placeholder="Location / Restaurant (optional)" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                <div>
+                    <input type="number" name="gst_amount" step="0.01" min="0" value="0" placeholder="GST ₹ (optional)" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                </div>
                 <select name="expense_mode" id="expense_mode" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     <option value="none">No new expense (habit only)</option>
                     <option value="separate">Create separate expense (total)</option>
-                    <option value="sub_item">Sub-item under existing expense</option>
+                    <option value="sub_item">Sub-item under existing expense / group</option>
                     <option value="voluntary">Voluntary spend</option>
                 </select>
                 <select name="parent_expense_id" id="parent_expense_id" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                    <option value="">Link to existing expense…</option>
+                    <option value="">Link to existing expense / group…</option>
                     @foreach($parentExpenses as $pe)
-                        <option value="{{ $pe->id }}" @disabled($pe->remaining_amount <= 0)>{{ $pe->description }} · ₹{{ number_format($pe->remaining_amount, 2) }} remaining · {{ $pe->date->format('d M') }}</option>
+                        <option value="{{ $pe->id }}"
+                            data-date="{{ $pe->date->toDateString() }}"
+                            data-amount="{{ $pe->totalAmount() }}"
+                            data-remaining="{{ $pe->remaining_amount }}"
+                            data-desc="{{ $pe->expenseGroup ? '['.$pe->expenseGroup->name.'] ' : '' }}{{ $pe->description }}"
+                            @disabled($pe->remaining_amount <= 0)>
+                            {{ $pe->expenseGroup ? '👥 [Group: '.$pe->expenseGroup->name.'] ' : '' }}{{ $pe->description }} · Total Spent: ₹{{ number_format($pe->totalAmount(), 2) }} (₹{{ number_format($pe->remaining_amount, 2) }} remaining) · {{ $pe->date->format('d M Y') }}
+                        </option>
                     @endforeach
                 </select>
                 <select name="payment_method" class="px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     @foreach($paymentMethods as $m)<option value="{{ $m }}">{{ $m }}</option>@endforeach
                 </select>
-                <textarea name="notes" rows="2" placeholder="Details (optional)" class="sm:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl"></textarea>
+                <textarea name="notes" rows="2" placeholder="Details & notes (optional)" class="sm:col-span-2 px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl"></textarea>
             </div>
-            <p class="text-xs text-slate-400">Picking an existing expense auto-links as sub-items (parent category stays on that expense). Credits/Debts are under Finance only.</p>
 
-            <button class="w-full py-2.5 rounded-xl bg-slate-900 text-white font-semibold">Save items</button>
+            <!-- Live Selected Expense Information Banner -->
+            <div id="selected-expense-info" class="hidden rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-900 leading-relaxed shadow-xs"></div>
+
+            <p class="text-xs text-slate-400">Picking an existing expense or expense group auto-links items as sub-items, syncs the date, and keeps parent tracking intact.</p>
+
+            <button class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-md transition cursor-pointer">Save food / snack items</button>
         </form>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -162,17 +176,36 @@
         const countSel = document.getElementById('item_count');
         const parentSel = document.getElementById('parent_expense_id');
         const modeSel = document.getElementById('expense_mode');
+        const dateInput = document.getElementById('food_date_input');
+        const infoBox = document.getElementById('selected-expense-info');
+
+        function getCurrentRowData() {
+            const data = [];
+            const rows = rowsBox.querySelectorAll('.food-item-row');
+            rows.forEach((row, i) => {
+                const name = row.querySelector(`input[name="items[${i}][item_name]"]`)?.value || '';
+                const cat = row.querySelector(`select[name="items[${i}][category_id]"]`)?.value || '';
+                const qty = row.querySelector(`input[name="items[${i}][quantity]"]`)?.value || '1';
+                const amt = row.querySelector(`input[name="items[${i}][amount]"]`)?.value || '0';
+                data.push({ name, cat, qty, amt });
+            });
+            return data;
+        }
 
         function renderRows() {
-            const n = Math.max(1, parseInt(countSel.value || '1', 10));
+            const existing = getCurrentRowData();
+            let n = parseInt(countSel.value || '1', 10);
+            if (isNaN(n) || n < 1) n = 1;
             countSel.value = n;
+
             let html = '';
             for (let i = 0; i < n; i++) {
-                const catOpts = foodCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-                html += `<div class="grid grid-cols-12 gap-2 items-end">
+                const prev = existing[i] || { name: '', cat: '', qty: '1', amt: '0' };
+                const catOpts = foodCategories.map(c => `<option value="${c.id}" ${String(c.id) === String(prev.cat) ? 'selected' : ''}>${c.name}</option>`).join('');
+                html += `<div class="food-item-row grid grid-cols-12 gap-2 items-end">
                     <div class="col-span-12 sm:col-span-4">
                         ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Item name *</label>' : ''}
-                        <input type="text" name="items[${i}][item_name]" ${i === 0 ? 'required' : ''} placeholder="Item ${i + 1}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        <input type="text" name="items[${i}][item_name]" value="${prev.name}" ${i === 0 ? 'required' : ''} placeholder="e.g. Dosa, Coffee, Sandwich..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     </div>
                     <div class="col-span-6 sm:col-span-3">
                         ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Food category</label>' : ''}
@@ -180,13 +213,13 @@
                     </div>
                     <div class="col-span-3 sm:col-span-2">
                         ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Qty</label>' : ''}
-                        <input type="number" name="items[${i}][quantity]" value="1" min="1" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        <input type="number" name="items[${i}][quantity]" value="${prev.qty}" min="1" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
                     </div>
                     <div class="col-span-3 sm:col-span-3">
                         ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Amount ₹</label>' : ''}
                         <div class="flex items-center gap-1">
-                            <input type="number" step="0.01" name="items[${i}][amount]" value="0" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
-                            ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-1.5 py-1 text-base hover:text-rose-700" title="Remove item">&times;</button>` : ''}
+                            <input type="number" step="0.01" name="items[${i}][amount]" value="${prev.amt}" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900">
+                            ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-1.5 py-1 text-base hover:text-rose-700 cursor-pointer" title="Remove item">&times;</button>` : ''}
                         </div>
                     </div>
                 </div>`;
@@ -201,18 +234,63 @@
         }
 
         function removeItemRow(index) {
-            const current = parseInt(countSel.value || '1', 10);
-            if (current > 1) {
-                countSel.value = current - 1;
-                renderRows();
+            const existing = getCurrentRowData();
+            if (existing.length > 1) {
+                existing.splice(index, 1);
+                countSel.value = existing.length;
+                let html = '';
+                for (let i = 0; i < existing.length; i++) {
+                    const prev = existing[i];
+                    const catOpts = foodCategories.map(c => `<option value="${c.id}" ${String(c.id) === String(prev.cat) ? 'selected' : ''}>${c.name}</option>`).join('');
+                    html += `<div class="food-item-row grid grid-cols-12 gap-2 items-end">
+                        <div class="col-span-12 sm:col-span-4">
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Item name *</label>' : ''}
+                            <input type="text" name="items[${i}][item_name]" value="${prev.name}" ${i === 0 ? 'required' : ''} placeholder="Item ${i + 1}" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        </div>
+                        <div class="col-span-6 sm:col-span-3">
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Food category</label>' : ''}
+                            <select name="items[${i}][category_id]" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl"><option value="">—</option>${catOpts}</select>
+                        </div>
+                        <div class="col-span-3 sm:col-span-2">
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Qty</label>' : ''}
+                            <input type="number" name="items[${i}][quantity]" value="${prev.qty}" min="1" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl">
+                        </div>
+                        <div class="col-span-3 sm:col-span-3">
+                            ${i === 0 ? '<label class="block text-xs font-semibold text-slate-600 mb-1">Amount ₹</label>' : ''}
+                            <div class="flex items-center gap-1">
+                                <input type="number" step="0.01" name="items[${i}][amount]" value="${prev.amt}" min="0" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900">
+                                ${i > 0 ? `<button type="button" onclick="removeItemRow(${i})" class="text-rose-500 font-bold px-1.5 py-1 text-base hover:text-rose-700 cursor-pointer" title="Remove item">&times;</button>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                }
+                rowsBox.innerHTML = html;
             }
         }
 
         countSel?.addEventListener('input', renderRows);
         countSel?.addEventListener('change', renderRows);
+
         parentSel?.addEventListener('change', () => {
-            if (parentSel.value) modeSel.value = 'sub_item';
+            const opt = parentSel.options[parentSel.selectedIndex];
+            if (parentSel.value && opt) {
+                modeSel.value = 'sub_item';
+                const expDate = opt.dataset.date;
+                const expAmount = opt.dataset.amount;
+                const expRemaining = opt.dataset.remaining;
+                const expDesc = opt.dataset.desc;
+                if (expDate && dateInput) {
+                    dateInput.value = expDate;
+                }
+                if (infoBox) {
+                    infoBox.innerHTML = `📌 Linked to: <strong>${expDesc}</strong> · Total Spent: <strong class="text-rose-600">₹${Number(expAmount).toFixed(2)}</strong> (Remaining: <strong class="text-emerald-600">₹${Number(expRemaining).toFixed(2)}</strong>) · Date auto-set to <strong>${expDate}</strong>`;
+                    infoBox.classList.remove('hidden');
+                }
+            } else {
+                if (infoBox) infoBox.classList.add('hidden');
+            }
         });
+
         renderRows();
     </script>
 </x-app-layout>
