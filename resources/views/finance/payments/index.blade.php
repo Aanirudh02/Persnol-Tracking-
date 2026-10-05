@@ -72,8 +72,8 @@
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                                 Reconciled
                                             </span>
-                                            @if($pay->reconciliation)
-                                                <span class="block text-[9px] text-slate-400 mt-0.5">On {{ $pay->reconciliation->reconciled_date->format('d M Y') }} by {{ $pay->reconciliation->reconciled_by }}</span>
+                                            @if($pay->reconciliation && $pay->reconciliation->reconciled_date)
+                                                <span class="block text-[9px] text-slate-400 mt-0.5">On {{ \Carbon\Carbon::parse($pay->reconciliation->reconciled_date)->format('d M Y') }} by {{ $pay->reconciliation->reconciled_by }}</span>
                                             @endif
                                         @elseif($pay->status === 'Pending')
                                             <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 w-max block">
