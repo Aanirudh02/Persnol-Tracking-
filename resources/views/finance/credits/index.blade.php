@@ -103,7 +103,15 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
                             <div class="min-w-0">
                                 <p class="font-bold text-slate-900">{{ $item->friend?->name ?? 'Friend' }}</p>
-                                <p class="text-slate-500">{{ $item->description ?: 'No description' }} · {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</p>
+                                <p class="text-slate-500 flex items-center gap-1.5 flex-wrap">
+                                    <span>{{ $item->description ?: 'No description' }} · {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</span>
+                                    @if($item->payment_method)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 border border-slate-200">
+                                            <span>{{ strtolower($item->payment_method) === 'cash' ? '💵' : (strtolower($item->payment_method) === 'upi' ? '📱' : '💳') }}</span>
+                                            <span>{{ $item->payment_method }}</span>
+                                        </span>
+                                    @endif
+                                </p>
                                 
                                 <!-- Settled / Paid Status Badges -->
                                 <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -125,7 +133,7 @@
                                     @if($item->linkedExpense)
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800">
                                             <span>✅ Recorded as Normal Expense:</span>
-                                            <a href="{{ route('expenses.index', ['search' => $item->linkedExpense->description]) }}" class="underline hover:text-emerald-950">{{ $item->linkedExpense->description }} · ₹{{ number_format($item->linkedExpense->amount, 2) }} ({{ \Carbon\Carbon::parse($item->linkedExpense->date)->format('d M Y') }})</a>
+                                            <a href="{{ route('expenses.index', ['search' => $item->linkedExpense->description]) }}" class="underline hover:text-emerald-950">{{ $item->linkedExpense->description }} · ₹{{ number_format($item->linkedExpense->amount, 2) }} ({{ $item->linkedExpense->payment_method ?: 'Cash' }}) ({{ \Carbon\Carbon::parse($item->linkedExpense->date)->format('d M Y') }})</a>
                                         </div>
                                     @else
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-800">
@@ -139,7 +147,7 @@
                                     @if($item->linkedPersonalExpense)
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-800">
                                             <span>💜 Recorded as Personal Expense:</span>
-                                            <a href="{{ route('personal-expenses.index') }}" class="underline hover:text-purple-950">{{ $item->linkedPersonalExpense->description }} · ₹{{ number_format($item->linkedPersonalExpense->amount, 2) }} ({{ \Carbon\Carbon::parse($item->linkedPersonalExpense->date)->format('d M Y') }})</a>
+                                            <a href="{{ route('personal-expenses.index') }}" class="underline hover:text-purple-950">{{ $item->linkedPersonalExpense->description }} · ₹{{ number_format($item->linkedPersonalExpense->amount, 2) }} ({{ $item->linkedPersonalExpense->payment_method ?: 'Cash' }}) ({{ \Carbon\Carbon::parse($item->linkedPersonalExpense->date)->format('d M Y') }})</a>
                                         </div>
                                     @else
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-800">

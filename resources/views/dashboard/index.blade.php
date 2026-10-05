@@ -144,47 +144,149 @@
                 </button>
             </form>
 
-            <!-- Current Balance & Mode Breakdown Card -->
-            <div class="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-md border border-slate-700/60 space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-700/60 pb-3">
-                    <div>
-                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Current Balance (All Modes)</div>
-                        <div class="text-2xl sm:text-3xl font-extrabold text-white mt-0.5">
-                            ₹{{ number_format($currentBalance, 2) }}
+            <!-- Daily Cash Register: Opening & Closing Balances (Total & Category-wise in same card) -->
+            @php
+                $regTot = $dailyRegister['total'] ?? ['opening' => 0, 'closing' => 0, 'inflow' => 0, 'outflow' => 0, 'adjustment' => 0, 'net_flow' => 0];
+                $regCats = $dailyRegister['categories'] ?? [];
+                $dayLabel = \Carbon\Carbon::parse($date)->format('l, d M Y');
+                $isTodayDate = ($date === \Carbon\Carbon::today()->toDateString());
+            @endphp
+            <div class="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-xl border border-slate-700/70 space-y-5">
+                <!-- Top Row: Date, Title & Quick Links -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-700/60 pb-4">
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <span class="text-xl">🧾</span>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-black text-white uppercase tracking-wider">
+                                    Daily Cash Register
+                                </h3>
+                                @if($isTodayDate)
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-white shadow-xs">
+                                        TODAY
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded-full text-[9px] font-bold text-slate-300 bg-white/10">
+                                        {{ \Carbon\Carbon::parse($date)->format('d M') }}
+                                    </span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-slate-400 mt-0.5">
+                                {{ $dayLabel }} · Day Opening to Closing ledger
+                            </p>
                         </div>
                     </div>
-                    <a href="{{ route('finance.index') }}" class="self-start sm:self-auto text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition">
-                        <span>Finance Hub & Wallets</span> &rarr;
-                    </a>
+                    <div class="flex items-center gap-2 self-start sm:self-auto">
+                        <a href="{{ route('daily-balances.today') }}" class="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center gap-1">
+                            <span>📊</span> Live Flow
+                        </a>
+                        <a href="{{ route('daily-balances.index', ['date' => $date]) }}" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm flex items-center gap-1">
+                            <span>Register Table</span> &rarr;
+                        </a>
+                    </div>
                 </div>
 
-                @if($wallets->isNotEmpty())
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                        @foreach($wallets as $wallet)
+                <!-- Combined Total Banner: Opening vs Closing -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-xs">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Total Day Opening</span>
+                        <div class="text-xl sm:text-2xl font-black text-white">
+                            ₹{{ number_format($regTot['opening'], 2) }}
+                        </div>
+                        <span class="text-[10px] text-slate-400">Day start count</span>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-0.5">Day Inflow (+)</span>
+                        <div class="text-xl sm:text-2xl font-black text-emerald-400">
+                            +₹{{ number_format($regTot['inflow'], 2) }}
+                        </div>
+                        <span class="text-[10px] text-slate-400">Received today</span>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-rose-400 block mb-0.5">Day Outflow (-)</span>
+                        <div class="text-xl sm:text-2xl font-black text-rose-400">
+                            -₹{{ number_format($regTot['outflow'], 2) }}
+                        </div>
+                        <span class="text-[10px] text-slate-400">Spent today</span>
+                    </div>
+
+                    <div class="rounded-xl bg-gradient-to-r from-indigo-600/40 to-sky-600/40 border border-indigo-400/30 p-2.5 sm:-m-1">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <span class="text-[10px] font-black uppercase tracking-wider text-indigo-200">
+                                {{ $isTodayDate ? 'Today Current Closing' : 'End of Day Closing' }}
+                            </span>
+                            @if($regTot['adjustment'] != 0)
+                                <span class="text-[10px] font-bold {{ $regTot['adjustment'] < 0 ? 'text-rose-300' : 'text-amber-300' }}">
+                                    Adj: {{ $regTot['adjustment'] > 0 ? '+' : '' }}₹{{ number_format($regTot['adjustment'], 2) }}
+                                </span>
+                            @endif
+                        </div>
+                        <div class="text-2xl sm:text-3xl font-black {{ $regTot['closing'] < 0 ? 'text-rose-400' : 'text-white' }}">
+                            ₹{{ number_format($regTot['closing'], 2) }}
+                        </div>
+                        <div class="text-[10px] text-indigo-200 mt-0.5 flex items-center justify-between">
+                            <span>Net: {{ $regTot['net_flow'] >= 0 ? '+' : '' }}₹{{ number_format($regTot['net_flow'], 2) }}</span>
+                            <span class="font-bold">Total Liquid</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category-Wise Breakdown in Same Card -->
+                <div>
+                    <div class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                        <span>Payment Category Balances</span>
+                        <span class="text-[10px] font-normal text-slate-400">Opening & Closing per mode</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        @foreach($regCats as $catName => $cData)
                             @php
                                 $modeIcons = ['Cash' => '💵', 'UPI' => '📱', 'Card' => '💳', 'Bank Transfer' => '🏦', 'Other' => '💰'];
-                                $icon = $modeIcons[$wallet->payment_method] ?? '💳';
+                                $icon = $modeIcons[$catName] ?? '💳';
                             @endphp
-                            <div class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-between">
-                                <div class="flex items-center justify-between text-xs text-slate-300 font-semibold mb-1">
-                                    <span class="truncate">{{ $wallet->payment_method }}</span>
-                                    <span>{{ $icon }}</span>
+                            <div class="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition flex flex-col justify-between space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-sm text-white flex items-center gap-1.5">
+                                        <span>{{ $icon }}</span>
+                                        <span>{{ $catName }}</span>
+                                    </span>
+                                    @if($cData['adjustment'] != 0)
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md {{ $cData['adjustment'] < 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30' }}" title="{{ $cData['adjustment_note'] ?? 'Adjustment' }}">
+                                            {{ $cData['adjustment'] > 0 ? '+' : '' }}₹{{ number_format($cData['adjustment'], 0) }}
+                                        </span>
+                                    @endif
                                 </div>
-                                <div class="mt-1">
-                                    <div class="text-sm sm:text-base font-bold text-white">
-                                        ₹{{ number_format($wallet->current_balance, 2) }}
+
+                                <!-- Opening vs Closing in category -->
+                                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-white/10 text-xs">
+                                    <div>
+                                        <span class="text-[10px] uppercase font-bold text-slate-400 block">Opening</span>
+                                        <span class="text-sm font-bold text-slate-200">
+                                            ₹{{ number_format($cData['opening'], 2) }}
+                                        </span>
                                     </div>
-                                    <div class="text-[10px] text-slate-400 flex items-center justify-between mt-0.5">
-                                        <span>Open: ₹{{ number_format($wallet->opening_balance, 0) }}</span>
-                                        @if($wallet->is_enabled)
-                                            <span class="text-emerald-400 font-bold" title="Wallet Enabled">●</span>
-                                        @endif
+                                    <div class="text-right">
+                                        <span class="text-[10px] uppercase font-bold text-indigo-300 block">Closing</span>
+                                        <span class="text-base font-black {{ $cData['closing'] < 0 ? 'text-rose-400' : 'text-emerald-400' }}">
+                                            ₹{{ number_format($cData['closing'], 2) }}
+                                        </span>
                                     </div>
+                                </div>
+
+                                <!-- Inflow / Outflow micro stats -->
+                                <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-white/5">
+                                    <span class="text-emerald-400 font-semibold">+₹{{ number_format($cData['inflow'], 0) }} in</span>
+                                    <span class="text-rose-400 font-semibold">-₹{{ number_format($cData['outflow'], 0) }} out</span>
+                                    <span class="{{ $cData['net_flow'] >= 0 ? 'text-emerald-300' : 'text-rose-300' }} font-bold">
+                                        {{ $cData['net_flow'] >= 0 ? '+' : '' }}₹{{ number_format($cData['net_flow'], 0) }}
+                                    </span>
                                 </div>
                             </div>
                         @endforeach
                     </div>
-                @endif
+                </div>
             </div>
         </div>
 

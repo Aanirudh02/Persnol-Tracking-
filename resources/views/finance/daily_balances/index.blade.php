@@ -414,12 +414,30 @@
 
                                 <!-- Total Inflow -->
                                 <td class="px-4 py-3 text-emerald-600 dark:text-emerald-400">
-                                    {{ $d['total']['inflow'] > 0 ? '+₹'.number_format($d['total']['inflow'], 2) : '—' }}
+                                    @if($d['total']['inflow'] > 0)
+                                        <button type="button" 
+                                            onclick='openFlowDetailsModal("Inflows (+)", "All Categories", "{{ $d['date']->format('d M Y (D)') }}", {{ json_encode($d['total']['income_items'] ?? []) }}, "inflow")'
+                                            class="font-bold underline hover:text-emerald-800 dark:hover:text-emerald-300 transition cursor-pointer"
+                                            title="Click to view all incomes on {{ $d['date']->format('d M Y') }}">
+                                            +₹{{ number_format($d['total']['inflow'], 2) }}
+                                        </button>
+                                    @else
+                                        <span>—</span>
+                                    @endif
                                 </td>
 
                                 <!-- Total Outflow -->
                                 <td class="px-4 py-3 text-rose-600 dark:text-rose-400">
-                                    {{ $d['total']['outflow'] > 0 ? '-₹'.number_format($d['total']['outflow'], 2) : '—' }}
+                                    @if($d['total']['outflow'] > 0)
+                                        <button type="button" 
+                                            onclick='openFlowDetailsModal("Outflows (-)", "All Categories", "{{ $d['date']->format('d M Y (D)') }}", {{ json_encode($d['total']['expense_items'] ?? []) }}, "outflow")'
+                                            class="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 transition cursor-pointer"
+                                            title="Click to view all expenses on {{ $d['date']->format('d M Y') }}">
+                                            -₹{{ number_format($d['total']['outflow'], 2) }}
+                                        </button>
+                                    @else
+                                        <span>—</span>
+                                    @endif
                                 </td>
 
                                 <!-- Category Columns -->
@@ -541,12 +559,30 @@
 
                                     <!-- Category Inflow -->
                                     <td class="px-4 py-3 text-emerald-600 dark:text-emerald-400">
-                                        {{ $cData['inflow'] > 0 ? '+₹'.number_format($cData['inflow'], 2) : '—' }}
+                                        @if($cData['inflow'] > 0)
+                                            <button type="button" 
+                                                onclick='openFlowDetailsModal("Inflows (+)", "{{ $cat }}", "{{ $d['date']->format('d M Y (D)') }}", {{ json_encode($cData['income_items'] ?? []) }}, "inflow")'
+                                                class="font-bold underline hover:text-emerald-800 dark:hover:text-emerald-300 transition cursor-pointer"
+                                                title="Click to view {{ $cat }} incomes on {{ $d['date']->format('d M Y') }}">
+                                                +₹{{ number_format($cData['inflow'], 2) }}
+                                            </button>
+                                        @else
+                                            <span>—</span>
+                                        @endif
                                     </td>
 
                                     <!-- Category Outflow -->
                                     <td class="px-4 py-3 text-rose-600 dark:text-rose-400">
-                                        {{ $cData['outflow'] > 0 ? '-₹'.number_format($cData['outflow'], 2) : '—' }}
+                                        @if($cData['outflow'] > 0)
+                                            <button type="button" 
+                                                onclick='openFlowDetailsModal("Outflows (-)", "{{ $cat }}", "{{ $d['date']->format('d M Y (D)') }}", {{ json_encode($cData['expense_items'] ?? []) }}, "outflow")'
+                                                class="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 transition cursor-pointer"
+                                                title="Click to view {{ $cat }} expenses on {{ $d['date']->format('d M Y') }}">
+                                                -₹{{ number_format($cData['outflow'], 2) }}
+                                            </button>
+                                        @else
+                                            <span>—</span>
+                                        @endif
                                     </td>
 
                                     <!-- Net Flow -->
@@ -561,8 +597,19 @@
                                     </td>
 
                                     <!-- Adjustment -->
-                                    <td class="px-4 py-3 text-amber-600 dark:text-amber-400">
-                                        {{ $cData['adjustment'] != 0 ? ($cData['adjustment'] > 0 ? '+' : '').'₹'.number_format($cData['adjustment'], 2) : '—' }}
+                                    <td class="px-4 py-3">
+                                        @if($cData['adjustment'] != 0)
+                                            <div class="inline-flex items-center gap-1">
+                                                <span class="font-bold {{ $cData['adjustment'] < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400' }}">
+                                                    {{ $cData['adjustment'] > 0 ? '+' : '' }}₹{{ number_format($cData['adjustment'], 2) }}
+                                                </span>
+                                                @if(!empty($cData['adjustment_note']))
+                                                    <span class="cursor-help text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="{{ $cData['adjustment_note'] }}">💬</span>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="text-slate-400">—</span>
+                                        @endif
                                     </td>
 
                                     <!-- Closing -->
@@ -638,30 +685,42 @@
 
                     @foreach($activeCategories as $cat)
                         @php
-                            $catInit = $selectedDayData['categories'][$cat] ?? ['opening' => 0, 'adjustment' => 0, 'closing' => 0];
+                            $catInit = $selectedDayData['categories'][$cat] ?? ['opening' => 0, 'adjustment' => 0, 'adjustment_note' => '', 'closing' => 0, 'inflow' => 0, 'outflow' => 0];
+                            $isNegAdj = ((float)($catInit['adjustment'] ?? 0)) < 0;
                         @endphp
-                        <div class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-2.5">
+                        <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3">
                             <div class="flex items-center justify-between">
                                 <span class="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                                     <span>{{ strtolower($cat) === 'cash' ? '💵' : (strtolower($cat) === 'upi' ? '📱' : '💳') }}</span>
                                     <span>{{ $cat }}</span>
                                 </span>
-                                <span class="text-[10px] text-slate-400">Opening, manual change or closing count</span>
+                                <span class="text-[10px] text-slate-400 font-medium">Opening &plus; Inflow &minus; Outflow &plus; Adjustment = Closing</span>
                             </div>
 
-                            <div class="grid grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                 <div>
                                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Opening (₹)</label>
-                                    <input type="number" step="0.01" name="categories[{{ $cat }}][opening]" id="modal_{{ $cat }}_opening" value="{{ $catInit['opening'] }}" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-white">
+                                    <input type="number" step="0.01" name="categories[{{ $cat }}][opening]" id="modal_{{ $cat }}_opening" value="{{ $catInit['opening'] }}" data-inflow="{{ $catInit['inflow'] ?? 0 }}" data-outflow="{{ $catInit['outflow'] ?? 0 }}" oninput="recalcModalCat('{{ $cat }}')" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-white shadow-2xs">
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-bold uppercase text-amber-600 mb-1">Adjustment (₹)</label>
-                                    <input type="number" step="0.01" name="categories[{{ $cat }}][adjustment]" id="modal_{{ $cat }}_adjustment" value="{{ $catInit['adjustment'] }}" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-amber-600">
+                                    <label class="block text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400 mb-1">Adjustment (₹)</label>
+                                    <div class="flex items-stretch rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 overflow-hidden shadow-2xs">
+                                        <button type="button" id="btn_sign_{{ $cat }}" onclick="toggleAdjustmentSign('{{ $cat }}')" class="px-2.5 py-1.5 text-xs font-black transition flex items-center justify-center shrink-0 cursor-pointer {{ $isNegAdj ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white' }}" title="Click to toggle (+ / -)">
+                                            <span id="icon_sign_{{ $cat }}">{{ $isNegAdj ? '−' : '+' }}</span>
+                                        </button>
+                                        <input type="number" step="0.01" name="categories[{{ $cat }}][adjustment]" id="modal_{{ $cat }}_adjustment" value="{{ $catInit['adjustment'] }}" oninput="handleAdjustmentInput('{{ $cat }}')" placeholder="0.00" class="w-full border-0 bg-transparent px-2.5 py-1.5 text-xs font-bold text-slate-900 dark:text-white focus:ring-0">
+                                    </div>
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-bold uppercase text-indigo-600 dark:text-indigo-400 mb-1">Closing (₹)</label>
-                                    <input type="number" step="0.01" name="categories[{{ $cat }}][closing]" id="modal_{{ $cat }}_closing" value="{{ $catInit['closing'] }}" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                                    <input type="number" step="0.01" name="categories[{{ $cat }}][closing]" id="modal_{{ $cat }}_closing" value="{{ $catInit['closing'] }}" class="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 shadow-2xs">
                                 </div>
+                            </div>
+
+                            <!-- Optional Adjustment Note for this Category -->
+                            <div>
+                                <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Optional {{ $cat }} Adjustment Note / Discrepancy Reason</label>
+                                <input type="text" name="categories[{{ $cat }}][adjustment_note]" id="modal_{{ $cat }}_adj_note" value="{{ $catInit['adjustment_note'] ?? '' }}" placeholder="e.g. Cash drawer shortage, bank fee adjustment, rounded off..." class="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 placeholder:text-slate-400 shadow-2xs">
                             </div>
                         </div>
                     @endforeach
@@ -670,7 +729,7 @@
                 <!-- Notes -->
                 <div>
                     <label class="font-bold text-slate-700 dark:text-slate-300 block mb-1">Day Notes / Tally Remarks</label>
-                    <input type="text" name="notes" id="adj_modal_notes" value="{{ $selectedDayData['notes'] ?? '' }}" placeholder="Reason for adjustments, wallet reconcile notes..." class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs">
+                    <input type="text" name="notes" id="adj_modal_notes" value="{{ $selectedDayData['notes'] ?? '' }}" placeholder="General remarks, wallet reconcile notes..." class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs">
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -729,11 +788,103 @@
         </div>
     </div>
 
+    <!-- MODAL 3: INFLOW / OUTFLOW BREAKDOWN DIALOG -->
+    <div id="flow-details-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+        <div class="w-full max-w-lg rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                <div>
+                    <h3 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <span id="flow-modal-icon">🧾</span>
+                        <span id="flow-modal-title">Transactions Breakdown</span>
+                    </h3>
+                    <p class="text-xs text-slate-500" id="flow-modal-subtitle"></p>
+                </div>
+                <button type="button" onclick="closeFlowDetailsModal()" class="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-lg font-bold cursor-pointer">&times;</button>
+            </div>
+
+            <!-- Total Banner -->
+            <div id="flow-modal-total-banner" class="rounded-2xl p-3 flex items-center justify-between text-xs font-bold shrink-0">
+                <span id="flow-modal-total-label">Total Amount:</span>
+                <span id="flow-modal-total-amount" class="text-base font-black"></span>
+            </div>
+
+            <!-- Items List -->
+            <div class="overflow-y-auto space-y-2 pr-1 flex-1" id="flow-modal-items-container">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Footer -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end shrink-0">
+                <button type="button" onclick="closeFlowDetailsModal()" class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPT FOR MODALS -->
     <script>
         function openAdjustmentModal() {
             document.getElementById('adjustment-modal').classList.remove('hidden');
             document.getElementById('adjustment-modal').classList.add('flex');
+        }
+
+        function toggleAdjustmentSign(cat) {
+            const adjInput = document.getElementById(`modal_${cat}_adjustment`);
+            const btn = document.getElementById(`btn_sign_${cat}`);
+            const icon = document.getElementById(`icon_sign_${cat}`);
+            if (!adjInput || !btn || !icon) return;
+
+            let val = parseFloat(adjInput.value) || 0;
+            if (val === 0) {
+                const isCurrentlyMinus = icon.textContent.trim() === '−' || icon.textContent.trim() === '-';
+                if (isCurrentlyMinus) {
+                    icon.textContent = '+';
+                    btn.className = 'px-2.5 py-1.5 text-xs font-black transition flex items-center justify-center shrink-0 cursor-pointer bg-emerald-500 text-white';
+                } else {
+                    icon.textContent = '−';
+                    btn.className = 'px-2.5 py-1.5 text-xs font-black transition flex items-center justify-center shrink-0 cursor-pointer bg-rose-500 text-white';
+                }
+            } else {
+                val = -val;
+                adjInput.value = val;
+                updateSignBtn(cat, val);
+            }
+            recalcModalCat(cat);
+        }
+
+        function handleAdjustmentInput(cat) {
+            const adjInput = document.getElementById(`modal_${cat}_adjustment`);
+            if (!adjInput) return;
+            let val = parseFloat(adjInput.value) || 0;
+            updateSignBtn(cat, val);
+            recalcModalCat(cat);
+        }
+
+        function updateSignBtn(cat, val) {
+            const btn = document.getElementById(`btn_sign_${cat}`);
+            const icon = document.getElementById(`icon_sign_${cat}`);
+            if (!btn || !icon) return;
+            if (val < 0) {
+                icon.textContent = '−';
+                btn.className = 'px-2.5 py-1.5 text-xs font-black transition flex items-center justify-center shrink-0 cursor-pointer bg-rose-500 text-white';
+            } else {
+                icon.textContent = '+';
+                btn.className = 'px-2.5 py-1.5 text-xs font-black transition flex items-center justify-center shrink-0 cursor-pointer bg-emerald-500 text-white';
+            }
+        }
+
+        function recalcModalCat(cat) {
+            const openElem = document.getElementById(`modal_${cat}_opening`);
+            const adjElem = document.getElementById(`modal_${cat}_adjustment`);
+            const closeElem = document.getElementById(`modal_${cat}_closing`);
+            if (!openElem || !adjElem || !closeElem) return;
+            const open = parseFloat(openElem.value) || 0;
+            const adj = parseFloat(adjElem.value) || 0;
+            const inflow = parseFloat(openElem.getAttribute('data-inflow') || 0);
+            const outflow = parseFloat(openElem.getAttribute('data-outflow') || 0);
+            closeElem.value = (open + inflow - outflow + adj).toFixed(2);
         }
 
         function openAdjustmentModalWithData(dateStr, categories, notes) {
@@ -746,9 +897,18 @@
                     const openElem = document.getElementById(`modal_${catName}_opening`);
                     const adjElem = document.getElementById(`modal_${catName}_adjustment`);
                     const closeElem = document.getElementById(`modal_${catName}_closing`);
-                    if (openElem) openElem.value = catData.opening;
-                    if (adjElem) adjElem.value = catData.adjustment;
+                    const noteElem = document.getElementById(`modal_${catName}_adj_note`);
+                    if (openElem) {
+                        openElem.value = catData.opening;
+                        openElem.setAttribute('data-inflow', catData.inflow || 0);
+                        openElem.setAttribute('data-outflow', catData.outflow || 0);
+                    }
+                    if (adjElem) {
+                        adjElem.value = catData.adjustment;
+                        updateSignBtn(catName, parseFloat(catData.adjustment) || 0);
+                    }
                     if (closeElem) closeElem.value = catData.closing;
+                    if (noteElem) noteElem.value = catData.adjustment_note || '';
                 }
             }
 
@@ -795,6 +955,77 @@
             try {
                 localStorage.setItem('daily_register_historical_tab', tabId);
             } catch(e) {}
+        }
+
+        function openFlowDetailsModal(typeLabel, catName, dateStr, items, mode) {
+            const isOutflow = mode === 'outflow';
+            const icon = isOutflow ? '💸' : '💰';
+            document.getElementById('flow-modal-icon').textContent = icon;
+            document.getElementById('flow-modal-title').textContent = `${catName} ${typeLabel}`;
+            document.getElementById('flow-modal-subtitle').textContent = `Recorded on ${dateStr}`;
+
+            const banner = document.getElementById('flow-modal-total-banner');
+            const totalAmountElem = document.getElementById('flow-modal-total-amount');
+            const totalLabel = document.getElementById('flow-modal-total-label');
+            const container = document.getElementById('flow-modal-items-container');
+
+            let sum = 0;
+            container.innerHTML = '';
+
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="py-8 text-center text-xs text-slate-400">No transactions recorded for this day.</div>';
+            } else {
+                items.forEach(item => {
+                    const amt = Number(item.amount) || 0;
+                    sum += amt;
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = `p-3 rounded-2xl border flex items-center justify-between text-xs shadow-2xs ${
+                        isOutflow 
+                            ? 'border-rose-100 dark:border-rose-950/60 bg-rose-50/40 dark:bg-rose-950/20' 
+                            : 'border-emerald-100 dark:border-emerald-950/60 bg-emerald-50/40 dark:bg-emerald-950/20'
+                    }`;
+
+                    const leftDiv = document.createElement('div');
+                    const titleElem = document.createElement('div');
+                    titleElem.className = 'font-bold text-slate-900 dark:text-white';
+                    titleElem.textContent = isOutflow ? (item.description || 'Expense') : (item.source || 'Income');
+
+                    const metaElem = document.createElement('div');
+                    metaElem.className = 'text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5';
+                    let metaHtml = `<span>${item.category || 'General'}</span>`;
+                    if (item.time) metaHtml += `<span>&bull;</span><span>${item.time}</span>`;
+                    if (item.notes) metaHtml += `<span>&bull;</span><span class="truncate max-w-[180px]">${item.notes}</span>`;
+                    metaElem.innerHTML = metaHtml;
+
+                    leftDiv.appendChild(titleElem);
+                    leftDiv.appendChild(metaElem);
+
+                    const amtElem = document.createElement('div');
+                    amtElem.className = `font-black text-sm ${isOutflow ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`;
+                    amtElem.textContent = (isOutflow ? '-₹' : '+₹') + amt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    itemDiv.appendChild(leftDiv);
+                    itemDiv.appendChild(amtElem);
+                    container.appendChild(itemDiv);
+                });
+            }
+
+            totalLabel.textContent = isOutflow ? 'Total Outflow for Day:' : 'Total Inflow for Day:';
+            if (isOutflow) {
+                banner.className = 'rounded-2xl p-3 flex items-center justify-between text-xs font-bold shrink-0 bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900';
+                totalAmountElem.textContent = '-₹' + sum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else {
+                banner.className = 'rounded-2xl p-3 flex items-center justify-between text-xs font-bold shrink-0 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-900';
+                totalAmountElem.textContent = '+₹' + sum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            document.getElementById('flow-details-modal').classList.remove('hidden');
+            document.getElementById('flow-details-modal').classList.add('flex');
+        }
+
+        function closeFlowDetailsModal() {
+            document.getElementById('flow-details-modal').classList.add('hidden');
+            document.getElementById('flow-details-modal').classList.remove('flex');
         }
 
         document.addEventListener('DOMContentLoaded', function() {

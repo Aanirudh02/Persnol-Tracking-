@@ -29,7 +29,8 @@ class DashboardController extends Controller
         Request $request,
         DailyPromptService $promptService,
         DayTimelineService $timelineService,
-        WalletService $walletService
+        WalletService $walletService,
+        \App\Services\DailyRegisterService $dailyRegisterService
     ) {
         $user = $request->user();
         $today = Carbon::today()->toDateString();
@@ -231,6 +232,8 @@ class DashboardController extends Controller
             ->where('record_date', $today)
             ->first();
 
+        $dailyRegister = $dailyRegisterService->getRegisterForDate($user, $date);
+
         return view('dashboard.index', compact(
             'todayRecord',
             'yesterdayRecord',
@@ -272,7 +275,8 @@ class DashboardController extends Controller
             'totalSavingsAvailable',
             'totalIncomeTallied',
             'totalIncomeSurplus',
-            'todayDailyBalance'
+            'todayDailyBalance',
+            'dailyRegister'
         ));
     }
 

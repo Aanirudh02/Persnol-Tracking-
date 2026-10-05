@@ -178,6 +178,42 @@ class CreditDebtController extends Controller
                 'status' => $validated['status'] ?? $creditDebt->status,
             ]);
 
+            // Sync payment_method to linked Normal Expense if exists
+            if ($creditDebt->linked_expense_id) {
+                $expense = Expense::where('user_id', $creditDebt->user_id)->find($creditDebt->linked_expense_id);
+                if ($expense) {
+                    $expense->update([
+                        'payment_method' => $newPaymentMethod ?: $expense->payment_method,
+                        'amount' => $validated['amount'],
+                        'date' => $validated['date'],
+                    ]);
+                }
+            }
+
+            // Sync payment_method to linked Personal Expense if exists
+            if ($creditDebt->linked_personal_expense_id) {
+                $pExpense = PersonalExpense::where('user_id', $creditDebt->user_id)->find($creditDebt->linked_personal_expense_id);
+                if ($pExpense) {
+                    $pExpense->update([
+                        'payment_method' => $newPaymentMethod ?: $pExpense->payment_method,
+                        'amount' => $validated['amount'],
+                        'date' => $validated['date'],
+                    ]);
+                }
+            }
+
+            // Sync payment_method to linked Income if exists
+            if ($creditDebt->linked_income_id) {
+                $income = Income::where('user_id', $creditDebt->user_id)->find($creditDebt->linked_income_id);
+                if ($income) {
+                    $income->update([
+                        'payment_method' => $newPaymentMethod ?: $income->payment_method,
+                        'amount' => $validated['amount'],
+                        'date' => $validated['date'],
+                    ]);
+                }
+            }
+
             if (array_key_exists('amount_paid', $validated)) {
                 $targetPaid = round((float) $validated['amount_paid'], 2);
                 $existingPaymentsCount = $creditDebt->payments()->count();
@@ -219,14 +255,13 @@ class CreditDebtController extends Controller
                                 'notes' => 'Adjusted paid amount',
                             ]);
                         }
+                    } elseif ($newPaymentMethod) {
+                        $creditDebt->payments()->update(['payment_method' => $newPaymentMethod]);
                     }
                 }
             } elseif ($newPaymentMethod) {
                 // Payment method changed without changing amount
-                $firstPayment = $creditDebt->payments()->first();
-                if ($firstPayment) {
-                    $firstPayment->update(['payment_method' => $newPaymentMethod]);
-                }
+                $creditDebt->payments()->update(['payment_method' => $newPaymentMethod]);
             }
 
             $this->refreshCreditDebtAmounts($creditDebt);
@@ -287,6 +322,10 @@ class CreditDebtController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        if (filled($validated['payment_method'] ?? null)) {
+            $creditDebt->payment_method = $validated['payment_method'];
+        }
+
         $this->refreshCreditDebtAmounts($creditDebt);
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
@@ -312,6 +351,11 @@ class CreditDebtController extends Controller
         }
 
         $payment->update($validated);
+
+        if (filled($validated['payment_method'] ?? null)) {
+            $creditDebt->payment_method = $validated['payment_method'];
+        }
+
         $this->refreshCreditDebtAmounts($creditDebt);
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
@@ -418,9 +462,7 @@ class CreditDebtController extends Controller
             }
 
             $creditDebt->linked_expense_id = $expense->id;
-            if ($isDebt && empty($creditDebt->payment_method)) {
-                $creditDebt->payment_method = $validated['payment_method'];
-            }
+            $creditDebt->payment_method = $validated['payment_method'];
             $this->refreshCreditDebtAmounts($creditDebt);
         });
 
@@ -473,6 +515,7 @@ class CreditDebtController extends Controller
             }
 
             $creditDebt->linked_personal_expense_id = $personalExpense->id;
+            $creditDebt->payment_method = $validated['payment_method'];
             $this->refreshCreditDebtAmounts($creditDebt);
         });
 
@@ -528,6 +571,7 @@ class CreditDebtController extends Controller
             ]);
 
             $creditDebt->linked_income_id = $income->id;
+            $creditDebt->payment_method = $validated['payment_method'];
             $this->refreshCreditDebtAmounts($creditDebt);
         });
 
@@ -567,6 +611,9 @@ class CreditDebtController extends Controller
             $creditDebt->amount_paid = (float) $creditDebt->payments()->sum('amount');
             $creditDebt->status = 'fully_paid';
             $creditDebt->fully_paid_at = Carbon::now();
+            if (filled($validated['payment_method'] ?? null)) {
+                $creditDebt->payment_method = $validated['payment_method'];
+            }
             $ifNote = ! empty($validated['notes']) ? "\nSettlement Note: ".$validated['notes'] : '';
             $creditDebt->notes = trim(($creditDebt->notes ?? '').$ifNote);
             $creditDebt->save();
@@ -618,6 +665,7 @@ class CreditDebtController extends Controller
             // 2. Mark status fully paid
             $creditDebt->status = 'fully_paid';
             $creditDebt->amount_paid = (float) $creditDebt->amount;
+            $creditDebt->payment_method = $closeMethod;
             $creditDebt->fully_paid_at = Carbon::now();
             if (! empty($validated['notes'])) {
                 $creditDebt->notes = trim(($creditDebt->notes ?? '')."\nClosing note: ".$validated['notes']);
