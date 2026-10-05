@@ -242,6 +242,8 @@
                     </div>
                 </div>
             </div>
+        </div>
+
         <!-- 2.8 SAVINGS, INCOME TALLY SURPLUS & DAILY CASH REGISTER -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <!-- Savings Card -->
