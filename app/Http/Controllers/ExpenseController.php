@@ -62,7 +62,11 @@ class ExpenseController extends Controller
         $period = $request->get('period', 'all');
         $fromDate = $request->get('from_date');
         $toDate = $request->get('to_date');
-        [$startDate, $endDate] = $this->resolveDates($period, $fromDate, $toDate);
+        $customMonth = $request->get('month');
+        if ($customMonth && ($period === 'all' || $period === 'month')) {
+            $period = 'month';
+        }
+        [$startDate, $endDate] = $this->resolveDates($period, $fromDate, $toDate, $customMonth);
 
         if ($startDate && $endDate) {
             $query->whereBetween('date', [$startDate, $endDate]);
@@ -215,7 +219,8 @@ class ExpenseController extends Controller
             'archivedCount',
             'period',
             'fromDate',
-            'toDate'
+            'toDate',
+            'customMonth'
         ));
     }
 
@@ -1360,9 +1365,15 @@ class ExpenseController extends Controller
         ));
     }
 
-    private function resolveDates(string $periodType, ?string $start, ?string $end): array
+    private function resolveDates(string $periodType, ?string $start, ?string $end, ?string $customMonth = null): array
     {
         $today = Carbon::today();
+
+        if ($customMonth) {
+            $m = Carbon::parse($customMonth.'-01');
+
+            return [$m->copy()->startOfMonth()->toDateString(), $m->copy()->endOfMonth()->toDateString()];
+        }
 
         return match ($periodType) {
             'day', 'today' => [$today->toDateString(), $today->toDateString()],

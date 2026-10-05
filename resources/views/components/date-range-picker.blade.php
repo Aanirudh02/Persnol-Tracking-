@@ -35,6 +35,10 @@
                     {{ $pLabel }}
                 </button>
             @endforeach
+            <div class="flex items-center gap-1 pl-1 border-l border-slate-200 dark:border-slate-700">
+                <span class="text-[10px] font-bold text-slate-400 hidden sm:inline">Month:</span>
+                <input type="month" name="month" value="{{ request('month') }}" onchange="selectCustomMonth(this.value)" class="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-white cursor-pointer shadow-2xs font-semibold" title="Select custom month">
+            </div>
             <button type="button" onclick="toggleDateRangeCustom()" 
                 class="drp-preset-btn px-3 py-1.5 text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer font-medium {{ $isCustom ? 'bg-slate-900 text-white shadow-xs font-semibold' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-200/60' }}">
                 <span>📅</span>
@@ -59,6 +63,12 @@
         document.getElementById('drp-period-input').value = period;
         document.getElementById('drp-custom-container').classList.add('hidden');
         document.getElementById('drp-custom-container').classList.remove('flex');
+        document.getElementById('date-range-picker-form').submit();
+    }
+
+    function selectCustomMonth(monthVal) {
+        if (!monthVal) return;
+        document.getElementById('drp-period-input').value = 'month';
         document.getElementById('date-range-picker-form').submit();
     }
 

@@ -312,6 +312,12 @@ class StatementController extends Controller
     {
         $today = Carbon::today();
 
+        if ($periodType === 'month' && $start) {
+            $m = Carbon::parse(strlen($start) === 7 ? $start.'-01' : $start);
+
+            return [$m->copy()->startOfMonth()->toDateString(), $m->copy()->endOfMonth()->toDateString()];
+        }
+
         return match ($periodType) {
             'day' => [$today->toDateString(), $today->toDateString()],
             'week' => [$today->copy()->startOfWeek()->toDateString(), $today->copy()->endOfWeek()->toDateString()],

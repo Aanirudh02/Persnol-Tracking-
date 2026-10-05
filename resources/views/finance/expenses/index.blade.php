@@ -209,7 +209,7 @@
         <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-sm">
             <form action="{{ route('expenses.index') }}" method="GET" class="space-y-3 text-xs">
                 <input type="hidden" name="status" value="{{ $status ?? 'active' }}">
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
                     <div>
                         <label class="block text-slate-400 mb-1">Category</label>
                         <select name="category_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
@@ -227,6 +227,10 @@
                                 <option value="{{ $m }}" {{ request('payment_method') == $m ? 'selected' : '' }}>{{ $m }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Month</label>
+                        <input type="month" name="month" value="{{ request('month') }}" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white">
                     </div>
                     <div>
                         <label class="block text-slate-400 mb-1">From Date</label>

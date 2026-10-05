@@ -39,16 +39,26 @@ class DashboardController extends Controller
         }
 
         $period = $request->get('period', 'today');
-        if (! in_array($period, ['today', 'week', 'month'], true)) {
+        if (! in_array($period, ['today', 'week', 'month', 'custom'], true)) {
             $period = 'today';
         }
 
-        $startDate = match ($period) {
-            'week' => Carbon::parse($date)->startOfWeek()->toDateString(),
-            'month' => Carbon::parse($date)->startOfMonth()->toDateString(),
-            default => $date,
-        };
-        $endDate = $date;
+        $selectedMonth = $request->get('month', Carbon::parse($date)->format('Y-m'));
+
+        if ($period === 'month') {
+            $startMonthCarbon = Carbon::parse($selectedMonth.'-01')->startOfMonth();
+            $startDate = $startMonthCarbon->toDateString();
+            $endDate = $startMonthCarbon->copy()->endOfMonth()->toDateString();
+        } elseif ($period === 'custom') {
+            $startDate = $request->get('start_date', Carbon::parse($date)->startOfMonth()->toDateString());
+            $endDate = $request->get('end_date', $date);
+        } elseif ($period === 'week') {
+            $startDate = Carbon::parse($date)->startOfWeek()->toDateString();
+            $endDate = Carbon::parse($date)->endOfWeek()->toDateString();
+        } else {
+            $startDate = $date;
+            $endDate = $date;
+        }
 
         $dayRecord = DailyRecord::query()
             ->where('user_id', $user->id)
@@ -134,8 +144,8 @@ class DashboardController extends Controller
         // Weekly and Monthly Totals (always available on dashboard)
         $startOfWeek = Carbon::parse($date)->startOfWeek()->toDateString();
         $endOfWeek = Carbon::parse($date)->endOfWeek()->toDateString();
-        $startOfMonth = Carbon::parse($date)->startOfMonth()->toDateString();
-        $endOfMonth = Carbon::parse($date)->endOfMonth()->toDateString();
+        $startOfMonth = Carbon::parse($selectedMonth.'-01')->startOfMonth()->toDateString();
+        $endOfMonth = Carbon::parse($selectedMonth.'-01')->endOfMonth()->toDateString();
 
         $weeklyExpensesTotal = (float) Expense::where('user_id', $user->id)
             ->whereNull('parent_id')
@@ -254,6 +264,7 @@ class DashboardController extends Controller
             'isToday',
             'workings',
             'period',
+            'selectedMonth',
             'startDate',
             'endDate',
             'wallets',
@@ -271,9 +282,14 @@ class DashboardController extends Controller
         $range = $request->get('range', '7d');
         $labels = [];
         $data = [];
+        $title = 'Spending Trend';
+        $sub = '';
 
         if ($range === 'week') {
-            $start = Carbon::today()->startOfWeek();
+            $refDate = $request->filled('date') ? Carbon::parse($request->get('date')) : Carbon::today();
+            $start = $refDate->copy()->startOfWeek();
+            $title = 'This Week Spending';
+            $sub = $start->format('d M').' - '.$start->copy()->endOfWeek()->format('d M Y');
             for ($i = 0; $i < 7; $i++) {
                 $d = $start->copy()->addDays($i);
                 $labels[] = $d->format('D (d M)');
@@ -285,10 +301,13 @@ class DashboardController extends Controller
                 $data[] = $sum;
             }
         } elseif ($range === 'month') {
-            $start = Carbon::today()->startOfMonth();
-            $daysInMonth = Carbon::today()->daysInMonth;
+            $targetMonth = $request->get('month', Carbon::today()->format('Y-m'));
+            $start = Carbon::parse($targetMonth.'-01')->startOfMonth();
+            $daysInMonth = $start->daysInMonth;
+            $title = $start->format('F Y').' Daily Spending';
+            $sub = $start->format('01 M').' - '.$start->copy()->endOfMonth()->format('d M Y');
             for ($i = 1; $i <= $daysInMonth; $i++) {
-                $d = Carbon::today()->startOfMonth()->day($i);
+                $d = $start->copy()->day($i);
                 $labels[] = $d->format('d M');
                 $sum = (float) Expense::where('user_id', $user->id)
                     ->whereNull('parent_id')
@@ -297,9 +316,33 @@ class DashboardController extends Controller
                     ->sum(DB::raw('amount + gst_amount'));
                 $data[] = $sum;
             }
+        } elseif ($range === 'custom') {
+            $start = Carbon::parse($request->get('start_date', Carbon::today()->subDays(14)->toDateString()));
+            $end = Carbon::parse($request->get('end_date', Carbon::today()->toDateString()));
+            if ($start->gt($end)) {
+                [$start, $end] = [$end, $start];
+            }
+            $diffDays = $start->diffInDays($end);
+            $title = 'Custom Range Spending';
+            $sub = $start->format('d M Y').' - '.$end->format('d M Y');
+
+            $cursor = $start->copy();
+            while ($cursor->lte($end)) {
+                $labels[] = $diffDays > 31 ? $cursor->format('d M') : $cursor->format('D, d M');
+                $sum = (float) Expense::where('user_id', $user->id)
+                    ->whereNull('parent_id')
+                    ->where('date', $cursor->toDateString())
+                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+                    ->sum(DB::raw('amount + gst_amount'));
+                $data[] = $sum;
+                $cursor->addDay();
+            }
         } elseif ($range === 'year') {
+            $year = (int) $request->get('year', Carbon::today()->year);
+            $title = $year.' Monthly Spending';
+            $sub = 'Jan '.$year.' - Dec '.$year;
             for ($m = 1; $m <= 12; $m++) {
-                $d = Carbon::today()->month($m)->startOfMonth();
+                $d = Carbon::create($year, $m, 1)->startOfMonth();
                 $labels[] = $d->format('M Y');
                 $sum = (float) Expense::where('user_id', $user->id)
                     ->whereNull('parent_id')
@@ -310,6 +353,8 @@ class DashboardController extends Controller
             }
         } else {
             // Default 7 days
+            $title = '7-Day Spending';
+            $sub = 'Daily expenses breakdown';
             for ($i = 6; $i >= 0; $i--) {
                 $d = Carbon::today()->subDays($i);
                 $labels[] = $d->format('D, M j');
@@ -327,6 +372,8 @@ class DashboardController extends Controller
             'labels' => $labels,
             'data' => $data,
             'total' => round(array_sum($data), 2),
+            'title' => $title,
+            'sub' => $sub.' (Total: ₹'.number_format(array_sum($data), 2).')',
         ]);
     }
 }

@@ -18,6 +18,7 @@ class DailyBalance extends Model
         'is_opening_manual',
         'is_closing_manual',
         'notes',
+        'categories_data',
     ];
 
     protected $casts = [
@@ -27,10 +28,29 @@ class DailyBalance extends Model
         'closing_balance' => 'decimal:2',
         'is_opening_manual' => 'boolean',
         'is_closing_manual' => 'boolean',
+        'categories_data' => 'array',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Retrieve category breakdown array for a specific category.
+     *
+     * @return array{opening: float, adjustment: float, closing: float, is_opening_manual: bool, is_closing_manual: bool}
+     */
+    public function categoryData(string $category): array
+    {
+        $data = $this->categories_data ?? [];
+
+        return $data[$category] ?? [
+            'opening' => 0.0,
+            'adjustment' => 0.0,
+            'closing' => 0.0,
+            'is_opening_manual' => false,
+            'is_closing_manual' => false,
+        ];
     }
 }

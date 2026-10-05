@@ -112,6 +112,7 @@ Route::middleware('auth')->group(function () {
         // Daily Balances & Cash Register
         Route::get('/daily-balances', [DailyBalanceController::class, 'index'])->name('daily-balances.index');
         Route::post('/daily-balances', [DailyBalanceController::class, 'update'])->name('daily-balances.update');
+        Route::post('/daily-balances/categories', [DailyBalanceController::class, 'updateCategories'])->name('daily-balances.categories');
 
         // Income
         Route::resource('income', IncomeController::class)->names('income');

@@ -87,18 +87,30 @@
         <!-- 2.5 PERIOD APPROACH & WALLET CURRENT BALANCES -->
         <div class="space-y-3.5">
             <!-- Period Toggle Switcher -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-                <div class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'today']) }}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'today' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                <div class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl flex-wrap">
+                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'today']) }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'today' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
                         📅 Today
                     </a>
-                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'week']) }}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'week' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
+                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'week']) }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'week' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
                         📊 This Week
                     </a>
-                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'month']) }}" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'month' ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
+                    <a href="{{ route('dashboard', ['date' => $date, 'period' => 'month', 'month' => now()->format('Y-m')]) }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition {{ ($period === 'month' && (!isset($selectedMonth) || $selectedMonth === now()->format('Y-m'))) ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900' }}">
                         🗓️ This Month
                     </a>
+
+                    <!-- Custom Month Selector -->
+                    <div class="flex items-center gap-1 pl-1 border-l border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold text-slate-400 hidden sm:inline">Month:</span>
+                        <input type="month" name="month" value="{{ $selectedMonth ?? now()->format('Y-m') }}" onchange="window.location.href='{{ route('dashboard') }}?date={{ $date }}&period=month&month=' + this.value" class="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-2xs cursor-pointer" title="Pick any custom month">
+                    </div>
+
+                    <!-- Custom Range Button -->
+                    <button type="button" onclick="document.getElementById('dash-custom-range-form').classList.toggle('hidden')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition {{ $period === 'custom' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-200/50' }}">
+                        📅 Custom Range
+                    </button>
                 </div>
+
                 <div class="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5 px-2">
                     <span>Range:</span>
                     <strong class="text-slate-800 dark:text-slate-200">
@@ -106,12 +118,31 @@
                             {{ \Carbon\Carbon::parse($date)->format('D, d M Y') }}
                         @elseif($period === 'week')
                             {{ \Carbon\Carbon::parse($startDate)->format('d M') }} &ndash; {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}
-                        @else
+                        @elseif($period === 'month')
                             {{ \Carbon\Carbon::parse($startDate)->format('F Y') }}
+                        @else
+                            {{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} &ndash; {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}
                         @endif
                     </strong>
                 </div>
             </div>
+
+            <!-- Custom Range Collapsible Form -->
+            <form id="dash-custom-range-form" method="GET" action="{{ route('dashboard') }}" class="{{ $period === 'custom' ? '' : 'hidden' }} p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-wrap items-center gap-3 text-xs">
+                <input type="hidden" name="period" value="custom">
+                <input type="hidden" name="date" value="{{ $date }}">
+                <div class="flex items-center gap-1.5">
+                    <label class="font-bold text-slate-500">From:</label>
+                    <input type="date" name="start_date" value="{{ $startDate }}" class="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-white">
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <label class="font-bold text-slate-500">To:</label>
+                    <input type="date" name="end_date" value="{{ $endDate }}" class="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-white">
+                </div>
+                <button type="submit" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition">
+                    Apply Custom Range
+                </button>
+            </form>
 
             <!-- Current Balance & Mode Breakdown Card -->
             <div class="p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white shadow-md border border-slate-700/60 space-y-4">
@@ -562,12 +593,39 @@
                             <h2 class="font-bold text-sm text-slate-900 dark:text-white" id="chart-title">7-Day Spending</h2>
                             <p class="text-xs text-slate-500" id="chart-sub">Daily expenses breakdown</p>
                         </div>
-                        <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
-                            <button type="button" onclick="switchChartRange('7d', this)" class="chart-range-btn px-2.5 py-1 rounded-lg bg-white shadow-xs text-indigo-600">7D</button>
-                            <button type="button" onclick="switchChartRange('week', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">Week</button>
-                            <button type="button" onclick="switchChartRange('month', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">Month</button>
-                            <button type="button" onclick="switchChartRange('year', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">Year</button>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px] font-bold">
+                                <button type="button" onclick="switchChartRange('7d', this)" class="chart-range-btn px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 shadow-xs text-indigo-600 dark:text-sky-400">7D</button>
+                                <button type="button" onclick="switchChartRange('week', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900">Week</button>
+                                <button type="button" onclick="switchChartRange('month', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900">Month</button>
+                                <button type="button" onclick="switchChartRange('year', this)" class="chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900">Year</button>
+                            </div>
+
+                            <!-- Custom Month Selector for Chart -->
+                            <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px]">
+                                <input type="month" id="chart-month-input" value="{{ $selectedMonth ?? now()->format('Y-m') }}" onchange="applyCustomMonthChart(this.value)" class="px-2 py-0.5 rounded-lg border-0 bg-white dark:bg-slate-900 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer shadow-2xs" title="Select custom month for chart">
+                            </div>
+
+                            <!-- Custom Date Range Button -->
+                            <button type="button" onclick="document.getElementById('chart-custom-range-box').classList.toggle('hidden')" class="chart-range-btn px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-2xs flex items-center gap-1 cursor-pointer">
+                                <span>📅</span> Range
+                            </button>
                         </div>
+                    </div>
+
+                    <!-- Custom Date Range Filter for Chart -->
+                    <div id="chart-custom-range-box" class="hidden mb-4 p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-2 text-xs">
+                        <div class="flex items-center gap-1">
+                            <label class="font-bold text-slate-500">From:</label>
+                            <input type="date" id="chart-range-start" value="{{ now()->subDays(14)->toDateString() }}" class="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-white">
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <label class="font-bold text-slate-500">To:</label>
+                            <input type="date" id="chart-range-end" value="{{ now()->toDateString() }}" class="px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-white">
+                        </div>
+                        <button type="button" onclick="applyCustomRangeChart()" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition cursor-pointer">
+                            Apply
+                        </button>
                     </div>
                     <div class="h-52 w-full">
                         <canvas id="weeklyExpenseChart"></canvas>
@@ -670,13 +728,17 @@
             });
         });
 
-        function switchChartRange(range, btn) {
+        function switchChartRange(range, btn, queryParams = '') {
             document.querySelectorAll('.chart-range-btn').forEach(b => {
-                b.className = 'chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900';
+                b.className = 'chart-range-btn px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900';
             });
-            btn.className = 'chart-range-btn px-2.5 py-1 rounded-lg bg-white shadow-xs text-indigo-600 font-bold';
+            if (btn) {
+                btn.className = 'chart-range-btn px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 shadow-xs text-indigo-600 dark:text-sky-400 font-bold';
+            }
 
-            fetch(`/dashboard/chart-data?range=${range}`)
+            let url = `/dashboard/chart-data?range=${range}` + (queryParams ? `&${queryParams}` : '');
+
+            fetch(url)
                 .then(r => r.json())
                 .then(res => {
                     if (!expenseChartInstance) return;
@@ -684,15 +746,21 @@
                     expenseChartInstance.data.datasets[0].data = res.data;
                     expenseChartInstance.update();
 
-                    const titleMap = {
-                        '7d': '7-Day Spending',
-                        'week': 'This Week Spending',
-                        'month': 'This Month Daily Spending',
-                        'year': 'This Year Monthly Spending'
-                    };
-                    document.getElementById('chart-title').textContent = titleMap[range] || 'Spending Trend';
-                    document.getElementById('chart-sub').textContent = `Total: ₹${Number(res.total).toFixed(2)}`;
+                    document.getElementById('chart-title').textContent = res.title || 'Spending Trend';
+                    document.getElementById('chart-sub').textContent = res.sub || `Total: ₹${Number(res.total).toFixed(2)}`;
                 });
+        }
+
+        function applyCustomMonthChart(monthVal) {
+            if (!monthVal) return;
+            switchChartRange('month', null, `month=${monthVal}`);
+        }
+
+        function applyCustomRangeChart() {
+            const start = document.getElementById('chart-range-start').value;
+            const end = document.getElementById('chart-range-end').value;
+            if (!start || !end) return;
+            switchChartRange('custom', null, `start_date=${start}&end_date=${end}`);
         }
     </script>
 

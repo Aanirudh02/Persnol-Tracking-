@@ -5,9 +5,17 @@
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Money Received</h1>
                 <p class="text-xs text-slate-500">Total recorded: <span class="font-bold text-emerald-600">₹{{ number_format($totalAmount, 2) }}</span></p>
             </div>
-            <a href="{{ route('income.create') }}" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5 self-start">
-                <span>+</span> Record Income
-            </a>
+            <div class="flex items-center gap-2">
+                <form method="GET" action="{{ route('income.index') }}" class="flex items-center gap-2 text-xs">
+                    <input type="month" name="month" value="{{ $month ?? '' }}" onchange="this.form.submit()" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-800 dark:text-white shadow-2xs cursor-pointer" title="Filter by month">
+                    @if(request('month') || request('source'))
+                        <a href="{{ route('income.index') }}" class="p-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Clear Filter">&times; Clear</a>
+                    @endif
+                </form>
+                <a href="{{ route('income.create') }}" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5 self-start">
+                    <span>+</span> Record Income
+                </a>
+            </div>
         </div>
 
         <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
