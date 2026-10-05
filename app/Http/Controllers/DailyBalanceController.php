@@ -267,6 +267,137 @@ class DailyBalanceController extends Controller
         ));
     }
 
+    /**
+     * Dedicated live breakdown page for Today's Cash & UPI Register flow.
+     */
+    public function today(Request $request): View
+    {
+        $user = $request->user();
+
+        // 1. Available & Active tracked Categories
+        $allPaymentMethods = $this->options->for('payment_method', $user->id);
+        $allMethodNames = $allPaymentMethods->pluck('name')->all();
+        if (empty($allMethodNames)) {
+            $allMethodNames = ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Other'];
+        }
+
+        $activeCategories = Setting::getVal('daily_register_categories', ['Cash', 'UPI']);
+        if (! is_array($activeCategories) || empty($activeCategories)) {
+            $activeCategories = ['Cash', 'UPI'];
+        }
+        $activeCategories = array_values(array_intersect($activeCategories, $allMethodNames));
+        if (empty($activeCategories)) {
+            $activeCategories = ['Cash', 'UPI'];
+        }
+
+        $today = Carbon::today();
+        $todayStr = $today->toDateString();
+
+        // Incomes for today
+        $todayIncomes = Income::query()
+            ->where('user_id', $user->id)
+            ->where('date', $todayStr)
+            ->with('category')
+            ->orderByDesc('id')
+            ->get();
+
+        // Expenses for today
+        $todayExpenses = Expense::query()
+            ->where('user_id', $user->id)
+            ->where('date', $todayStr)
+            ->whereNull('parent_id')
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->where(fn ($q) => $q->whereNull('paid_by')->orWhere('paid_by', '!=', 'friend'))
+            ->with(['category', 'friendSplits.friend'])
+            ->orderByDesc('id')
+            ->get();
+
+        // Saved today record
+        $savedToday = DailyBalance::query()
+            ->where('user_id', $user->id)
+            ->where('record_date', $todayStr)
+            ->first();
+
+        // Baseline opening balance from yesterday or most recent prior record
+        $lastPriorBalance = DailyBalance::query()
+            ->where('user_id', $user->id)
+            ->where('record_date', '<', $todayStr)
+            ->orderByDesc('record_date')
+            ->first();
+
+        $wallets = PaymentWallet::query()
+            ->where('user_id', $user->id)
+            ->get()
+            ->keyBy('payment_method');
+
+        $categoriesBreakdown = [];
+        $totalOpening = 0.0;
+        $totalInflow = 0.0;
+        $totalOutflow = 0.0;
+        $totalNetFlow = 0.0;
+        $totalClosing = 0.0;
+
+        foreach ($activeCategories as $cat) {
+            $catIncomes = $todayIncomes->filter(fn ($i) => ($i->payment_method ?: 'Cash') === $cat);
+            $catExpenses = $todayExpenses->filter(fn ($e) => ($e->payment_method ?: 'Cash') === $cat);
+
+            $inflow = (float) $catIncomes->sum('amount');
+            $outflow = (float) $catExpenses->sum(fn ($e) => (float) $e->amount + (float) ($e->gst_amount ?? 0));
+
+            // Determine opening
+            $savedOpening = $savedToday?->categories_data[$cat]['opening'] ?? null;
+            if ($savedOpening !== null) {
+                $opening = (float) $savedOpening;
+            } elseif ($lastPriorBalance && isset($lastPriorBalance->categories_data[$cat]['closing'])) {
+                $opening = (float) $lastPriorBalance->categories_data[$cat]['closing'];
+            } elseif ($wallets->has($cat)) {
+                $opening = (float) $wallets->get($cat)->opening_balance;
+            } else {
+                $opening = 0.0;
+            }
+
+            $adjustment = (float) ($savedToday?->categories_data[$cat]['adjustment'] ?? 0.0);
+            $netFlow = round($inflow - $outflow, 2);
+            $closing = round($opening + $inflow - $outflow + $adjustment, 2);
+
+            $categoriesBreakdown[$cat] = [
+                'name' => $cat,
+                'opening' => round($opening, 2),
+                'inflow' => round($inflow, 2),
+                'outflow' => round($outflow, 2),
+                'net_flow' => $netFlow,
+                'adjustment' => round($adjustment, 2),
+                'closing' => $closing,
+                'incomes' => $catIncomes,
+                'expenses' => $catExpenses,
+            ];
+
+            $totalOpening += $opening;
+            $totalInflow += $inflow;
+            $totalOutflow += $outflow;
+            $totalNetFlow += $netFlow;
+            $totalClosing += $closing;
+        }
+
+        $totals = [
+            'opening' => round($totalOpening, 2),
+            'inflow' => round($totalInflow, 2),
+            'outflow' => round($totalOutflow, 2),
+            'net_flow' => round($totalNetFlow, 2),
+            'closing' => round($totalClosing, 2),
+        ];
+
+        return view('finance.daily_balances.today', compact(
+            'today',
+            'categoriesBreakdown',
+            'totals',
+            'activeCategories',
+            'todayIncomes',
+            'todayExpenses',
+            'savedToday'
+        ));
+    }
+
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();

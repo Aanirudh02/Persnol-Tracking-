@@ -18,33 +18,51 @@ class CloudinaryService
         $apiSecret = config('services.cloudinary.api_secret');
         $targetFolder = $folder ?: config('services.cloudinary.folder', 'odometer');
 
-        // If credentials are configured, upload directly to Cloudinary API
-        if ($cloudName && $apiKey && $apiSecret) {
-            $timestamp = time();
-            $paramsToSign = "folder={$targetFolder}&timestamp={$timestamp}";
-            $signature = sha1($paramsToSign.$apiSecret);
-
-            $response = Http::timeout(25)
-                ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
-                ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
-                    'api_key' => $apiKey,
-                    'timestamp' => $timestamp,
-                    'folder' => $targetFolder,
-                    'signature' => $signature,
-                ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                if (! empty($data['secure_url'])) {
-                    return $data['secure_url'];
-                }
+        // Check if CLOUDINARY_URL is available
+        $cloudinaryUrl = config('services.cloudinary.url') ?: env('CLOUDINARY_URL');
+        if ($cloudinaryUrl) {
+            $parsed = parse_url($cloudinaryUrl);
+            if (! empty($parsed['host'])) {
+                $cloudName = $parsed['host'];
             }
-
-            Log::error('Cloudinary direct upload failed: '.$response->body());
-            throw new \RuntimeException('Cloudinary image upload failed: '.$response->body());
+            if (! empty($parsed['user'])) {
+                $apiKey = $parsed['user'];
+            }
+            if (! empty($parsed['pass'])) {
+                $apiSecret = $parsed['pass'];
+            }
         }
 
-        // Standard storage when Cloudinary credentials are not provided
+        // If credentials are fully configured, attempt upload to Cloudinary API
+        if ($cloudName && $apiKey && $apiSecret) {
+            try {
+                $timestamp = time();
+                $paramsToSign = "folder={$targetFolder}&timestamp={$timestamp}";
+                $signature = sha1($paramsToSign.$apiSecret);
+
+                $response = Http::timeout(25)
+                    ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                    ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                        'api_key' => $apiKey,
+                        'timestamp' => $timestamp,
+                        'folder' => $targetFolder,
+                        'signature' => $signature,
+                    ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (! empty($data['secure_url'])) {
+                        return $data['secure_url'];
+                    }
+                }
+
+                Log::warning('Cloudinary direct upload returned unsuccessful response: '.$response->body().' — falling back to local public disk.');
+            } catch (\Throwable $e) {
+                Log::warning('Cloudinary direct upload encountered an exception: '.$e->getMessage().' — falling back to local public disk.');
+            }
+        }
+
+        // Standard storage when Cloudinary credentials are not provided or upload fails
         return $file->store($targetFolder, 'public');
     }
 

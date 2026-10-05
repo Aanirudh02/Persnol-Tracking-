@@ -111,6 +111,7 @@ Route::middleware('auth')->group(function () {
 
         // Daily Balances & Cash Register
         Route::get('/daily-balances', [DailyBalanceController::class, 'index'])->name('daily-balances.index');
+        Route::get('/daily-balances/today', [DailyBalanceController::class, 'today'])->name('daily-balances.today');
         Route::post('/daily-balances', [DailyBalanceController::class, 'update'])->name('daily-balances.update');
         Route::post('/daily-balances/categories', [DailyBalanceController::class, 'updateCategories'])->name('daily-balances.categories');
 
@@ -143,6 +144,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/credits/{creditDebt}/record-as-personal-expense', [CreditDebtController::class, 'recordAsPersonalExpense'])->name('credits.record-as-personal-expense');
         Route::post('/credits/{creditDebt}/record-as-income', [CreditDebtController::class, 'recordAsIncome'])->name('credits.record-as-income');
         Route::post('/credits/{creditDebt}/settle-discounted', [CreditDebtController::class, 'settleDiscounted'])->name('credits.settle-discounted');
+        Route::post('/credits/{creditDebt}/close', [CreditDebtController::class, 'close'])->name('credits.close');
     });
 
     // Petrol Statement Route
@@ -227,6 +229,9 @@ Route::middleware('auth')->group(function () {
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/export', [ReportController::class, 'exportCsv'])->name('reports.export');
+
+    // Global Media Upload (Cloudinary)
+    Route::post('/media/upload', [\App\Http\Controllers\MediaUploadController::class, 'upload'])->name('media.upload');
 
     // Global Search
     Route::get('/search', [SearchController::class, 'search'])->name('search');

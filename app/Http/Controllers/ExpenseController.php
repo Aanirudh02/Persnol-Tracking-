@@ -325,7 +325,7 @@ class ExpenseController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('receipt_image')) {
-            $imagePath = $request->file('receipt_image')->store('receipts', 'public');
+            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
         }
 
         $parentId = $validated['parent_id'] ?? null;
@@ -697,7 +697,7 @@ class ExpenseController extends Controller
         $oldValues = $expense->only(['amount', 'gst_amount', 'category_id', 'date', 'description', 'payment_method']);
 
         if ($request->hasFile('receipt_image')) {
-            $validated['receipt_image'] = $request->file('receipt_image')->store('receipts', 'public');
+            $validated['receipt_image'] = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
         }
 
         $category = ! empty($validated['category_id']) ? ExpenseCategory::query()->find($validated['category_id']) : null;

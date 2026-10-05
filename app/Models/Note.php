@@ -26,4 +26,9 @@ class Note extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function imageUrl(): ?string
+    {
+        return \App\Services\CloudinaryService::url($this->image_path);
+    }
 }

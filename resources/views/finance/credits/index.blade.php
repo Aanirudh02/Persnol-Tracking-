@@ -87,6 +87,12 @@
                 <label class="font-semibold text-slate-700">Notes</label>
                 <textarea name="notes" rows="2" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5"></textarea>
             </div>
+            <div class="sm:col-span-2 flex items-center gap-2 pt-1">
+                <input type="checkbox" name="link_as_expense" id="link_as_expense" value="1" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                <label for="link_as_expense" class="text-xs font-semibold text-slate-700 cursor-pointer">
+                    {{ $type === 'debt' ? 'Also file as Normal Expense (cash lent/given to friend)' : 'Also file as Normal Expense (repayment paid to friend)' }}
+                </label>
+            </div>
             <button class="sm:col-span-2 rounded-xl bg-slate-900 py-2.5 font-semibold text-white">Save {{ $type }}</button>
         </form>
 
@@ -161,79 +167,164 @@
                         <div class="flex flex-wrap items-center gap-3 text-xs">
                             <a href="{{ route('credits.edit', $item) }}" class="font-semibold text-indigo-600 hover:underline">Edit</a>
 
+                            {{-- Normal Expense Link / Button for BOTH Credit & Debt --}}
+                            @if($item->linked_expense_id && $item->linkedExpense)
+                                <span class="font-semibold text-emerald-700 inline-flex items-center gap-1">
+                                    <span>✅</span> Recorded as Normal Expense
+                                </span>
+                            @else
+                                <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+                                    <span>📗</span> File as Normal Expense
+                                </button>
+                            @endif
+
+                            {{-- Credit Only: Personal Expense Option --}}
                             @if($item->type === 'credit')
-                                @if($item->linked_expense_id && $item->linkedExpense)
-                                    <span class="font-semibold text-emerald-700 inline-flex items-center gap-1">
-                                        <span>✅</span> Already Recorded as Normal Expense
+                                @if($item->linked_personal_expense_id && $item->linkedPersonalExpense)
+                                    <span class="font-semibold text-purple-700 inline-flex items-center gap-1">
+                                        <span>💜</span> Recorded as Personal Expense
                                     </span>
                                 @else
-                                    <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
-                                        <span>📗</span> File as Normal Expense
+                                    <button type="button" onclick="document.getElementById('record-personal-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-purple-700 hover:underline flex items-center gap-1">
+                                        <span>💜</span> File as Personal Expense
                                     </button>
                                 @endif
 
-                                @if($item->linked_personal_expense_id && $item->linkedPersonalExpense)
-                                    <span class="font-semibold text-purple-700 inline-flex items-center gap-1">
-                                        <span>💜</span> Already Recorded as Personal Expense
-                                    </span>
-                                @else
-                                    <button type="button" onclick="document.getElementById('record-personal-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-purple-700 hover:underline flex items-center gap-1">
-                                        <span>💜</span> File as Personal Expense
+                                @if($item->remaining() > 0)
+                                    <button type="button" onclick="document.getElementById('close-credit-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-indigo-700 hover:underline flex items-center gap-1">
+                                        <span>🔒</span> Close Credit (as Expense)
                                     </button>
                                 @endif
                             @endif
 
+                            {{-- Debt Only: Close as Income & Partial Income --}}
                             @if($item->type === 'debt' && $item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-teal-700 hover:underline flex items-center gap-1">
-                                    <span>💰</span> Record as Income
+                                <button type="button" onclick="document.getElementById('close-debt-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+                                    <span>🔒</span> Close Debt (as Income)
+                                </button>
+                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-teal-700 hover:underline flex items-center gap-1">
+                                    <span>💰</span> Partial Income
                                 </button>
                             @endif
 
                             @if($item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
                                     <span>🤝</span> Settle with Discount / Forgiven
                                 </button>
                             @endif
 
-                            <form action="{{ route('credits.destroy', $item) }}" method="POST" onsubmit="return confirm('Delete this {{ $item->type }} record?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="font-semibold text-rose-600 hover:underline">Delete</button>
-                            </form>
+                            {{-- Delete with prompt if linked to normal expense --}}
+                            @if($item->linked_expense_id && $item->linkedExpense)
+                                <button type="button" onclick="openDeleteCreditModal({{ $item->id }}, '{{ $item->type }}', '{{ addslashes($item->linkedExpense->description) }}', '{{ number_format($item->linkedExpense->amount, 2) }}')" class="font-semibold text-rose-600 hover:underline">
+                                    Delete
+                                </button>
+                            @else
+                                <form action="{{ route('credits.destroy', $item) }}" method="POST" onsubmit="return confirm('Delete this {{ $item->type }} record?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="font-semibold text-rose-600 hover:underline">Delete</button>
+                                </form>
+                            @endif
                         </div>
 
-                        <!-- Record as Normal Expense Inline Form (Credit) -->
-                        @if($item->type === 'credit')
-                            @php
-                                $suggestedRepay = (float) $item->amount_paid > 0 ? (float) $item->amount_paid : (float) $item->remaining();
-                                $suggestedDate = $item->payments->last()?->paid_on?->toDateString() ?? $item->date->toDateString();
-                            @endphp
-                            <form id="record-expense-{{ $item->id }}" action="{{ route('credits.record-as-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs space-y-2">
+                        <!-- Close Debt Form (Friend Paid Back -> Adds Income) -->
+                        @if($item->type === 'debt' && $item->remaining() > 0)
+                            <form id="close-debt-{{ $item->id }}" action="{{ route('credits.close', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-300 bg-emerald-50/70 p-3 text-xs space-y-2">
                                 @csrf
-                                <div class="font-bold text-emerald-900">Record Credit Repayment as Normal Expense</div>
-                                <p class="text-slate-600">Files this repayment under standard / college expenses. Pre-filled with paid amount (₹{{ number_format($suggestedRepay, 2) }}) and payment date ({{ Carbon\Carbon::parse($suggestedDate)->format('d M Y') }}).</p>
-                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                <div class="font-bold text-emerald-900 flex items-center justify-between">
+                                    <span>🔒 Close Debt & Record as Income</span>
+                                    <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg font-black">Remaining: ₹{{ number_format($item->remaining(), 2) }}</span>
+                                </div>
+                                <p class="text-slate-600">Marks this debt as <strong>Fully Paid</strong> and automatically records <strong>₹{{ number_format($item->remaining(), 2) }}</strong> as an Income entry from {{ $item->friend?->name ?? 'Friend' }}.</p>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                     <div>
-                                        <label class="font-semibold text-slate-700 block mb-1">Repay Amount (₹)</label>
-                                        <input type="number" step="0.01" name="amount" value="{{ $suggestedRepay }}" max="{{ $item->amount }}" min="0.01" required placeholder="Repay Amount" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800">
-                                    </div>
-                                    <div>
-                                        <label class="font-semibold text-slate-700 block mb-1">Repayment Date</label>
-                                        <input type="date" name="date" value="{{ $suggestedDate }}" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                                        <label class="font-semibold text-slate-700 block mb-1">Date Received</label>
+                                        <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
                                     </div>
                                     <div>
                                         <label class="font-semibold text-slate-700 block mb-1">Payment Method</label>
-                                        <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                        <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
                                             @foreach($paymentMethods as $method)
-                                                <option value="{{ $method }}" @selected(($item->payments->last()?->payment_method ?? $item->payment_method) === $method)>{{ $method }}</option>
+                                                <option value="{{ $method }}" @selected(($item->payment_method ?: 'Cash') === $method)>{{ $method }}</option>
                                             @endforeach
                                         </select>
                                     </div>
                                     <div class="flex items-end">
-                                        <button class="w-full rounded-xl bg-emerald-700 px-3 py-2 font-bold text-white hover:bg-emerald-800">Submit Normal Expense</button>
+                                        <button type="submit" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2 font-bold text-white shadow-sm transition">
+                                            Confirm Close & Add Income
+                                        </button>
                                     </div>
                                 </div>
                             </form>
+                        @endif
+
+                        <!-- Close Credit Form (I Paid Back -> Adds Normal Expense) -->
+                        @if($item->type === 'credit' && $item->remaining() > 0)
+                            <form id="close-credit-{{ $item->id }}" action="{{ route('credits.close', $item) }}" method="POST" class="hidden rounded-2xl border border-indigo-300 bg-indigo-50/70 p-3 text-xs space-y-2">
+                                @csrf
+                                <div class="font-bold text-indigo-900 flex items-center justify-between">
+                                    <span>🔒 Close Credit & Record as Normal Expense</span>
+                                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-lg font-black">Remaining: ₹{{ number_format($item->remaining(), 2) }}</span>
+                                </div>
+                                <p class="text-slate-600">Marks this credit as <strong>Fully Paid</strong> and automatically records <strong>₹{{ number_format($item->remaining(), 2) }}</strong> as a Normal Expense entry to {{ $item->friend?->name ?? 'Friend' }}.</p>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Date Repaid</label>
+                                        <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Payment Method</label>
+                                        <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                                            @foreach($paymentMethods as $method)
+                                                <option value="{{ $method }}" @selected(($item->payment_method ?: 'Cash') === $method)>{{ $method }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="flex items-end">
+                                        <button type="submit" class="w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2 font-bold text-white shadow-sm transition">
+                                            Confirm Close & Add Expense
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        @endif
+
+                        <!-- Record as Normal Expense Inline Form (Credit Repayment OR Debt Lent) -->
+                        @php
+                            $isDebt = $item->type === 'debt';
+                            $defaultAmt = $isDebt ? (float) $item->amount : ((float) $item->amount_paid > 0 ? (float) $item->amount_paid : (float) $item->remaining());
+                            $suggestedDate = $item->payments->last()?->paid_on?->toDateString() ?? $item->date->toDateString();
+                        @endphp
+                        <form id="record-expense-{{ $item->id }}" action="{{ route('credits.record-as-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs space-y-2">
+                            @csrf
+                            <div class="font-bold text-emerald-900">
+                                {{ $isDebt ? 'Record Money Lent as Normal Expense' : 'Record Credit Repayment as Normal Expense' }}
+                            </div>
+                            <p class="text-slate-600">
+                                {{ $isDebt ? 'Files the cash given/lent under normal expenses. Amount defaults to ₹'.number_format($defaultAmt, 2).'.' : 'Files this repayment under standard / college expenses. Pre-filled with paid amount (₹'.number_format($defaultAmt, 2).').' }}
+                            </p>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">Amount (₹)</label>
+                                    <input type="number" step="0.01" name="amount" value="{{ $defaultAmt }}" max="{{ $item->amount }}" min="0.01" required placeholder="Amount" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800">
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">Date</label>
+                                    <input type="date" name="date" value="{{ $suggestedDate }}" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                                </div>
+                                <div>
+                                    <label class="font-semibold text-slate-700 block mb-1">Payment Method</label>
+                                    <select name="payment_method" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                        @foreach($paymentMethods as $method)
+                                            <option value="{{ $method }}" @selected(($item->payment_method ?: ($item->payments->last()?->payment_method ?? 'Cash')) === $method)>{{ $method }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="flex items-end">
+                                    <button class="w-full rounded-xl bg-emerald-700 px-3 py-2 font-bold text-white hover:bg-emerald-800">Submit Normal Expense</button>
+                                </div>
+                            </div>
+                        </form>
 
                             <!-- Record as Personal Expense Inline Form (Credit) -->
                             <form id="record-personal-expense-{{ $item->id }}" action="{{ route('credits.record-as-personal-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-purple-200 bg-purple-50/60 p-3 text-xs space-y-2">
@@ -407,4 +498,60 @@
             <div class="p-4">{{ $items->links() }}</div>
         </div>
     </div>
+
+    <!-- Modal for deleting Credit/Debt linked to Normal Expense -->
+    <div id="delete-linked-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs hidden">
+        <div class="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>⚠️</span> Delete <span id="del-modal-type">Credit</span>
+            </h3>
+            <p class="mt-2 text-xs text-slate-600 leading-relaxed">
+                This item is linked to a Normal Expense:
+                <span id="del-modal-exp-desc" class="font-bold text-slate-900 block mt-1"></span>
+                <span id="del-modal-exp-amt" class="text-emerald-600 font-bold block mt-0.5"></span>
+            </p>
+            <p class="mt-3 text-xs text-slate-700 font-medium">
+                Would you like to delete the linked Normal Expense as well, or delete the <span id="del-modal-type-2">credit</span> alone?
+            </p>
+            <div class="mt-5 flex flex-col gap-2">
+                <form id="del-form-alone" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="delete_linked_expense" value="0">
+                    <button type="submit" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 transition cursor-pointer">
+                        Delete <span id="del-btn-type">Credit</span> Alone (Keep Expense)
+                    </button>
+                </form>
+                <form id="del-form-both" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="delete_linked_expense" value="1">
+                    <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white shadow-md shadow-rose-600/20 transition cursor-pointer">
+                        Delete Both (<span id="del-btn-type-2">Credit</span> & Linked Normal Expense)
+                    </button>
+                </form>
+                <button type="button" onclick="document.getElementById('delete-linked-modal').classList.add('hidden')" class="w-full py-2 text-xs text-slate-400 hover:text-slate-600 font-semibold cursor-pointer">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openDeleteCreditModal(id, type, expDesc, expAmt) {
+            const capitalized = type.charAt(0).toUpperCase() + type.slice(1);
+            document.getElementById('del-modal-type').textContent = capitalized;
+            document.getElementById('del-modal-type-2').textContent = type;
+            document.getElementById('del-btn-type').textContent = capitalized;
+            document.getElementById('del-btn-type-2').textContent = capitalized;
+            document.getElementById('del-modal-exp-desc').textContent = '“' + expDesc + '”';
+            document.getElementById('del-modal-exp-amt').textContent = 'Amount: ₹' + expAmt;
+            
+            const destroyUrl = "{{ url('/finance/credits') }}/" + id;
+            document.getElementById('del-form-alone').action = destroyUrl;
+            document.getElementById('del-form-both').action = destroyUrl;
+            
+            document.getElementById('delete-linked-modal').classList.remove('hidden');
+        }
+    </script>
 </x-app-layout>

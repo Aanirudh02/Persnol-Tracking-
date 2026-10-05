@@ -241,7 +241,7 @@ class ScooterController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('speedometer_image')) {
-            $imagePath = $request->file('speedometer_image')->store('speedometers', 'public');
+            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('speedometer_image'), 'speedometers');
         }
 
         $trip->end_time = Carbon::now()->format('H:i:s');

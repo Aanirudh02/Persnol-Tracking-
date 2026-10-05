@@ -136,14 +136,15 @@ class OdometerController extends Controller
         ]);
 
         // Process optional image upload (to Cloudinary or fallback to local public disk)
-        $imagePath = null;
-        if ($request->hasFile('odometer_image')) {
-            $imagePath = $cloudinary->upload($request->file('odometer_image'), 'odometer');
-        }
+        try {
+            $imagePath = null;
+            if ($request->hasFile('odometer_image')) {
+                $imagePath = $cloudinary->upload($request->file('odometer_image'), 'odometer');
+            }
 
-        $vehicleId = $validated['vehicle_id'] ?? Vehicle::defaultFor($user->id)?->id;
-        $date = $validated['reading_date'];
-        $time = $validated['reading_time'] ? Carbon::parse($validated['reading_time'])->format('H:i:s') : Carbon::now()->format('H:i:s');
+            $vehicleId = $validated['vehicle_id'] ?? Vehicle::defaultFor($user->id)?->id;
+            $date = $validated['reading_date'];
+            $time = $validated['reading_time'] ? Carbon::parse($validated['reading_time'])->format('H:i:s') : Carbon::now()->format('H:i:s');
         $odometerKm = round((float) $validated['odometer_km'], 2);
 
         // -------------------------------------------------------------
@@ -321,7 +322,12 @@ class OdometerController extends Controller
         }
 
         return redirect()->route('odometer.index');
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::error('Error saving odometer log: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+        return back()->withInput()->with('error', 'Error saving odometer log: '.$e->getMessage());
     }
+}
 
     /**
      * Show details of a specific cycle with leg-by-leg timeline.
@@ -358,21 +364,27 @@ class OdometerController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        if ($request->hasFile('odometer_image')) {
-            $validated['odometer_image'] = $cloudinary->upload($request->file('odometer_image'), 'odometer');
+        try {
+            if ($request->hasFile('odometer_image')) {
+                $validated['odometer_image'] = $cloudinary->upload($request->file('odometer_image'), config('services.cloudinary.folder', 'odometer'));
+            }
+
+            if (! empty($validated['reading_time'])) {
+                $validated['reading_time'] = Carbon::parse($validated['reading_time'])->format('H:i:s');
+            }
+
+            $reading->update($validated);
+
+            if ($reading->group) {
+                $reading->group->recalculateSummary();
+            }
+
+            return back()->with('success', 'Reading updated successfully!');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Error updating odometer reading: '.$e->getMessage());
+
+            return back()->withInput()->with('error', 'Error updating odometer reading: '.$e->getMessage());
         }
-
-        if (! empty($validated['reading_time'])) {
-            $validated['reading_time'] = Carbon::parse($validated['reading_time'])->format('H:i:s');
-        }
-
-        $reading->update($validated);
-
-        if ($reading->group) {
-            $reading->group->recalculateSummary();
-        }
-
-        return back()->with('success', 'Reading updated successfully!');
     }
 
     /**

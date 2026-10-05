@@ -17,6 +17,7 @@ class CreditDebt extends Model
         'type',
         'amount',
         'amount_paid',
+        'payment_method',
         'status',
         'date',
         'location',

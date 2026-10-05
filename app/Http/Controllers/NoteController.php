@@ -43,7 +43,7 @@ class NoteController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('notes', 'public');
+            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('image'), 'notes');
         }
 
         Note::create([
@@ -85,7 +85,7 @@ class NoteController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $validated['image_path'] = $request->file('image')->store('notes', 'public');
+            $validated['image_path'] = app(\App\Services\CloudinaryService::class)->upload($request->file('image'), 'notes');
         }
         $validated['is_pinned'] = $request->boolean('is_pinned');
 

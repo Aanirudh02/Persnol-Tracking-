@@ -182,7 +182,7 @@ class SettingController extends Controller
         ]);
 
         if ($request->hasFile('profile_photo')) {
-            $validated['profile_photo'] = $request->file('profile_photo')->store('profiles', 'public');
+            $validated['profile_photo'] = app(\App\Services\CloudinaryService::class)->upload($request->file('profile_photo'), 'profiles');
         }
 
         $user->update($validated);
@@ -400,8 +400,22 @@ class SettingController extends Controller
         $apiKey = config('services.cloudinary.api_key');
         $apiSecret = config('services.cloudinary.api_secret');
 
+        $cloudinaryUrl = config('services.cloudinary.url') ?: env('CLOUDINARY_URL');
+        if ($cloudinaryUrl) {
+            $parsed = parse_url($cloudinaryUrl);
+            if (! empty($parsed['host'])) {
+                $cloudName = $parsed['host'];
+            }
+            if (! empty($parsed['user'])) {
+                $apiKey = $parsed['user'];
+            }
+            if (! empty($parsed['pass'])) {
+                $apiSecret = $parsed['pass'];
+            }
+        }
+
         if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
-            return back()->with('error', 'Cloudinary credentials missing in .env (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET).');
+            return back()->with('error', 'Cloudinary credentials missing in .env (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, or CLOUDINARY_URL).');
         }
 
         try {

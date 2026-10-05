@@ -98,7 +98,7 @@ class PetrolController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('receipt_image')) {
-            $imagePath = $request->file('receipt_image')->store('petrol_receipts', 'public');
+            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'petrol_receipts');
         }
 
         $pricePerLitre = round($validated['amount'] / $validated['litres'], 2);

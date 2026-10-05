@@ -128,6 +128,12 @@
                     <div>
                         <label for="profile_photo" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Profile Photo</label>
                         <input type="file" name="profile_photo" id="profile_photo" accept="image/*" class="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/50 transition" />
+                        @if($user->profile_photo)
+                            <div class="mt-2 flex items-center gap-2">
+                                <img src="{{ \App\Services\CloudinaryService::url($user->profile_photo) }}" alt="Profile Photo" class="w-10 h-10 rounded-full object-cover border border-indigo-200">
+                                <span class="text-[11px] text-slate-500">Current profile photo</span>
+                            </div>
+                        @endif
                     </div>
                 </div>
                 <div class="pt-2">

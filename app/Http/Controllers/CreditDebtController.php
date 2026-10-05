@@ -72,6 +72,7 @@ class CreditDebtController extends Controller
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
                 'amount_paid' => 0,
+                'payment_method' => $validated['payment_method'] ?? null,
                 'date' => $validated['date'],
                 'location' => $validated['location'] ?? null,
                 'description' => $validated['description'] ?? null,
@@ -93,6 +94,43 @@ class CreditDebtController extends Controller
             }
 
             $this->refreshCreditDebtAmounts($item);
+
+            // Optional auto-link as normal expense on creation
+            if ($request->boolean('link_as_expense')) {
+                $categoryName = $item->type === 'debt' ? 'Loan / Lending' : 'Debt Repayment';
+                $category = ExpenseCategory::firstOrCreate(
+                    ['name' => $categoryName, 'user_id' => null],
+                    ['icon' => 'hand-coins', 'color' => '#6366f1', 'is_archived' => false, 'is_voluntary' => false]
+                );
+
+                $dailyRecord = DailyRecord::firstOrCreate([
+                    'user_id' => $request->user()->id,
+                    'record_date' => $validated['date'],
+                ]);
+
+                $desc = $item->type === 'debt'
+                    ? 'Lent to '.$friend->name.($item->description ? ' ('.$item->description.')' : '')
+                    : 'Credit Repayment to '.$friend->name;
+
+                $expense = Expense::create([
+                    'user_id' => $request->user()->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $category->id,
+                    'amount' => $item->amount,
+                    'gst_amount' => 0,
+                    'date' => $validated['date'],
+                    'time' => Carbon::now()->format('H:i'),
+                    'description' => $desc,
+                    'payment_method' => $validated['payment_method'] ?: 'Cash',
+                    'paid_by' => 'Me',
+                    'paid_by_type' => 'me',
+                    'notes' => trim(($validated['notes'] ?? '')."\nLinked to ".ucfirst($item->type).' #'.$item->id),
+                    'is_voluntary' => false,
+                ]);
+
+                $item->linked_expense_id = $expense->id;
+                $item->save();
+            }
 
             return $item->fresh();
         });
@@ -124,12 +162,14 @@ class CreditDebtController extends Controller
 
         $validated = $this->validateCreditDebt($request, true);
         $friend = Friend::query()->where('user_id', $request->user()->id)->findOrFail($validated['friend_id']);
+        $newPaymentMethod = filled($validated['payment_method'] ?? null) ? $validated['payment_method'] : $creditDebt->payment_method;
 
-        DB::transaction(function () use ($creditDebt, $validated, $friend): void {
+        DB::transaction(function () use ($creditDebt, $validated, $friend, $newPaymentMethod): void {
             $creditDebt->update([
                 'friend_id' => $friend->id,
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
+                'payment_method' => $newPaymentMethod,
                 'date' => $validated['date'],
                 'location' => $validated['location'] ?? null,
                 'description' => $validated['description'] ?? null,
@@ -140,7 +180,6 @@ class CreditDebtController extends Controller
 
             if (array_key_exists('amount_paid', $validated)) {
                 $targetPaid = round((float) $validated['amount_paid'], 2);
-                $method = filled($validated['payment_method'] ?? null) ? $validated['payment_method'] : null;
                 $existingPaymentsCount = $creditDebt->payments()->count();
 
                 if ($existingPaymentsCount === 0) {
@@ -149,7 +188,7 @@ class CreditDebtController extends Controller
                             'credit_debt_id' => $creditDebt->id,
                             'amount' => $targetPaid,
                             'paid_on' => $validated['date'],
-                            'payment_method' => $method,
+                            'payment_method' => $newPaymentMethod,
                             'notes' => 'Direct paid update',
                         ]);
                     }
@@ -160,7 +199,7 @@ class CreditDebtController extends Controller
                     } else {
                         $singlePayment->update([
                             'amount' => $targetPaid,
-                            'payment_method' => $method ?: $singlePayment->payment_method,
+                            'payment_method' => $newPaymentMethod ?: $singlePayment->payment_method,
                         ]);
                     }
                 } else {
@@ -176,11 +215,17 @@ class CreditDebtController extends Controller
                                 'credit_debt_id' => $creditDebt->id,
                                 'amount' => $targetPaid,
                                 'paid_on' => $validated['date'],
-                                'payment_method' => $method,
+                                'payment_method' => $newPaymentMethod,
                                 'notes' => 'Adjusted paid amount',
                             ]);
                         }
                     }
+                }
+            } elseif ($newPaymentMethod) {
+                // Payment method changed without changing amount
+                $firstPayment = $creditDebt->payments()->first();
+                if ($firstPayment) {
+                    $firstPayment->update(['payment_method' => $newPaymentMethod]);
                 }
             }
 
@@ -199,11 +244,22 @@ class CreditDebtController extends Controller
         }
 
         $type = $creditDebt->type;
+        $deleteLinkedExpense = $request->boolean('delete_linked_expense');
+
+        if ($deleteLinkedExpense && $creditDebt->linked_expense_id) {
+            $expense = Expense::where('user_id', $request->user()->id)->find($creditDebt->linked_expense_id);
+            if ($expense) {
+                $expense->delete();
+            }
+        }
+
         $linkService->removeCreditDebtLink($creditDebt);
         $creditDebt->payments()->delete();
         $creditDebt->delete();
 
-        return redirect()->route('credits.index', ['type' => $type])->with('success', ucfirst($type).' deleted.');
+        $msg = ucfirst($type).' deleted'.($deleteLinkedExpense ? ' along with linked normal expense.' : '.');
+
+        return redirect()->route('credits.index', ['type' => $type])->with('success', $msg);
     }
 
     public function addPayment(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
@@ -305,7 +361,7 @@ class CreditDebtController extends Controller
 
     public function recordAsExpense(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
     {
-        if ($creditDebt->user_id !== $request->user()->id || $creditDebt->type !== 'credit') {
+        if ($creditDebt->user_id !== $request->user()->id) {
             abort(403);
         }
 
@@ -316,12 +372,20 @@ class CreditDebtController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        $friendName = $creditDebt->friend?->name ?? 'Friend';
+        $isDebt = $creditDebt->type === 'debt';
+        $categoryName = $isDebt ? 'Loan / Lending' : 'Debt Repayment';
+
         $category = ExpenseCategory::firstOrCreate(
-            ['name' => 'Debt Repayment', 'user_id' => null],
+            ['name' => $categoryName, 'user_id' => null],
             ['icon' => 'hand-coins', 'color' => '#6366f1', 'is_archived' => false, 'is_voluntary' => false]
         );
 
-        DB::transaction(function () use ($request, $creditDebt, $validated, $category): void {
+        $desc = $isDebt
+            ? 'Lent to '.$friendName.($creditDebt->description ? ' ('.$creditDebt->description.')' : '')
+            : 'Credit Repayment to '.$friendName;
+
+        DB::transaction(function () use ($request, $creditDebt, $validated, $category, $desc, $isDebt): void {
             $dailyRecord = DailyRecord::firstOrCreate([
                 'user_id' => $request->user()->id,
                 'record_date' => $validated['date'],
@@ -335,15 +399,15 @@ class CreditDebtController extends Controller
                 'gst_amount' => 0,
                 'date' => $validated['date'],
                 'time' => Carbon::now()->format('H:i'),
-                'description' => 'Credit Repayment to '.($creditDebt->friend?->name ?? 'Friend'),
+                'description' => $desc,
                 'payment_method' => $validated['payment_method'],
                 'paid_by' => 'Me',
                 'paid_by_type' => 'me',
-                'notes' => trim(($validated['notes'] ?? '')."\nLinked to Credit #".$creditDebt->id),
+                'notes' => trim(($validated['notes'] ?? '')."\nLinked to ".ucfirst($creditDebt->type).' #'.$creditDebt->id),
                 'is_voluntary' => false,
             ]);
 
-            if ($creditDebt->remaining() > 0) {
+            if (! $isDebt && $creditDebt->remaining() > 0) {
                 CreditDebtPayment::create([
                     'credit_debt_id' => $creditDebt->id,
                     'amount' => min((float) $validated['amount'], (float) $creditDebt->remaining()),
@@ -354,12 +418,15 @@ class CreditDebtController extends Controller
             }
 
             $creditDebt->linked_expense_id = $expense->id;
+            if ($isDebt && empty($creditDebt->payment_method)) {
+                $creditDebt->payment_method = $validated['payment_method'];
+            }
             $this->refreshCreditDebtAmounts($creditDebt);
         });
 
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
-        return back()->with('success', 'Credit repayment of ₹'.number_format($validated['amount'], 2).' filed as Normal Expense.');
+        return back()->with('success', ucfirst($creditDebt->type).' of ₹'.number_format($validated['amount'], 2).' filed as Normal Expense.');
     }
 
     public function recordAsPersonalExpense(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
@@ -508,6 +575,114 @@ class CreditDebtController extends Controller
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
         return back()->with('success', 'Marked as settled with ₹'.number_format($validated['discount_amount'], 2).' forgiven/discounted.');
+    }
+
+    public function close(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $remaining = $creditDebt->remaining();
+        if ($remaining <= 0) {
+            return back()->with('info', ucfirst($creditDebt->type).' is already fully settled / closed.');
+        }
+
+        $validated = $request->validate([
+            'payment_method' => ['nullable', 'string', 'max:50'],
+            'date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $closeDate = $validated['date'] ?? Carbon::today()->toDateString();
+        $closeMethod = filled($validated['payment_method'] ?? null)
+            ? $validated['payment_method']
+            : ($creditDebt->payment_method ?: 'Cash');
+        $friendName = $creditDebt->friend?->name ?? 'Friend';
+
+        DB::transaction(function () use ($request, $creditDebt, $remaining, $closeDate, $closeMethod, $friendName, $validated): void {
+            $dailyRecord = DailyRecord::firstOrCreate([
+                'user_id' => $request->user()->id,
+                'record_date' => $closeDate,
+            ]);
+
+            // 1. Record closing payment
+            CreditDebtPayment::create([
+                'credit_debt_id' => $creditDebt->id,
+                'amount' => $remaining,
+                'paid_on' => $closeDate,
+                'payment_method' => $closeMethod,
+                'notes' => 'Closed in full',
+            ]);
+
+            // 2. Mark status fully paid
+            $creditDebt->status = 'fully_paid';
+            $creditDebt->amount_paid = (float) $creditDebt->amount;
+            $creditDebt->fully_paid_at = Carbon::now();
+            if (! empty($validated['notes'])) {
+                $creditDebt->notes = trim(($creditDebt->notes ?? '')."\nClosing note: ".$validated['notes']);
+            }
+
+            // 3. If Debt (Friend owed me) -> Friend paid me back -> Record as Income!
+            if ($creditDebt->type === 'debt') {
+                $category = IncomeCategory::firstOrCreate(
+                    ['name' => 'Debt Recovery', 'user_id' => null],
+                    ['icon' => 'wallet', 'color' => '#10b981', 'is_archived' => false]
+                );
+
+                $income = Income::create([
+                    'user_id' => $request->user()->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $category->id,
+                    'amount' => $remaining,
+                    'source' => 'Debt Collection: '.$friendName,
+                    'date' => $closeDate,
+                    'time' => Carbon::now()->format('H:i'),
+                    'payment_method' => $closeMethod,
+                    'description' => 'Received from '.$friendName.' (Debt #'.$creditDebt->id.' closed)',
+                    'notes' => 'Debt #'.$creditDebt->id.' closed and settled in full.',
+                ]);
+
+                $creditDebt->linked_income_id = $income->id;
+            }
+
+            // 4. If Credit (I owed friend) -> I paid friend back -> Record as Normal Expense!
+            if ($creditDebt->type === 'credit') {
+                $category = ExpenseCategory::firstOrCreate(
+                    ['name' => 'Debt Repayment', 'user_id' => null],
+                    ['icon' => 'hand-coins', 'color' => '#6366f1', 'is_archived' => false, 'is_voluntary' => false]
+                );
+
+                $expense = Expense::create([
+                    'user_id' => $request->user()->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $category->id,
+                    'amount' => $remaining,
+                    'gst_amount' => 0,
+                    'date' => $closeDate,
+                    'time' => Carbon::now()->format('H:i'),
+                    'description' => 'Credit Repaid to '.$friendName.' (Credit #'.$creditDebt->id.' closed)',
+                    'payment_method' => $closeMethod,
+                    'paid_by' => 'Me',
+                    'paid_by_type' => 'me',
+                    'notes' => 'Credit #'.$creditDebt->id.' closed and settled in full.',
+                    'is_voluntary' => false,
+                ]);
+
+                $creditDebt->linked_expense_id = $expense->id;
+            }
+
+            $creditDebt->save();
+        });
+
+        $linkService->syncCreditDebtToFriend($creditDebt->fresh());
+
+        $typeLabel = ucfirst($creditDebt->type);
+        $linkedMsg = $creditDebt->type === 'debt'
+            ? 'and ₹'.number_format($remaining, 2).' added as Income'
+            : 'and ₹'.number_format($remaining, 2).' filed as Normal Expense';
+
+        return back()->with('success', "✅ {$typeLabel} closed successfully {$linkedMsg}!");
     }
 
     private function refreshCreditDebtAmounts(CreditDebt $creditDebt, bool $allowManualOverride = true): void

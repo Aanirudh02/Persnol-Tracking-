@@ -64,11 +64,11 @@
                 </div>
 
                 <div>
-                    <label class="font-semibold text-slate-700">Payment Method (if updating payment)</label>
+                    <label class="font-semibold text-slate-700">Payment Method</label>
                     <select name="payment_method" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
-                        <option value="">Keep existing method</option>
+                        <option value="">Select Payment Method</option>
                         @foreach($paymentMethods as $method)
-                            <option value="{{ $method }}">{{ $method }}</option>
+                            <option value="{{ $method }}" @selected(old('payment_method', $creditDebt->payment_method) === $method)>{{ $method }}</option>
                         @endforeach
                     </select>
                 </div>

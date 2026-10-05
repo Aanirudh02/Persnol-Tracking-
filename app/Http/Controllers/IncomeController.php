@@ -30,6 +30,7 @@ class IncomeController extends Controller
         }
         if ($request->filled('to_date')) {
             $query->where('date', '<=', $request->to_date);
+        }
         if ($request->filled('month')) {
             $m = \Carbon\Carbon::parse($request->get('month').'-01');
             $query->whereBetween('date', [$m->copy()->startOfMonth()->toDateString(), $m->copy()->endOfMonth()->toDateString()]);

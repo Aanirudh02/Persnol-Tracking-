@@ -44,6 +44,11 @@ class FuelEntry extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function receiptUrl(): ?string
+    {
+        return \App\Services\CloudinaryService::url($this->receipt_image);
+    }
+
     public function dailyRecord(): BelongsTo
     {
         return $this->belongsTo(DailyRecord::class);
