@@ -103,7 +103,7 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
                             <div class="min-w-0">
                                 <p class="font-bold text-slate-900">{{ $item->friend?->name ?? 'Friend' }}</p>
-                                <p class="text-slate-500">{{ $item->description ?: 'No description' }} · {{ $item->date->format('d M Y') }}</p>
+                                <p class="text-slate-500">{{ $item->description ?: 'No description' }} · {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</p>
                                 
                                 <!-- Settled / Paid Status Badges -->
                                 <div class="mt-1 flex flex-wrap items-center gap-2">
@@ -125,7 +125,7 @@
                                     @if($item->linkedExpense)
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800">
                                             <span>✅ Recorded as Normal Expense:</span>
-                                            <a href="{{ route('expenses.index', ['search' => $item->linkedExpense->description]) }}" class="underline hover:text-emerald-950">{{ $item->linkedExpense->description }} · ₹{{ number_format($item->linkedExpense->amount, 2) }} ({{ $item->linkedExpense->date->format('d M Y') }})</a>
+                                            <a href="{{ route('expenses.index', ['search' => $item->linkedExpense->description]) }}" class="underline hover:text-emerald-950">{{ $item->linkedExpense->description }} · ₹{{ number_format($item->linkedExpense->amount, 2) }} ({{ \Carbon\Carbon::parse($item->linkedExpense->date)->format('d M Y') }})</a>
                                         </div>
                                     @else
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-800">
@@ -139,7 +139,7 @@
                                     @if($item->linkedPersonalExpense)
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-bold text-purple-800">
                                             <span>💜 Recorded as Personal Expense:</span>
-                                            <a href="{{ route('personal-expenses.index') }}" class="underline hover:text-purple-950">{{ $item->linkedPersonalExpense->description }} · ₹{{ number_format($item->linkedPersonalExpense->amount, 2) }} ({{ $item->linkedPersonalExpense->date->format('d M Y') }})</a>
+                                            <a href="{{ route('personal-expenses.index') }}" class="underline hover:text-purple-950">{{ $item->linkedPersonalExpense->description }} · ₹{{ number_format($item->linkedPersonalExpense->amount, 2) }} ({{ \Carbon\Carbon::parse($item->linkedPersonalExpense->date)->format('d M Y') }})</a>
                                         </div>
                                     @else
                                         <div class="mt-1.5 inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-800">
@@ -293,7 +293,9 @@
                         @php
                             $isDebt = $item->type === 'debt';
                             $defaultAmt = $isDebt ? (float) $item->amount : ((float) $item->amount_paid > 0 ? (float) $item->amount_paid : (float) $item->remaining());
-                            $suggestedDate = $item->payments->last()?->paid_on?->toDateString() ?? $item->date->toDateString();
+                            $rawDate = $item->payments->last()?->paid_on ?? $item->date ?? now();
+                            $suggestedDate = \Carbon\Carbon::parse($rawDate)->toDateString();
+                            $suggestedRepay = (float) $item->amount_paid > 0 ? (float) $item->amount_paid : (float) $item->remaining();
                         @endphp
                         <form id="record-expense-{{ $item->id }}" action="{{ route('credits.record-as-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-xs space-y-2">
                             @csrf
@@ -326,11 +328,12 @@
                             </div>
                         </form>
 
-                            <!-- Record as Personal Expense Inline Form (Credit) -->
+                        @if($item->type === 'credit')
+                            <!-- Record as Personal Expense Inline Form (Credit Repayment Only) -->
                             <form id="record-personal-expense-{{ $item->id }}" action="{{ route('credits.record-as-personal-expense', $item) }}" method="POST" class="hidden rounded-2xl border border-purple-200 bg-purple-50/60 p-3 text-xs space-y-2">
                                 @csrf
                                 <div class="font-bold text-purple-900">Record Credit Repayment as Personal Expense</div>
-                                <p class="text-slate-600">Files this repayment under personal & family domain. Pre-filled with paid amount (₹{{ number_format($suggestedRepay, 2) }}) and payment date ({{ Carbon\Carbon::parse($suggestedDate)->format('d M Y') }}).</p>
+                                <p class="text-slate-600">Files this repayment under personal & family domain. Pre-filled with paid amount (₹{{ number_format($suggestedRepay, 2) }}) and payment date ({{ \Carbon\Carbon::parse($suggestedDate)->format('d M Y') }}).</p>
                                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                                     <div>
                                         <label class="font-semibold text-slate-700 block mb-1">Repay Amount (₹)</label>
@@ -378,7 +381,7 @@
                                 <div class="font-bold text-teal-900">Record Recovered Debt as Income Entry</div>
                                 <div class="grid grid-cols-1 gap-2 sm:grid-cols-4">
                                     <input type="number" step="0.01" name="amount" value="{{ $item->remaining() }}" max="{{ $item->remaining() }}" min="0.01" required placeholder="Collected Amount" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold">
-                                    <input type="date" name="date" value="{{ $item->payments->last()?->paid_on?->toDateString() ?? $item->date->toDateString() }}" required class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                    <input type="date" name="date" value="{{ $suggestedDate }}" required class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
                                     <select name="payment_method" class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
                                         @foreach($paymentMethods as $method)
                                             <option value="{{ $method }}">{{ $method }}</option>
@@ -406,7 +409,7 @@
                                     </div>
                                     <div>
                                         <label class="font-semibold text-slate-700 block">Settled On Date</label>
-                                        <input type="date" name="paid_on" value="{{ $item->payments->last()?->paid_on?->toDateString() ?? date('Y-m-d') }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
+                                        <input type="date" name="paid_on" value="{{ $suggestedDate }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs">
                                     </div>
                                     <div class="flex items-end">
                                         <button class="w-full rounded-xl bg-amber-600 px-3 py-2 font-bold text-white hover:bg-amber-700">Mark Settled</button>
@@ -437,7 +440,7 @@
                                                 <div class="flex items-center gap-2">
                                                     <span class="font-bold text-slate-900">₹{{ number_format($payment->amount, 2) }}</span>
                                                     <span class="text-slate-400">·</span>
-                                                    <span class="text-slate-600">{{ $payment->paid_on->format('d M Y') }}</span>
+                                                    <span class="text-slate-600">{{ \Carbon\Carbon::parse($payment->paid_on)->format('d M Y') }}</span>
                                                     <span class="text-slate-400">·</span>
                                                     <span class="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{{ $payment->payment_method ?? 'Payment' }}</span>
                                                 </div>
@@ -456,7 +459,7 @@
                                             @csrf
                                             @method('PUT')
                                             <input type="number" step="0.01" name="amount" value="{{ $payment->amount }}" class="rounded-lg border border-slate-300 px-2 py-2 text-xs font-bold">
-                                            <input type="date" name="paid_on" value="{{ $payment->paid_on->toDateString() }}" class="rounded-lg border border-slate-300 px-2 py-2 text-xs">
+                                            <input type="date" name="paid_on" value="{{ \Carbon\Carbon::parse($payment->paid_on)->toDateString() }}" class="rounded-lg border border-slate-300 px-2 py-2 text-xs">
                                             <select name="payment_method" class="rounded-lg border border-slate-300 px-2 py-2 text-xs">
                                                 @foreach($paymentMethods as $method)
                                                     <option value="{{ $method }}" @selected($payment->payment_method === $method)>{{ $method }}</option>

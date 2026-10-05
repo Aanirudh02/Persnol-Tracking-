@@ -60,7 +60,7 @@
 
                 <div>
                     <label class="font-semibold text-slate-700">Date</label>
-                    <input type="date" name="date" value="{{ old('date', $creditDebt->date->toDateString()) }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                    <input type="date" name="date" value="{{ old('date', \Carbon\Carbon::parse($creditDebt->date ?? now())->toDateString()) }}" required class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
                 </div>
 
                 <div>
@@ -75,7 +75,7 @@
 
                 <div>
                     <label class="font-semibold text-slate-700">Due date</label>
-                    <input type="date" name="due_date" value="{{ old('due_date', optional($creditDebt->due_date)->toDateString()) }}" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
+                    <input type="date" name="due_date" value="{{ old('due_date', $creditDebt->due_date ? \Carbon\Carbon::parse($creditDebt->due_date)->toDateString() : '') }}" class="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
                 </div>
 
                 <div>
@@ -119,7 +119,7 @@
                         <div class="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
                             <div>
                                 <div class="font-bold text-slate-900">₹{{ number_format($payment->amount, 2) }}</div>
-                                <div class="text-xs text-slate-500">{{ $payment->paid_on->format('d M Y') }} · {{ $payment->payment_method ?: 'No method' }}</div>
+                                <div class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($payment->paid_on)->format('d M Y') }} · {{ $payment->payment_method ?: 'No method' }}</div>
                                 @if($payment->notes)
                                     <div class="text-xs text-slate-400 mt-0.5">{{ $payment->notes }}</div>
                                 @endif

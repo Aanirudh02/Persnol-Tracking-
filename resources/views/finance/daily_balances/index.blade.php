@@ -328,23 +328,45 @@
             </div>
         </div>
 
-        <!-- 6. HISTORICAL LOG (PAST DAYS UP TO TODAY - NO FUTURE MONTH PROJECTIONS) -->
+        <!-- 6. HISTORICAL LOG (PAST DAYS UP TO TODAY - CATEGORY BASED & COMBINED) -->
         <div class="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden space-y-0">
-            <div class="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h3 class="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                    <h3 class="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
                         <span>🗓️</span> Historical Cash Register ({{ Carbon\Carbon::parse($month.'-01')->format('F Y') }})
                     </h3>
                     <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Historical records up to today. Future dates are hidden until each day arrives.
+                        Category-specific daily breakdown (UPI, Cash & Combined) with running opening and closing balances.
                     </p>
                 </div>
-                <form method="GET" action="{{ route('daily-balances.index') }}" class="flex items-center gap-2">
-                    <input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()" class="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs">
-                </form>
+                <div class="flex items-center gap-2">
+                    <form method="GET" action="{{ route('daily-balances.index') }}" class="flex items-center gap-2">
+                        <input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()" class="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-xs">
+                    </form>
+                </div>
             </div>
 
-            <div class="overflow-x-auto">
+            <!-- Category Tab Switcher -->
+            <div class="px-4 py-2.5 bg-slate-100/70 dark:bg-slate-800/50 border-b border-slate-200/70 dark:border-slate-800 flex items-center gap-2 overflow-x-auto text-xs">
+                <button type="button" onclick="switchCategoryTable('all-combined')" id="tab-btn-all-combined" class="cat-tab-btn px-3.5 py-1.5 rounded-xl font-bold transition shadow-xs bg-indigo-600 text-white cursor-pointer">
+                    🌟 Combined Total
+                </button>
+                @foreach($activeCategories as $cat)
+                    @php
+                        $tabIcon = strtolower($cat) === 'cash' ? '💵' : (strtolower($cat) === 'upi' ? '📱' : (strtolower($cat) === 'card' ? '💳' : '🏦'));
+                        $tabSlug = \Illuminate\Support\Str::slug($cat);
+                    @endphp
+                    <button type="button" onclick="switchCategoryTable('cat-{{ $tabSlug }}')" id="tab-btn-cat-{{ $tabSlug }}" class="cat-tab-btn px-3.5 py-1.5 rounded-xl font-bold transition text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 cursor-pointer">
+                        <span>{{ $tabIcon }}</span> {{ $cat }} Register
+                    </button>
+                @endforeach
+                <button type="button" onclick="switchCategoryTable('view-all-stacked')" id="tab-btn-view-all-stacked" class="cat-tab-btn px-3.5 py-1.5 rounded-xl font-bold transition text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 cursor-pointer">
+                    📑 View All Category Tables
+                </button>
+            </div>
+
+            <!-- TAB PANE 1: COMBINED OVERVIEW TABLE -->
+            <div id="table-all-combined" class="cat-table-pane overflow-x-auto">
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -361,7 +383,17 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-semibold">
+                        @php
+                            $totMonthInflow = 0;
+                            $totMonthOutflow = 0;
+                            $totMonthAdjustment = 0;
+                        @endphp
                         @forelse($days as $d)
+                            @php
+                                $totMonthInflow += $d['total']['inflow'];
+                                $totMonthOutflow += $d['total']['outflow'];
+                                $totMonthAdjustment += $d['total']['adjustment'];
+                            @endphp
                             <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition {{ $d['is_selected'] ? 'bg-sky-50/60 dark:bg-sky-950/30' : ($d['is_today'] ? 'bg-indigo-50/40 dark:bg-indigo-950/30 font-bold' : '') }}">
                                 <!-- Date -->
                                 <td class="px-4 py-3">
@@ -427,8 +459,156 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if(count($days) > 0)
+                        <tfoot class="bg-slate-50/70 dark:bg-slate-800/60 font-bold border-t border-slate-200 dark:border-slate-800 text-[11px]">
+                            <tr>
+                                <td class="px-4 py-3 text-slate-800 dark:text-white uppercase tracking-wider">Month Total</td>
+                                <td class="px-4 py-3 text-slate-400">—</td>
+                                <td class="px-4 py-3 text-emerald-600 dark:text-emerald-400">+₹{{ number_format($totMonthInflow, 2) }}</td>
+                                <td class="px-4 py-3 text-rose-600 dark:text-rose-400">-₹{{ number_format($totMonthOutflow, 2) }}</td>
+                                @foreach($activeCategories as $cat)
+                                    <td class="px-4 py-3 text-slate-400">—</td>
+                                @endforeach
+                                <td class="px-4 py-3 text-amber-600 dark:text-amber-400">
+                                    {{ $totMonthAdjustment != 0 ? ($totMonthAdjustment > 0 ? '+' : '').'₹'.number_format($totMonthAdjustment, 2) : '—' }}
+                                </td>
+                                <td class="px-4 py-3 text-slate-400">—</td>
+                                <td class="px-4 py-3 text-right text-slate-400">—</td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
+
+            <!-- TAB PANES 2+: INDIVIDUAL CATEGORY REGISTER TABLES (UPI, CASH, ETC.) -->
+            @foreach($activeCategories as $cat)
+                @php
+                    $catSlug = \Illuminate\Support\Str::slug($cat);
+                    $icon = strtolower($cat) === 'cash' ? '💵' : (strtolower($cat) === 'upi' ? '📱' : (strtolower($cat) === 'card' ? '💳' : '🏦'));
+                    $catMonthInflow = 0;
+                    $catMonthOutflow = 0;
+                    $catMonthAdjustment = 0;
+                @endphp
+                <div id="table-cat-{{ $catSlug }}" class="cat-table-pane cat-specific-pane hidden overflow-x-auto border-t first:border-t-0 border-slate-200/80 dark:border-slate-800">
+                    <div class="px-4 py-3 bg-slate-50/90 dark:bg-slate-800/60 border-b border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs">
+                        <span class="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span class="text-base">{{ $icon }}</span>
+                            <span class="text-sm">{{ $cat }} Register</span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold uppercase">Daily Ledger</span>
+                        </span>
+                        <span class="text-[11px] text-slate-400">Running balance rolls forward automatically</span>
+                    </div>
+
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3">Opening</th>
+                                <th class="px-4 py-3 text-emerald-700 dark:text-emerald-400">Inflow (+)</th>
+                                <th class="px-4 py-3 text-rose-700 dark:text-rose-400">Outflow (-)</th>
+                                <th class="px-4 py-3 text-indigo-700 dark:text-indigo-400">Net Flow</th>
+                                <th class="px-4 py-3 text-amber-700 dark:text-amber-400">Adjustment</th>
+                                <th class="px-4 py-3 font-black text-slate-900 dark:text-white">Closing / Current</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-semibold">
+                            @forelse($days as $d)
+                                @php
+                                    $cData = $d['categories'][$cat] ?? ['opening' => 0.0, 'inflow' => 0.0, 'outflow' => 0.0, 'adjustment' => 0.0, 'closing' => 0.0];
+                                    $netFlow = (float)$cData['inflow'] - (float)$cData['outflow'];
+                                    $catMonthInflow += $cData['inflow'];
+                                    $catMonthOutflow += $cData['outflow'];
+                                    $catMonthAdjustment += $cData['adjustment'];
+                                @endphp
+                                <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition {{ $d['is_selected'] ? 'bg-sky-50/60 dark:bg-sky-950/30' : ($d['is_today'] ? 'bg-indigo-50/40 dark:bg-indigo-950/30 font-bold' : '') }}">
+                                    <!-- Date -->
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-1.5">
+                                            <a href="{{ route('daily-balances.index', ['date' => $d['date_str']]) }}" class="hover:underline font-bold text-slate-900 dark:text-white">
+                                                {{ $d['date']->format('d M (D)') }}
+                                            </a>
+                                            @if($d['is_today'])
+                                                <span class="rounded bg-indigo-600 px-1.5 py-0.5 text-[9px] font-black text-white">TODAY</span>
+                                            @endif
+                                        </div>
+                                    </td>
+
+                                    <!-- Category Opening -->
+                                    <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
+                                        ₹{{ number_format($cData['opening'], 2) }}
+                                    </td>
+
+                                    <!-- Category Inflow -->
+                                    <td class="px-4 py-3 text-emerald-600 dark:text-emerald-400">
+                                        {{ $cData['inflow'] > 0 ? '+₹'.number_format($cData['inflow'], 2) : '—' }}
+                                    </td>
+
+                                    <!-- Category Outflow -->
+                                    <td class="px-4 py-3 text-rose-600 dark:text-rose-400">
+                                        {{ $cData['outflow'] > 0 ? '-₹'.number_format($cData['outflow'], 2) : '—' }}
+                                    </td>
+
+                                    <!-- Net Flow -->
+                                    <td class="px-4 py-3 text-xs">
+                                        @if($netFlow != 0)
+                                            <span class="font-bold {{ $netFlow > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                                {{ $netFlow > 0 ? '+' : '' }}₹{{ number_format($netFlow, 2) }}
+                                            </span>
+                                        @else
+                                            <span class="text-slate-400">₹0.00</span>
+                                        @endif
+                                    </td>
+
+                                    <!-- Adjustment -->
+                                    <td class="px-4 py-3 text-amber-600 dark:text-amber-400">
+                                        {{ $cData['adjustment'] != 0 ? ($cData['adjustment'] > 0 ? '+' : '').'₹'.number_format($cData['adjustment'], 2) : '—' }}
+                                    </td>
+
+                                    <!-- Closing -->
+                                    <td class="px-4 py-3 font-black {{ $cData['closing'] < 0 ? 'text-rose-600' : 'text-slate-900 dark:text-white' }}">
+                                        ₹{{ number_format($cData['closing'], 2) }}
+                                    </td>
+
+                                    <!-- Action -->
+                                    <td class="px-4 py-3 text-right">
+                                        <button type="button" onclick="openAdjustmentModalWithData('{{ $d['date_str'] }}', {{ json_encode($d['categories']) }}, '{{ addslashes($d['notes'] ?? '') }}')" class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-2xs">
+                                            Adjust
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="px-4 py-8 text-center text-xs text-slate-400">
+                                        No records available for {{ $cat }}.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                        @if(count($days) > 0)
+                            @php
+                                $catMonthNet = $catMonthInflow - $catMonthOutflow;
+                            @endphp
+                            <tfoot class="bg-slate-50/70 dark:bg-slate-800/60 font-bold border-t border-slate-200 dark:border-slate-800 text-[11px]">
+                                <tr>
+                                    <td class="px-4 py-3 text-slate-800 dark:text-white uppercase tracking-wider">{{ $cat }} Total</td>
+                                    <td class="px-4 py-3 text-slate-400">—</td>
+                                    <td class="px-4 py-3 text-emerald-600 dark:text-emerald-400">+₹{{ number_format($catMonthInflow, 2) }}</td>
+                                    <td class="px-4 py-3 text-rose-600 dark:text-rose-400">-₹{{ number_format($catMonthOutflow, 2) }}</td>
+                                    <td class="px-4 py-3 {{ $catMonthNet >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400' }}">
+                                        {{ $catMonthNet >= 0 ? '+' : '' }}₹{{ number_format($catMonthNet, 2) }}
+                                    </td>
+                                    <td class="px-4 py-3 text-amber-600 dark:text-amber-400">
+                                        {{ $catMonthAdjustment != 0 ? ($catMonthAdjustment > 0 ? '+' : '').'₹'.number_format($catMonthAdjustment, 2) : '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-400">—</td>
+                                    <td class="px-4 py-3 text-right text-slate-400">—</td>
+                                </tr>
+                            </tfoot>
+                        @endif
+                    </table>
+                </div>
+            @endforeach
         </div>
 
     </div>
@@ -589,5 +769,41 @@
             document.getElementById('categories-modal').classList.add('hidden');
             document.getElementById('categories-modal').classList.remove('flex');
         }
+
+        function switchCategoryTable(tabId) {
+            document.querySelectorAll('.cat-table-pane').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.cat-tab-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-xs');
+                btn.classList.add('text-slate-600', 'dark:text-slate-300', 'hover:bg-white', 'dark:hover:bg-slate-800');
+            });
+
+            const activeBtn = document.getElementById('tab-btn-' + tabId);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-slate-600', 'dark:text-slate-300', 'hover:bg-white', 'dark:hover:bg-slate-800');
+                activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-xs');
+            }
+
+            if (tabId === 'view-all-stacked') {
+                document.querySelectorAll('.cat-specific-pane').forEach(el => el.classList.remove('hidden'));
+            } else {
+                const target = document.getElementById('table-' + tabId);
+                if (target) {
+                    target.classList.remove('hidden');
+                }
+            }
+
+            try {
+                localStorage.setItem('daily_register_historical_tab', tabId);
+            } catch(e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const savedTab = localStorage.getItem('daily_register_historical_tab');
+                if (savedTab && document.getElementById('tab-btn-' + savedTab)) {
+                    switchCategoryTable(savedTab);
+                }
+            } catch(e) {}
+        });
     </script>
 </x-app-layout>
