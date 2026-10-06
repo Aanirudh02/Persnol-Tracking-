@@ -624,6 +624,44 @@ class CreditDebtController extends Controller
         return back()->with('success', 'Marked as settled with ₹'.number_format($validated['discount_amount'], 2).' forgiven/discounted.');
     }
 
+    public function settleNoPay(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $remaining = $creditDebt->remaining();
+        if ($remaining <= 0) {
+            return back()->with('info', ucfirst($creditDebt->type).' is already fully settled / closed.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:255'],
+            'settled_on' => ['nullable', 'date'],
+        ]);
+
+        $settleDate = $validated['settled_on'] ?? Carbon::today()->toDateString();
+        $reason = filled($validated['reason'] ?? null)
+            ? $validated['reason']
+            : 'Waived off / Settled with no payment (₹0 closing)';
+
+        DB::transaction(function () use ($creditDebt, $remaining, $reason): void {
+            $creditDebt->settled_discount_amount = (float) $remaining;
+            $creditDebt->is_settled_discounted = true;
+            $creditDebt->status = 'fully_paid';
+            $creditDebt->fully_paid_at = Carbon::now();
+            $ifNote = "\nNo-Pay Settlement: ".$reason;
+            $creditDebt->notes = trim(($creditDebt->notes ?? '').$ifNote);
+            $creditDebt->save();
+        });
+
+        $linkService->syncCreditDebtToFriend($creditDebt->fresh());
+
+        $typeLabel = ucfirst($creditDebt->type);
+
+        return back()->with('success', "✅ {$typeLabel} marked as Settled with No Payment (₹".number_format($remaining, 2).' waived off / forgiven).');
+    }
+
     public function close(Request $request, CreditDebt $creditDebt, FinanceLinkService $linkService): RedirectResponse
     {
         if ($creditDebt->user_id !== $request->user()->id) {

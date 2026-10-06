@@ -126,6 +126,10 @@ class CreditDebt extends Model
     public function statusLabel(): string
     {
         if ($this->is_settled_discounted) {
+            if ((float) $this->amount_paid <= 0) {
+                return 'Settled No-Pay (₹'.number_format((float) $this->settled_discount_amount, 2).' waived)';
+            }
+
             return 'Settled (₹'.number_format((float) $this->settled_discount_amount, 2).' forgiven)';
         }
 

@@ -144,6 +144,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/credits/{creditDebt}/record-as-personal-expense', [CreditDebtController::class, 'recordAsPersonalExpense'])->name('credits.record-as-personal-expense');
         Route::post('/credits/{creditDebt}/record-as-income', [CreditDebtController::class, 'recordAsIncome'])->name('credits.record-as-income');
         Route::post('/credits/{creditDebt}/settle-discounted', [CreditDebtController::class, 'settleDiscounted'])->name('credits.settle-discounted');
+        Route::post('/credits/{creditDebt}/settle-no-pay', [CreditDebtController::class, 'settleNoPay'])->name('credits.settle-no-pay');
         Route::post('/credits/{creditDebt}/close', [CreditDebtController::class, 'close'])->name('credits.close');
     });
 

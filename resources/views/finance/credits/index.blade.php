@@ -117,7 +117,11 @@
                                 <div class="mt-1 flex flex-wrap items-center gap-2">
                                     @if($item->is_settled_discounted)
                                         <span class="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 px-3 py-1 text-xs font-black text-white shadow-sm ring-1 ring-amber-400/40">
-                                            <span>🤝 Settled</span> · <span>₹{{ number_format($item->settled_discount_amount, 2) }} forgiven</span>
+                                            @if((float) $item->amount_paid <= 0)
+                                                <span>🕊️ Settled (No-Pay)</span> · <span>₹{{ number_format($item->settled_discount_amount, 2) }} waived</span>
+                                            @else
+                                                <span>🤝 Settled</span> · <span>₹{{ number_format($item->settled_discount_amount, 2) }} forgiven</span>
+                                            @endif
                                         </span>
                                     @elseif($item->status === 'fully_paid')
                                         <span class="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1 text-xs font-black text-white shadow-sm ring-1 ring-emerald-400/40">
@@ -181,7 +185,7 @@
                                     <span>✅</span> Recorded as Normal Expense
                                 </span>
                             @else
-                                <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
                                     <span>📗</span> File as Normal Expense
                                 </button>
                             @endif
@@ -193,13 +197,13 @@
                                         <span>💜</span> Recorded as Personal Expense
                                     </span>
                                 @else
-                                    <button type="button" onclick="document.getElementById('record-personal-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-purple-700 hover:underline flex items-center gap-1">
+                                    <button type="button" onclick="document.getElementById('record-personal-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-purple-700 hover:underline flex items-center gap-1">
                                         <span>💜</span> File as Personal Expense
                                     </button>
                                 @endif
 
                                 @if($item->remaining() > 0)
-                                    <button type="button" onclick="document.getElementById('close-credit-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-indigo-700 hover:underline flex items-center gap-1">
+                                    <button type="button" onclick="document.getElementById('close-credit-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-indigo-700 hover:underline flex items-center gap-1">
                                         <span>🔒</span> Close Credit (as Expense)
                                     </button>
                                 @endif
@@ -207,16 +211,19 @@
 
                             {{-- Debt Only: Close as Income & Partial Income --}}
                             @if($item->type === 'debt' && $item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('close-debt-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('close-debt-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
                                     <span>🔒</span> Close Debt (as Income)
                                 </button>
-                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-teal-700 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('record-income-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-teal-700 hover:underline flex items-center gap-1">
                                     <span>💰</span> Partial Income
                                 </button>
                             @endif
 
                             @if($item->remaining() > 0)
-                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
+                                <button type="button" onclick="document.getElementById('settle-nopay-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
+                                    <span>🕊️</span> No-Pay Settle (₹0)
+                                </button>
+                                <button type="button" onclick="document.getElementById('settle-discount-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-amber-600 hover:underline flex items-center gap-1">
                                     <span>🤝</span> Settle with Discount / Forgiven
                                 </button>
                             @endif
@@ -421,6 +428,37 @@
                                     </div>
                                     <div class="flex items-end">
                                         <button class="w-full rounded-xl bg-amber-600 px-3 py-2 font-bold text-white hover:bg-amber-700">Mark Settled</button>
+                                    </div>
+                                </div>
+                            </form>
+
+                            <!-- No-Pay Settle (₹0 Close / Waive Off) Inline Form -->
+                            <form id="settle-nopay-{{ $item->id }}" action="{{ route('credits.settle-no-pay', $item) }}" method="POST" class="hidden rounded-2xl border border-emerald-300 bg-emerald-50/70 p-3 text-xs space-y-2">
+                                @csrf
+                                <div class="font-bold text-emerald-900 flex items-center justify-between">
+                                    <span>🕊️ No-Pay Settle (₹0 Payment / Waive Off in Full)</span>
+                                    <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-lg font-black">Waiving: ₹{{ number_format($item->remaining(), 2) }}</span>
+                                </div>
+                                <p class="text-slate-600">
+                                    @if($item->type === 'debt')
+                                        Forgive remaining <strong>₹{{ number_format($item->remaining(), 2) }}</strong> owed by {{ $item->friend?->name ?? 'Friend' }} without collecting money. Daily cash & GPay registers will NOT be affected.
+                                    @else
+                                        Waive remaining <strong>₹{{ number_format($item->remaining(), 2) }}</strong> you owe to {{ $item->friend?->name ?? 'Friend' }} with ₹0 payment. Daily cash & GPay registers will NOT be affected.
+                                    @endif
+                                </p>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Reason / Note</label>
+                                        <input type="text" name="reason" value="Waived off / Settled with ₹0" placeholder="e.g. Waived off by agreement" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                                    </div>
+                                    <div>
+                                        <label class="font-semibold text-slate-700 block mb-1">Date</label>
+                                        <input type="date" name="settled_on" value="{{ $suggestedDate }}" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold">
+                                    </div>
+                                    <div class="flex items-end">
+                                        <button type="submit" class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2 font-bold text-white shadow-sm transition">
+                                            Confirm No-Pay Settle (₹0)
+                                        </button>
                                     </div>
                                 </div>
                             </form>
