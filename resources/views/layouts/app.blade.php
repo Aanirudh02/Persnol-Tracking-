@@ -328,6 +328,199 @@
     <!-- UNIVERSAL QUICK-ADD MODAL COMPONENT -->
     <x-quick-add-modal />
 
+    <!-- GLOBAL IMAGE LIGHTBOX DIALOG MODAL -->
+    <div id="global-image-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" onclick="if(event.target === this) window.closeImageModal()">
+        <div class="relative max-w-4xl w-full max-h-[92vh] bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                <div class="min-w-0 pr-4">
+                    <h4 id="global-image-modal-title" class="text-sm font-bold text-white truncate">Image Preview</h4>
+                    <p id="global-image-modal-subtitle" class="text-xs text-slate-400 truncate"></p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a id="global-image-modal-external" href="#" target="_blank" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5" title="Open full original image in new tab">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span class="hidden sm:inline">Open Original</span>
+                    </a>
+                    <button type="button" onclick="window.closeImageModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer" title="Close">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Image Area -->
+            <div class="p-3 sm:p-5 bg-black/60 flex items-center justify-center overflow-auto max-h-[calc(92vh-75px)]">
+                <img id="global-image-modal-img" src="" alt="Preview" class="max-w-full max-h-[75vh] w-auto h-auto object-contain rounded-xl shadow-lg border border-slate-800">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.openImageModal = function(url, title = 'Image Preview', subtitle = '') {
+            const modal = document.getElementById('global-image-modal');
+            const img = document.getElementById('global-image-modal-img');
+            const titleEl = document.getElementById('global-image-modal-title');
+            const subEl = document.getElementById('global-image-modal-subtitle');
+            const extEl = document.getElementById('global-image-modal-external');
+
+            if (!modal || !img) return;
+
+            img.src = url;
+            extEl.href = url;
+            titleEl.textContent = title;
+            subEl.textContent = subtitle;
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        };
+
+        window.closeImageModal = function() {
+            const modal = document.getElementById('global-image-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        };
+
+        // Aliases for compatibility
+        window.openPhotoModal = window.openImageModal;
+        window.closePhotoModal = window.closeImageModal;
+
+        // Auto-delegate any clicks on elements with [data-lightbox-img]
+        document.addEventListener('click', function(e) {
+            const trigger = e.target.closest('[data-lightbox-img]');
+            if (trigger) {
+                e.preventDefault();
+                const url = trigger.getAttribute('data-lightbox-img') || trigger.getAttribute('href');
+                const title = trigger.getAttribute('data-lightbox-title') || 'Image Preview';
+                const sub = trigger.getAttribute('data-lightbox-sub') || '';
+                window.openImageModal(url, title, sub);
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                window.closeImageModal();
+            }
+        });
+
+        // Global Mobile Image Compression & Optimization (Shrinks 12MP 6MB photos down to ~300KB)
+        window.handleImageOptimization = async function(inputEl, previewContainerId) {
+            const file = inputEl.files && inputEl.files[0];
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const previewEl = document.getElementById(previewContainerId);
+            if (previewEl) {
+                previewEl.innerHTML = `
+                    <div class="flex items-center gap-2 mt-2 p-2 rounded-xl bg-indigo-50 dark:bg-slate-800 text-xs text-indigo-700 dark:text-indigo-300">
+                        <span class="animate-spin inline-block">⏳</span>
+                        <span>Optimizing photo for fast mobile upload (${(file.size / (1024 * 1024)).toFixed(1)} MB)...</span>
+                    </div>
+                `;
+                previewEl.classList.remove('hidden');
+            }
+
+            try {
+                if (file.size > 800 * 1024) {
+                    const compressedBlob = await window.compressImageFile(file, 1920, 0.82);
+                    if (compressedBlob && compressedBlob.size < file.size) {
+                        const dt = new DataTransfer();
+                        const optimizedFile = new File([compressedBlob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        dt.items.add(optimizedFile);
+                        inputEl.files = dt.files;
+
+                        if (previewEl) {
+                            const origMB = (file.size / (1024 * 1024)).toFixed(1);
+                            const newKB = Math.round(compressedBlob.size / 1024);
+                            const thumbUrl = URL.createObjectURL(compressedBlob);
+                            previewEl.innerHTML = `
+                                <div class="flex items-center gap-2.5 mt-2 p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs">
+                                    <img src="${thumbUrl}" class="w-9 h-9 rounded-lg object-cover border border-emerald-300 dark:border-emerald-700">
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-semibold text-emerald-800 dark:text-emerald-200 truncate">${optimizedFile.name}</p>
+                                        <p class="text-[11px] text-emerald-600 dark:text-emerald-400">⚡ Mobile-optimized: ${origMB}MB → ${newKB}KB (Fast upload)</p>
+                                    </div>
+                                    <button type="button" onclick="window.clearImageUpload('${inputEl.id}', '${previewContainerId}')" class="text-slate-400 hover:text-rose-500 font-bold px-1.5 cursor-pointer">&times;</button>
+                                </div>
+                            `;
+                        }
+                        return;
+                    }
+                }
+
+                if (previewEl) {
+                    const thumbUrl = URL.createObjectURL(file);
+                    const sizeKB = Math.round(file.size / 1024);
+                    previewEl.innerHTML = `
+                        <div class="flex items-center gap-2.5 mt-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                            <img src="${thumbUrl}" class="w-9 h-9 rounded-lg object-cover border border-slate-300 dark:border-slate-600">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-slate-800 dark:text-slate-200 truncate">${file.name}</p>
+                                <p class="text-[11px] text-slate-500">${sizeKB} KB ready</p>
+                            </div>
+                            <button type="button" onclick="window.clearImageUpload('${inputEl.id}', '${previewContainerId}')" class="text-slate-400 hover:text-rose-500 font-bold px-1.5 cursor-pointer">&times;</button>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.warn('Client-side compression skipped:', err);
+            }
+        };
+
+        window.clearImageUpload = function(inputId, previewContainerId) {
+            const input = document.getElementById(inputId);
+            const preview = document.getElementById(previewContainerId);
+            if (input) input.value = '';
+            if (preview) {
+                preview.innerHTML = '';
+                preview.classList.add('hidden');
+            }
+        };
+
+        window.compressImageFile = function(file, maxDimension = 1920, quality = 0.82) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = reject;
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onerror = reject;
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxDimension || height > maxDimension) {
+                            if (width > height) {
+                                height = Math.round((height * maxDimension) / width);
+                                width = maxDimension;
+                            } else {
+                                width = Math.round((width * maxDimension) / height);
+                                height = maxDimension;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            resolve(blob);
+                        }, 'image/jpeg', quality);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        };
+    </script>
+
     <!-- TOAST CONTAINER -->
     <div id="toast-container" class="fixed bottom-20 md:bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 

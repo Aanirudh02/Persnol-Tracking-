@@ -130,7 +130,7 @@ class OdometerController extends Controller
             'manual_litres' => 'nullable|numeric|min:0',
             'manual_fuel_cost' => 'nullable|numeric|min:0',
             'duration_minutes' => 'nullable|integer|min:1|max:1440',
-            'odometer_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:8192',
+            'odometer_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:16384',
             'group_title' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
         ]);
@@ -140,6 +140,10 @@ class OdometerController extends Controller
             $imagePath = null;
             if ($request->hasFile('odometer_image')) {
                 $imagePath = $cloudinary->upload($request->file('odometer_image'), 'odometer');
+            } elseif ($uploadedFile = $request->file('odometer_image')) {
+                if (! $uploadedFile->isValid()) {
+                    return back()->withInput()->with('error', 'Image upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
+                }
             }
 
             $vehicleId = $validated['vehicle_id'] ?? Vehicle::defaultFor($user->id)?->id;
@@ -248,6 +252,8 @@ class OdometerController extends Controller
                 'odometer_image' => $imagePath,
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            $group->recalculateSummary();
 
             return redirect()->route('odometer.index')->with(
                 'success',
@@ -361,13 +367,17 @@ class OdometerController extends Controller
             'source_location' => 'nullable|string|max:255',
             'destination' => 'nullable|string|max:255',
             'duration_minutes' => 'nullable|integer|min:1|max:1440',
-            'odometer_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:8192',
+            'odometer_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:16384',
             'notes' => 'nullable|string',
         ]);
 
         try {
             if ($request->hasFile('odometer_image')) {
                 $validated['odometer_image'] = $cloudinary->upload($request->file('odometer_image'), config('services.cloudinary.folder', 'odometer'));
+            } elseif ($uploadedFile = $request->file('odometer_image')) {
+                if (! $uploadedFile->isValid()) {
+                    return back()->withInput()->with('error', 'Image upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
+                }
             }
 
             if (! empty($validated['reading_time'])) {

@@ -161,10 +161,10 @@
                                     </button>
                                 </form>
                                 @if($t->speedometer_image)
-                                    <a href="{{ asset('storage/' . $t->speedometer_image) }}" target="_blank"
-                                       class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200 transition">
-                                        Odo
-                                    </a>
+                                    <button type="button" onclick="window.openImageModal('{{ \App\Services\CloudinaryService::url($t->speedometer_image) }}', 'Odometer: {{ addslashes($t->title ?? 'Trip') }}', '{{ $t->distance_km ?? '' }} km · {{ $t->started_at?->format('d M Y') }}')"
+                                       class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold hover:bg-slate-200 transition cursor-pointer" title="View Speedometer photo in dialog">
+                                        📷 Odo
+                                    </button>
                                 @endif
                             </div>
                         </div>

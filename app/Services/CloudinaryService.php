@@ -67,7 +67,7 @@ class CloudinaryService
                 $mimeType = $file->getMimeType() ?: 'image/jpeg';
                 $base64Data = 'data:'.$mimeType.';base64,'.base64_encode(file_get_contents($file->getRealPath()));
 
-                $response = Http::timeout(30)->asForm()->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                $response = Http::timeout(60)->asForm()->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
                     'file' => $base64Data,
                     'api_key' => $apiKey,
                     'timestamp' => $timestamp,
@@ -82,9 +82,14 @@ class CloudinaryService
                     }
                 }
 
-                Log::warning('Cloudinary direct upload returned unsuccessful response: '.$response->body().' — falling back to local public disk.');
+                $errorDetails = $response->json('error.message') ?? ('Status '.$response->status().': '.$response->body());
+                Log::error('Cloudinary direct upload unsuccessful: '.$errorDetails);
+                throw new \RuntimeException('Cloudinary upload rejected: '.$errorDetails);
+            } catch (\RuntimeException $re) {
+                throw $re;
             } catch (\Throwable $e) {
-                Log::warning('Cloudinary direct upload encountered an exception: '.$e->getMessage().' — falling back to local public disk.');
+                Log::error('Cloudinary direct upload exception: '.$e->getMessage());
+                throw new \RuntimeException('Cloudinary upload connection failed: '.$e->getMessage());
             }
         }
 

@@ -330,7 +330,7 @@
                                         @if($isGroup)
                                             <span class="mt-1 block text-xs font-normal text-slate-500">{{ $groupExpenses->count() }} transactions · {{ $displayMethods }}</span>
                                         @elseif($exp->receipt_image)
-                                            <a href="{{ \App\Services\CloudinaryService::url($exp->receipt_image) }}" target="_blank" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px]">📷 receipt</a>
+                                            <button type="button" onclick="window.openImageModal('{{ \App\Services\CloudinaryService::url($exp->receipt_image) }}', 'Receipt: {{ addslashes($exp->description) }}', '₹{{ number_format($exp->amount, 2) }} · {{ $exp->date?->format('d M Y') }}')" class="inline-block ml-1 text-indigo-500 hover:underline text-[10px] cursor-pointer" title="View receipt photo in dialog">📷 receipt</button>
                                         @endif
                                         @if(!$isGroup && $exp->friendSplits->isNotEmpty())
                                             <span class="block text-[10px] font-medium text-indigo-600 dark:text-indigo-400">

@@ -23,6 +23,13 @@ RUN apt-get update \
     && sed -ri -e "s!/var/www/!$APACHE_DOCUMENT_ROOT!g" /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
     && rm -rf /var/lib/apt/lists/*
 
+RUN { \
+        echo 'upload_max_filesize = 64M'; \
+        echo 'post_max_size = 64M'; \
+        echo 'memory_limit = 256M'; \
+        echo 'max_execution_time = 120'; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html

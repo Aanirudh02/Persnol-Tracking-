@@ -38,6 +38,23 @@
             </div>
         @endif
 
+        @if($errors->any())
+            <div class="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-sm flex items-start justify-between">
+                <div>
+                    <div class="font-bold flex items-center gap-1.5 mb-1">
+                        <span>⚠️</span>
+                        <span>Upload or Validation Error:</span>
+                    </div>
+                    <ul class="list-disc list-inside text-xs space-y-0.5">
+                        @foreach($errors->all() as $err)
+                            <li>{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                <button type="button" onclick="this.parentElement.remove()" class="text-rose-700 dark:text-rose-400 hover:text-rose-900 font-bold ml-2">&times;</button>
+            </div>
+        @endif
+
         <!-- High-level Metric Cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -165,17 +182,27 @@
                                 <div class="flex items-center gap-3 self-end sm:self-center">
                                     <div class="text-right">
                                         <div class="font-bold text-white text-sm">{{ number_format($reading->odometer_km, 1) }} km</div>
-                                        @if($reading->distance_km > 0)
-                                            <div class="text-emerald-400 font-semibold text-[11px]">+{{ number_format($reading->distance_km, 1) }} km</div>
+                                        @php
+                                            $startOdo = (float) ($activeGroup->start_odometer ?? $activeReadings->first()?->odometer_km ?? 0);
+                                            $cumulativeKm = max(0, round((float) $reading->odometer_km - $startOdo, 1));
+                                        @endphp
+                                        @if($reading->reading_type === 'source')
+                                            <div class="text-slate-400 text-[11px]">Start Anchor</div>
+                                        @elseif($reading->distance_km > 0)
+                                            <div class="text-[11px] font-medium flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                                <span class="text-emerald-400 font-semibold">+{{ number_format($reading->distance_km, 1) }} km leg</span>
+                                                <span class="text-slate-400">·</span>
+                                                <span class="text-slate-300 font-normal">{{ number_format($cumulativeKm, 1) }} km total</span>
+                                            </div>
                                         @endif
                                     </div>
 
                                     @if($reading->image_url)
-                                        <a href="{{ $reading->image_url }}" target="_blank" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white" title="View Odometer Photo">
+                                        <button type="button" onclick="openPhotoModal('{{ $reading->image_url }}', '{{ addslashes($reading->trip_name ?: 'Odometer Reading') }}', '{{ number_format($reading->odometer_km, 1) }} km', '{{ $reading->reading_date?->format('d M Y') ?? '' }} {{ $reading->reading_time ? \Carbon\Carbon::parse($reading->reading_time)->format('h:i A') : '' }}')" class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white transition cursor-pointer" title="View Odometer Photo in dialog">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                             </svg>
-                                        </a>
+                                        </button>
                                     @endif
 
                                     <button type="button" onclick='openEditReadingModal(@json($reading))' class="p-1.5 rounded-lg hover:bg-white/20 text-indigo-200 hover:text-white transition cursor-pointer" title="Edit reading">
@@ -404,8 +431,10 @@
                             Odometer Photo (Optional · Cloudinary / Supabase)
                         </label>
                         <input type="file" name="odometer_image" id="odometer_image" accept="image/*"
+                            onchange="handleImageOptimization(this, 'odometer-image-preview')"
                             class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-950 dark:file:text-indigo-300">
-                        <p class="text-[11px] text-slate-400 mt-1">Saved directly to your Cloudinary `odometer` folder or storage.</p>
+                        <div id="odometer-image-preview" class="hidden"></div>
+                        <p class="text-[11px] text-slate-400 mt-1">Saved directly to your Cloudinary `odometer` folder. Auto-optimized for fast mobile upload.</p>
                     </div>
 
                     <div>
@@ -582,8 +611,151 @@
             document.getElementById('edit-reading-modal').classList.add('hidden');
         }
 
+        async function handleImageOptimization(inputEl, previewContainerId) {
+            const file = inputEl.files && inputEl.files[0];
+            if (!file || !file.type.startsWith('image/')) return;
+
+            const previewEl = document.getElementById(previewContainerId);
+            if (previewEl) {
+                previewEl.innerHTML = `
+                    <div class="flex items-center gap-2 mt-2 p-2 rounded-xl bg-indigo-50 dark:bg-slate-800 text-xs text-indigo-700 dark:text-indigo-300">
+                        <span class="animate-spin inline-block">⏳</span>
+                        <span>Optimizing photo for fast mobile upload (${(file.size / (1024 * 1024)).toFixed(1)} MB)...</span>
+                    </div>
+                `;
+                previewEl.classList.remove('hidden');
+            }
+
+            try {
+                if (file.size > 800 * 1024) {
+                    const compressedBlob = await compressImageFile(file, 1920, 0.82);
+                    if (compressedBlob && compressedBlob.size < file.size) {
+                        const dt = new DataTransfer();
+                        const optimizedFile = new File([compressedBlob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        dt.items.add(optimizedFile);
+                        inputEl.files = dt.files;
+
+                        if (previewEl) {
+                            const origMB = (file.size / (1024 * 1024)).toFixed(1);
+                            const newKB = Math.round(compressedBlob.size / 1024);
+                            const thumbUrl = URL.createObjectURL(compressedBlob);
+                            previewEl.innerHTML = `
+                                <div class="flex items-center gap-2.5 mt-2 p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs">
+                                    <img src="${thumbUrl}" class="w-9 h-9 rounded-lg object-cover border border-emerald-300 dark:border-emerald-700">
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-semibold text-emerald-800 dark:text-emerald-200 truncate">${optimizedFile.name}</p>
+                                        <p class="text-[11px] text-emerald-600 dark:text-emerald-400">⚡ Mobile-optimized: ${origMB}MB → ${newKB}KB</p>
+                                    </div>
+                                    <button type="button" onclick="clearImageUpload('${inputEl.id}', '${previewContainerId}')" class="text-slate-400 hover:text-rose-500 font-bold px-1.5 cursor-pointer">&times;</button>
+                                </div>
+                            `;
+                        }
+                        return;
+                    }
+                }
+
+                if (previewEl) {
+                    const thumbUrl = URL.createObjectURL(file);
+                    const sizeKB = Math.round(file.size / 1024);
+                    previewEl.innerHTML = `
+                        <div class="flex items-center gap-2.5 mt-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                            <img src="${thumbUrl}" class="w-9 h-9 rounded-lg object-cover border border-slate-300 dark:border-slate-600">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-slate-800 dark:text-slate-200 truncate">${file.name}</p>
+                                <p class="text-[11px] text-slate-500">${sizeKB} KB ready</p>
+                            </div>
+                            <button type="button" onclick="clearImageUpload('${inputEl.id}', '${previewContainerId}')" class="text-slate-400 hover:text-rose-500 font-bold px-1.5 cursor-pointer">&times;</button>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.warn('Client-side compression skipped:', err);
+            }
+        }
+
+        function clearImageUpload(inputId, previewContainerId) {
+            const input = document.getElementById(inputId);
+            const preview = document.getElementById(previewContainerId);
+            if (input) input.value = '';
+            if (preview) {
+                preview.innerHTML = '';
+                preview.classList.add('hidden');
+            }
+        }
+
+        function compressImageFile(file, maxDimension = 1920, quality = 0.82) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = reject;
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onerror = reject;
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxDimension || height > maxDimension) {
+                            if (width > height) {
+                                height = Math.round((height * maxDimension) / width);
+                                width = maxDimension;
+                            } else {
+                                width = Math.round((width * maxDimension) / height);
+                                height = maxDimension;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            resolve(blob);
+                        }, 'image/jpeg', quality);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function openPhotoModal(url, tripName, km, dateStr) {
+            if (window.openImageModal) {
+                window.openImageModal(url, (tripName ? tripName + ' · ' : '') + km, dateStr || 'Odometer photo');
+                return;
+            }
+            const modal = document.getElementById('photo-dialog-modal');
+            const img = document.getElementById('photo-modal-img');
+            const title = document.getElementById('photo-modal-title');
+            const sub = document.getElementById('photo-modal-subtitle');
+            const ext = document.getElementById('photo-modal-external');
+
+            if (!modal || !img) return;
+            img.src = url;
+            if (ext) ext.href = url;
+            if (title) title.textContent = (tripName ? tripName + ' · ' : '') + km;
+            if (sub) sub.textContent = dateStr || 'Odometer photo';
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closePhotoModal() {
+            if (window.closeImageModal) window.closeImageModal();
+            const modal = document.getElementById('photo-dialog-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                closePhotoModal();
                 closeEditReadingModal();
             }
         });
@@ -677,7 +849,9 @@
                             Replace Photo (Optional)
                         </label>
                         <input type="file" name="odometer_image" id="edit_odometer_image" accept="image/*"
+                            onchange="handleImageOptimization(this, 'edit-odometer-image-preview')"
                             class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-950 dark:file:text-indigo-300">
+                        <div id="edit-odometer-image-preview" class="hidden"></div>
                     </div>
                 </div>
 
@@ -700,6 +874,34 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- PHOTO DIALOG MODAL -->
+    <div id="photo-dialog-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" onclick="if(event.target === this) closePhotoModal()">
+        <div class="relative max-w-3xl w-full max-h-[90vh] bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+            <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                <div class="min-w-0 pr-4">
+                    <h4 id="photo-modal-title" class="text-sm font-bold text-white truncate">Odometer Photo</h4>
+                    <p id="photo-modal-subtitle" class="text-xs text-slate-400 truncate"></p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a id="photo-modal-external" href="#" target="_blank" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5" title="Open full original">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span class="hidden sm:inline">Open Original</span>
+                    </a>
+                    <button type="button" onclick="closePhotoModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer" title="Close">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-3 sm:p-4 bg-black/60 flex items-center justify-center overflow-auto max-h-[calc(90vh-80px)]">
+                <img id="photo-modal-img" src="" alt="Odometer Reading" class="max-w-full max-h-[75vh] w-auto h-auto object-contain rounded-xl shadow-lg border border-slate-800">
+            </div>
         </div>
     </div>
 </x-app-layout>

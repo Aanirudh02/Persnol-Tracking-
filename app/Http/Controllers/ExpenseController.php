@@ -326,6 +326,10 @@ class ExpenseController extends Controller
         $imagePath = null;
         if ($request->hasFile('receipt_image')) {
             $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
+        } elseif ($uploadedFile = $request->file('receipt_image')) {
+            if (! $uploadedFile->isValid()) {
+                return back()->withInput()->with('error', 'Receipt upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
+            }
         }
 
         $parentId = $validated['parent_id'] ?? null;
@@ -698,6 +702,10 @@ class ExpenseController extends Controller
 
         if ($request->hasFile('receipt_image')) {
             $validated['receipt_image'] = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
+        } elseif ($uploadedFile = $request->file('receipt_image')) {
+            if (! $uploadedFile->isValid()) {
+                return back()->withInput()->with('error', 'Receipt upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
+            }
         }
 
         $category = ! empty($validated['category_id']) ? ExpenseCategory::query()->find($validated['category_id']) : null;

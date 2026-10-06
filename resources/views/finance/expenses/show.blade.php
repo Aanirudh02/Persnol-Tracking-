@@ -94,6 +94,15 @@
                 <p class="text-amber-700 text-xs">Breakdown does not match parent total yet — edit amounts or add remaining items.</p>
             @endif
             @if($expense->notes)<p class="text-slate-500">{{ $expense->notes }}</p>@endif
+            @if($expense->receipt_image)
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span class="text-xs text-slate-500 font-medium">Attached Receipt:</span>
+                    <button type="button" onclick="window.openImageModal('{{ \App\Services\CloudinaryService::url($expense->receipt_image) }}', 'Receipt: {{ addslashes($expense->description) }}', '₹{{ number_format($expense->amount, 2) }} · {{ $expense->date?->format('d M Y') }}')" class="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition cursor-pointer flex items-center gap-1.5">
+                        <span>📷</span>
+                        <span>View Receipt</span>
+                    </button>
+                </div>
+            @endif
             <a href="{{ route('expenses.edit', $expense) }}" class="inline-block text-sm font-semibold text-slate-800 hover:underline">Edit expense</a>
         </div>
 

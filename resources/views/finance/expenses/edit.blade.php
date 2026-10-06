@@ -194,7 +194,7 @@
                     <input type="file" name="receipt_image" accept="image/*" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2">
                     @if($expense->receipt_image)
                         <div class="mt-1.5 text-xs">
-                            <a href="{{ \App\Services\CloudinaryService::url($expense->receipt_image) }}" target="_blank" class="font-semibold text-indigo-600 hover:underline">📷 View current uploaded receipt</a>
+                            <button type="button" onclick="window.openImageModal('{{ \App\Services\CloudinaryService::url($expense->receipt_image) }}', 'Receipt: {{ addslashes($expense->description) }}', '₹{{ number_format($expense->amount, 2) }} · {{ $expense->date?->format('d M Y') }}')" class="font-semibold text-indigo-600 hover:underline cursor-pointer">📷 View current uploaded receipt</button>
                         </div>
                     @endif
                 </div>

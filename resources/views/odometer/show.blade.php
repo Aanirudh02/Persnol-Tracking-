@@ -132,19 +132,27 @@
                                 <div class="font-bold text-slate-900 dark:text-white text-base">
                                     {{ number_format($reading->odometer_km, 1) }} <span class="text-xs font-normal text-slate-400">km</span>
                                 </div>
-                                @if($reading->distance_km > 0)
-                                    <div class="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                        +{{ number_format($reading->distance_km, 1) }} km
+                                @php
+                                    $startOdo = (float) ($group->start_odometer ?? $group->readings->first()?->odometer_km ?? 0);
+                                    $cumulativeKm = max(0, round((float) $reading->odometer_km - $startOdo, 1));
+                                @endphp
+                                @if($reading->reading_type === 'source')
+                                    <div class="text-xs text-slate-400">Cycle Start Anchor</div>
+                                @elseif($reading->distance_km > 0)
+                                    <div class="text-xs font-medium flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                        <span class="font-bold text-emerald-600 dark:text-emerald-400">+{{ number_format($reading->distance_km, 1) }} km leg</span>
+                                        <span class="text-slate-400">·</span>
+                                        <span class="text-slate-500 dark:text-slate-400">{{ number_format($cumulativeKm, 1) }} km total</span>
                                     </div>
                                 @endif
                             </div>
 
                             @if($reading->image_url)
-                                <a href="{{ $reading->image_url }}" target="_blank" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition" title="View Odometer Photo">
+                                <button type="button" onclick="openPhotoModal('{{ $reading->image_url }}', '{{ addslashes($reading->trip_name ?: 'Odometer Reading') }}', '{{ number_format($reading->odometer_km, 1) }} km', '{{ $reading->reading_date?->format('d M Y') ?? '' }} {{ $reading->reading_time ? \Carbon\Carbon::parse($reading->reading_time)->format('h:i A') : '' }}')" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 transition cursor-pointer" title="View Odometer Photo in dialog">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
-                                </a>
+                                </button>
                             @endif
 
                             <button type="button" onclick='openEditReadingModal(@json($reading))' class="p-2 rounded-xl text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-slate-700 transition cursor-pointer" title="Edit reading">
@@ -257,7 +265,9 @@
                             Replace Photo (Optional)
                         </label>
                         <input type="file" name="odometer_image" id="edit_odometer_image" accept="image/*"
+                            onchange="handleImageOptimization(this, 'show-edit-odometer-image-preview')"
                             class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-950 dark:file:text-indigo-300">
+                        <div id="show-edit-odometer-image-preview" class="hidden"></div>
                     </div>
                 </div>
 
@@ -283,7 +293,59 @@
         </div>
     </div>
 
+    <!-- PHOTO DIALOG MODAL -->
+    <div id="photo-dialog-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" onclick="if(event.target === this) closePhotoModal()">
+        <div class="relative max-w-3xl w-full max-h-[90vh] bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+            <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                <div class="min-w-0 pr-4">
+                    <h4 id="photo-modal-title" class="text-sm font-bold text-white truncate">Odometer Photo</h4>
+                    <p id="photo-modal-subtitle" class="text-xs text-slate-400 truncate"></p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a id="photo-modal-external" href="#" target="_blank" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5" title="Open full original">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span class="hidden sm:inline">Open Original</span>
+                    </a>
+                    <button type="button" onclick="closePhotoModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer" title="Close">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-3 sm:p-4 bg-black/60 flex items-center justify-center overflow-auto max-h-[calc(90vh-80px)]">
+                <img id="photo-modal-img" src="" alt="Odometer Reading" class="max-w-full max-h-[75vh] w-auto h-auto object-contain rounded-xl shadow-lg border border-slate-800">
+            </div>
+        </div>
+    </div>
+
     <script>
+        function openPhotoModal(url, tripName, km, dateStr) {
+            const modal = document.getElementById('photo-dialog-modal');
+            const img = document.getElementById('photo-modal-img');
+            const title = document.getElementById('photo-modal-title');
+            const sub = document.getElementById('photo-modal-subtitle');
+            const ext = document.getElementById('photo-modal-external');
+
+            img.src = url;
+            ext.href = url;
+            title.textContent = (tripName ? tripName + ' · ' : '') + km;
+            sub.textContent = dateStr || 'Odometer photo';
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closePhotoModal() {
+            const modal = document.getElementById('photo-dialog-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
         function openEditReadingModal(reading) {
             const form = document.getElementById('edit-reading-form');
             form.action = `/odometer/readings/${reading.id}`;
@@ -306,6 +368,7 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                closePhotoModal();
                 closeEditReadingModal();
             }
         });
