@@ -22,6 +22,13 @@
                 <a href="{{ route('daily-balances.index') }}" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 transition">
                     📅 Calendar View
                 </a>
+                <form action="{{ route('daily-balances.reconcile') }}" method="POST" class="inline">
+                    @csrf
+                    <button type="submit" title="Reconcile live ledger and unfreeze stuck balances" class="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                        <span>🔄</span>
+                        <span>Reconcile</span>
+                    </button>
+                </form>
                 <a href="{{ route('income.create') }}" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-sm transition">
                     + Inflow (Income)
                 </a>

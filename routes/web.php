@@ -114,6 +114,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/daily-balances/today', [DailyBalanceController::class, 'today'])->name('daily-balances.today');
         Route::post('/daily-balances', [DailyBalanceController::class, 'update'])->name('daily-balances.update');
         Route::post('/daily-balances/categories', [DailyBalanceController::class, 'updateCategories'])->name('daily-balances.categories');
+        Route::post('/daily-balances/reconcile', [DailyBalanceController::class, 'reconcile'])->name('daily-balances.reconcile');
 
         // Income
         Route::resource('income', IncomeController::class)->names('income');

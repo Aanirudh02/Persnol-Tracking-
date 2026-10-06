@@ -50,6 +50,16 @@
                     <span>Payment Categories ({{ count($activeCategories) }})</span>
                 </button>
 
+                <!-- Reconcile Button -->
+                <form action="{{ route('daily-balances.reconcile') }}" method="POST" class="inline">
+                    @csrf
+                    <input type="hidden" name="month" value="{{ $month }}">
+                    <button type="submit" title="Reconcile live ledger and unfreeze stuck balances" class="px-3.5 py-2 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold shadow-xs transition active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                        <span>🔄</span>
+                        <span>Reconcile</span>
+                    </button>
+                </form>
+
                 <!-- Adjust Balances Button -->
                 <button type="button" onclick="openAdjustmentModal()" class="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition active:scale-95 flex items-center gap-1.5 cursor-pointer">
                     <span>✍️</span>

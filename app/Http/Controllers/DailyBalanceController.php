@@ -315,8 +315,8 @@ class DailyBalanceController extends Controller
                 ? trim((string) $fields['adjustment_note'])
                 : null;
 
-            $isOpeningManual = ! empty($fields['is_opening_manual']) || (array_key_exists('opening', $fields) && $fields['opening'] !== null && $fields['opening'] !== '');
-            $isClosingManual = ! empty($fields['is_closing_manual']) || (array_key_exists('closing', $fields) && $fields['closing'] !== null && $fields['closing'] !== '');
+            $isOpeningManual = ! empty($fields['is_opening_manual']);
+            $isClosingManual = ! empty($fields['is_closing_manual']);
 
             $existingCategoriesData[$catName] = [
                 'opening' => round($opening, 2),
@@ -337,8 +337,8 @@ class DailyBalanceController extends Controller
             $record->opening_balance = $totalOpening;
             $record->manual_adjustment = $totalAdjustment;
             $record->closing_balance = $totalClosing;
-            $record->is_opening_manual = true;
-            $record->is_closing_manual = true;
+            $record->is_opening_manual = false;
+            $record->is_closing_manual = false;
         } else {
             // Direct overall adjustment (legacy or single input)
             if (array_key_exists('opening_balance', $validated) && $validated['opening_balance'] !== null) {
@@ -376,5 +376,38 @@ class DailyBalanceController extends Controller
         Setting::setVal('daily_register_categories', $validated['categories'], 'json', 'finance', 'Active payment categories in Daily Cash Register');
 
         return back()->with('success', 'Daily cash register payment categories updated.');
+    }
+
+    public function reconcile(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        // Reset any frozen manual closing flags so all records dynamically calculate
+        DailyBalance::query()
+            ->where('user_id', $user->id)
+            ->get()
+            ->each(function (DailyBalance $record): void {
+                $catData = $record->categories_data ?? [];
+                $changed = false;
+                foreach ($catData as $cat => &$info) {
+                    if (! empty($info['is_closing_manual'])) {
+                        $info['is_closing_manual'] = false;
+                        $changed = true;
+                    }
+                }
+                unset($info);
+
+                if ($record->is_closing_manual) {
+                    $record->is_closing_manual = false;
+                    $changed = true;
+                }
+
+                if ($changed) {
+                    $record->categories_data = $catData;
+                    $record->save();
+                }
+            });
+
+        return back()->with('success', '🔄 Daily register reconciled successfully! Inflows, outflows, and adjustments are now dynamically tallied.');
     }
 }

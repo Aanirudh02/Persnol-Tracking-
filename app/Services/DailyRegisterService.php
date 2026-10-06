@@ -205,9 +205,11 @@ class DailyRegisterService
 
                 $adjustment = (float) ($catSaved['adjustment'] ?? 0.0);
 
-                $closing = $isManualClosing
-                    ? (float) $catSaved['closing']
-                    : ($opening + $inflow - $outflow + $adjustment);
+                // Closing is mathematically Opening + Inflow - Outflow + Adjustment.
+                // Dynamic inflows and outflows must ALWAYS flow into closing (especially for today and whenever transactions exist).
+                $closing = ($dStr === $todayStr || ($inflow > 0 || $outflow > 0) || ! $isManualClosing)
+                    ? ($opening + $inflow - $outflow + $adjustment)
+                    : (float) $catSaved['closing'];
 
                 $dayCategories[$cat] = [
                     'name' => $cat,
