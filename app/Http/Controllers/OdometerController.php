@@ -223,7 +223,8 @@ class OdometerController extends Controller
         $avgSpeed = null;
         if (! empty($validated['duration_minutes']) && $validated['duration_minutes'] > 0 && $distanceKm > 0) {
             $hours = $validated['duration_minutes'] / 60;
-            $avgSpeed = round($distanceKm / $hours, 2);
+            $calcSpeed = round($distanceKm / $hours, 2);
+            $avgSpeed = ($calcSpeed > 999.99) ? null : $calcSpeed;
         }
 
         // -------------------------------------------------------------

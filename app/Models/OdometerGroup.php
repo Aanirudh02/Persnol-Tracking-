@@ -80,7 +80,8 @@ class OdometerGroup extends Model
             } else {
                 $r->distance_km = max(0, round((float) $r->odometer_km - $prevKm, 2));
                 if ($r->duration_minutes && $r->duration_minutes > 0 && $r->distance_km > 0) {
-                    $r->avg_speed_kmh = round($r->distance_km / ($r->duration_minutes / 60), 2);
+                    $calcSpeed = round($r->distance_km / ($r->duration_minutes / 60), 2);
+                    $r->avg_speed_kmh = ($calcSpeed > 999.99) ? null : $calcSpeed;
                 }
             }
             $r->saveQuietly();

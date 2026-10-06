@@ -33,6 +33,30 @@ class CloudinaryService
             }
         }
 
+        // Check if upload preset is configured for unsigned uploads
+        $preset = config('services.cloudinary.upload_preset') ?: env('CLOUDINARY_UPLOAD_PRESET');
+        if ($preset && $cloudName) {
+            try {
+                $response = Http::timeout(25)
+                    ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                    ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                        'upload_preset' => $preset,
+                        'folder' => $targetFolder,
+                    ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    if (! empty($data['secure_url'])) {
+                        return $data['secure_url'];
+                    }
+                }
+
+                Log::warning('Cloudinary unsigned upload returned: '.$response->body());
+            } catch (\Throwable $e) {
+                Log::warning('Cloudinary unsigned upload exception: '.$e->getMessage());
+            }
+        }
+
         // If credentials are fully configured, attempt upload to Cloudinary API
         if ($cloudName && $apiKey && $apiSecret) {
             try {
@@ -40,14 +64,16 @@ class CloudinaryService
                 $paramsToSign = "folder={$targetFolder}&timestamp={$timestamp}";
                 $signature = sha1($paramsToSign.$apiSecret);
 
-                $response = Http::timeout(25)
-                    ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
-                    ->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
-                        'api_key' => $apiKey,
-                        'timestamp' => $timestamp,
-                        'folder' => $targetFolder,
-                        'signature' => $signature,
-                    ]);
+                $mimeType = $file->getMimeType() ?: 'image/jpeg';
+                $base64Data = 'data:'.$mimeType.';base64,'.base64_encode(file_get_contents($file->getRealPath()));
+
+                $response = Http::timeout(30)->asForm()->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
+                    'file' => $base64Data,
+                    'api_key' => $apiKey,
+                    'timestamp' => $timestamp,
+                    'folder' => $targetFolder,
+                    'signature' => $signature,
+                ]);
 
                 if ($response->successful()) {
                     $data = $response->json();

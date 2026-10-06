@@ -253,3 +253,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/roles/{role}/permissions', [SettingController::class, 'updateRolePermissions'])->name('settings.roles.permissions')->middleware('role:Admin');
     });
 });
+
+// Fallback image route for storage files when public/storage symlink is missing in container
+Route::get('/storage/{path}', function (string $path) {
+    $fullPath = storage_path('app/public/' . $path);
+    if (! file_exists($fullPath)) {
+        abort(404);
+    }
+
+    return response()->file($fullPath);
+})->where('path', '.*')->name('storage.local');
