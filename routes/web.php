@@ -227,6 +227,7 @@ Route::middleware('auth')->group(function () {
 
     // Analytics
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index')->middleware('permission:analytics.view');
+    Route::get('/analytics/drilldown', [AnalyticsController::class, 'drilldown'])->name('analytics.drilldown')->middleware('permission:analytics.view');
 
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
