@@ -7,6 +7,8 @@ Status legend: ✅ fixed · 🔴 High (open) · 🟠 Medium · 🟡 Low · 🔍 
 
 ---
 
+> **Read the status table at the end first.** Items marked ✅ FIXED are done — do not change them again. Line numbers below are from commit `6dbc943` and may have shifted; locate code by file + method name.
+
 ## 0. Already fixed in commit `6dbc943`
 
 | # | Problem | Where |
@@ -25,22 +27,22 @@ Status legend: ✅ fixed · 🔴 High (open) · 🟠 Medium · 🟡 Low · 🔍 
 
 ---
 
-## 1. 🔴 High — still open (money logic)
+## 1. High — money logic (✅ all fixed in `ecd48fe` — kept for reference, do not re-fix)
 
 These change stored money values, so they need you to confirm the intended behaviour before they are changed.
 
-### H4 🔍 Expense list subtracts the friend's payment twice
+### ✅ FIXED (`ecd48fe`) — H4 Expense list subtracts the friend's payment twice
 - **Where:** `resources/views/finance/expenses/index.blade.php:305-306`, `ExpenseController.php:280-287` and `726-733`
 - **Problem:** for split bills the controller already saves only *your* share in `amount`. The list then does `$myPaid = displayAmount - friendsPaid`, so "your spend" shows ₹0 or too low.
 - **Example:** bill ₹90, you paid ₹20, friend ₹70 → `amount` = 20 → list shows `max(0, 20 - 70)` = ₹0.
 - **Fix:** for new-style rows show `totalAmount()` as your spend; only subtract for legacy rows where `amount` is the full bill.
 
-### H5 🔍 Credit created with "link as expense" is counted twice on close
+### ✅ FIXED (`ecd48fe`) — H5 Credit created with "link as expense" is counted twice on close
 - **Where:** `CreditDebtController.php:99-133` and `736-758`
 - **Problem:** storing a *credit* with `link_as_expense` creates a full-amount "Credit Repayment" expense but records no payment. `close()` then creates a second expense for the remaining amount and overwrites `linked_expense_id`.
 - **Fix:** record a matching payment when linking, or make `close()` reuse/adjust the already-linked expense.
 
-### H6 🔍 Editing a credit/debt overwrites partial linked amounts
+### ✅ FIXED (`ecd48fe`) — H6 Editing a credit/debt overwrites partial linked amounts
 - **Where:** `CreditDebtController.php:182-215`
 - **Problem:** `update()` sets linked Expense / PersonalExpense / Income `amount` to the full credit amount, even when they were filed for a partial amount (`recordAsIncome`, `recordAsExpense`, `close()` remainder). Editing just the description rewrites them.
 - **Fix:** sync only date / payment method, or sync the amount only when the link covered the full amount.
@@ -88,29 +90,29 @@ These change stored money values, so they need you to confirm the intended behav
 
 ### Money correctness
 
-**M8. Locked/reconciled records can still be deleted**
+**✅ FIXED (`069d0f7`) — M8. Locked/reconciled records can still be deleted**
 - **Where:** `ExpenseController::destroy` (845), `IncomeController::destroy` (262), `PaymentController::destroy` (224)
 - **Fix:** run the same `FinanceService::canEdit` check used for edit.
 
-**M9. Orphaned income tallies inflate "tallied" totals**
+**✅ FIXED (`069d0f7`, existing orphans not cleaned) — M9. Orphaned income tallies inflate "tallied" totals**
 - **Where:** `IncomeController.php:269`, `Expense::totalTalliedAmount()` (`Expense.php:110-117`), `DashboardController.php` (tally total)
 - **Problem:** soft-deleting an Income/Expense leaves its `IncomeExpenseTally` rows, which are still counted.
 - **Fix:** delete tallies on delete, or only count tallies whose parents are alive.
 
-**M10. Restoring an expense loses its friend link**
+**✅ FIXED (`069d0f7`, single-friend splits) — M10. Restoring an expense loses its friend link**
 - **Where:** `ExpenseController.php:821, 830-843` (restore) vs `864` (destroy)
 - **Fix:** call `syncExpenseFriendLink` on restore.
 
-**M11. Deleting an expense-linked friend split leaves the expense dangling**
+**✅ FIXED (`069d0f7`) — M11. Deleting an expense-linked friend split leaves the expense dangling**
 - **Where:** `FriendSplitController.php:53-62`
 - **Fix:** block delete when `expense_id` is set (as `update` already does at line 105).
 
-**M12. Personal expenses double-counted on the dashboard**
+**✅ FIXED (`069d0f7`) — M12. Personal expenses double-counted on the dashboard**
 - **Where:** `DashboardController.php:88-102`
 - **Problem:** with `show_personal_expenses_in_dashboard` on, personal expenses that were "recorded as normal" (they also created an `Expense`) are counted twice; archived personal rows are included.
 - **Fix:** exclude rows with `expense_id` set and archived rows. (The chart builder added in `6dbc943` already excludes archived rows.)
 
-**M13. Archived expenses handled inconsistently**
+**🟡 PARTLY FIXED (dashboard only; Analytics open) — M13. Archived expenses handled inconsistently**
 - **Where:** `DashboardController.php:99` (period total) vs the weekly/monthly cards; `AnalyticsController` excludes archived nowhere
 - **Problem:** the same period shows different totals on the dashboard cards, the chart and Analytics.
 - **Fix:** one shared scope, e.g. `Expense::scopeActive()`, used everywhere.
@@ -119,7 +121,7 @@ These change stored money values, so they need you to confirm the intended behav
 - **Where:** `FinanceService.php:132-137, 179-183`
 - **Fix:** add `whereNull('parent_id')` and the archived filter.
 
-**M15. Friend-paid expenses deducted from your cash register**
+**✅ FIXED (`ecd48fe`) — M15. Friend-paid expenses deducted from your cash register**
 - **Where:** `DailyBalanceController.php:175`, `DailyRegisterService.php:133`
 - **Problem:** filters `paid_by != 'friend'`, but `paid_by` holds names/"Me"; the type lives in `paid_by_type`.
 - **Fix:** filter on `paid_by_type`.
@@ -129,16 +131,16 @@ These change stored money values, so they need you to confirm the intended behav
 - **Problem:** footer shows stored `total_amount` while rows are re-queried live; the `else` branch at 226-253 is dead for new statements.
 - **Fix:** sum the rows shown (or show "snapshot vs live").
 
-**M17. Food entries and auto-created expenses get out of sync**
+**✅ FIXED (`ecd48fe`) — M17. Food entries and auto-created expenses get out of sync**
 - **Where:** `FoodController.php:158-224, 282-306`
 - **Problem:** no transaction; update/destroy ignore the auto-created expense, leaving stale/orphan expenses that are still counted.
 - **Fix:** wrap in a transaction and update/delete expenses created via `auto_create_expense`.
 
-**M18. Deleting a credit/debt orphans linked personal expense and income**
+**✅ FIXED (`ecd48fe`) — M18. Deleting a credit/debt orphans linked personal expense and income**
 - **Where:** `CreditDebtController.php:284-289`
 - **Fix:** handle all three `linked_*_id` links.
 
-**M19. Missing DB transactions on multi-write operations**
+**🟡 PARTLY FIXED (see status table) — M19. Missing DB transactions on multi-write operations**
 - **Where:** `ExpenseController::update` (759-781), `ExpenseController::store` link sync (461), `CreditDebtController` destroy/addPayment/updatePayment/deletePayment (284-373), `PersonalExpenseController` store/update + `syncNormalExpense` (176-239)
 - **Fix:** wrap each in `DB::transaction`.
 
@@ -167,7 +169,7 @@ These change stored money values, so they need you to confirm the intended behav
 
 ### Side effects on GET
 
-**M24. GET requests that write data**
+**✅ FIXED (`ecd48fe`) — M24. GET requests that write data**
 - `PetrolController::index` runs `Vehicle::firstOrCreate(['name' => 'TVS Pep+'])` on **every visit** — a deleted or renamed TVS Pep+ is silently re-created, and all unassigned fuel rows are reassigned.
 - `DashboardController.php:64-74` creates a `DailyRecord` for any `?date=`.
 - `ExpenseController::create` (236-248) creates a shared "Snacks" category.
