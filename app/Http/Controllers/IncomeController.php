@@ -14,6 +14,7 @@ use App\Services\OptionsService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class IncomeController extends Controller
@@ -273,14 +274,23 @@ class IncomeController extends Controller
         return back()->with('success', 'Expense tally removed.');
     }
 
-    public function destroy(Request $request, Income $income): RedirectResponse
+    public function destroy(Request $request, Income $income, FinanceService $financeService): RedirectResponse
     {
         if ($income->user_id !== auth()->id()) {
             abort(403);
         }
 
-        AuditService::log('income', $income->id, 'deleted', $income->toArray(), null, $request->input('reason', 'Deleted by user'));
-        $income->delete();
+        // Same rule as editing: locked / out-of-window records can't be removed either
+        if (! $financeService->canEdit('income', $income)) {
+            return redirect()->route('income.index')->with('error', '🔒 This income record is locked and cannot be deleted.');
+        }
+
+        DB::transaction(function () use ($request, $income): void {
+            AuditService::log('income', $income->id, 'deleted', $income->toArray(), null, $request->input('reason', 'Deleted by user'));
+            // Its tallies against expenses go with it, so expenses don't stay "tallied" by a deleted income
+            $income->tallies()->delete();
+            $income->delete();
+        });
 
         return redirect()->route('income.index')->with('success', 'Income record deleted.');
     }

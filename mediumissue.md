@@ -202,3 +202,27 @@ These change stored money values, so they need you to confirm the intended behav
 | L20 | `OsmMapProvider::localLandmarks` | Hard-coded Coimbatore landmarks; "414-A Tex Park Road" and "IMIK Technologies" share identical coordinates | Move to a user-editable "Saved Places" table |
 | L21 | `OsmMapProvider` | Uses public Nominatim/OSRM demo servers (1 req/s policy, no SLA) — the main reason search/route feel flaky | Cache harder, or use a keyed provider (Google provider already exists) |
 | L22 | `tests/Feature/FinanceMultiSplitAndDashboardTest.php:123` | Test expects "Total Current Balance" on the dashboard; text no longer exists → suite has 1 failing test | Update the test or restore the label |
+
+---
+
+## Status update — 2026-10-07 (later commits)
+
+| Item | Status | Commit |
+|---|---|---|
+| H4 Expense list subtracts friend's payment twice | ✅ fixed (old rows fixed automatically — display logic) | `ecd48fe` |
+| H5 Credit "link as expense" counted twice on close | ✅ fixed; old duplicates: run `php artisan finance:repair-credit-links` (dry run) then `--fix` | `ecd48fe` |
+| H6 Editing credit overwrites linked amounts | ✅ fixed; now asks "update both places?" for payment method / date / amount, both directions | `ecd48fe` |
+| M8 Locked records deletable | ✅ fixed for expense / income / payment. Also fixed: the lock check itself never worked (`property_exists` on Eloquent) | next commit |
+| M9 Orphaned income tallies | ✅ tallies removed when an income or expense is deleted (existing orphans are not cleaned up yet) | next commit |
+| M10 Restored expense loses friend link | ✅ single-friend splits rebuilt on restore (multi-friend splits still need re-entry) | next commit |
+| M11 Deleting expense-linked split | ✅ blocked | next commit |
+| M12 Personal expenses double-counted on dashboard | ✅ excludes rows already filed as normal expense and archived rows | next commit |
+| M13 Archived handling inconsistent | 🟡 dashboard period total fixed; Analytics still includes archived | next commit |
+| M15 Cash register deducts friend-paid expenses | ✅ fixed | `ecd48fe` |
+| M17 Food ↔ auto-created expense out of sync | ✅ fixed | `ecd48fe` |
+| M18 Credit delete orphans linked records | ✅ fixed | `ecd48fe` |
+| M19 Missing transactions | 🟡 credit delete, expense delete, income delete, food store/update/destroy done; others open | `ecd48fe` + next |
+| M24 GET requests writing data | ✅ fixed (dashboard, prompts, petrol, categories, classifications, wallets; dismiss is POST) | `ecd48fe` |
+| M14, M16, M20 and the security items M1–M7 | ⏳ still open | — |
+
+**After pulling:** run `php artisan migrate`, then `php artisan finance:repair-credit-links` (review) and `php artisan finance:repair-credit-links --fix`.

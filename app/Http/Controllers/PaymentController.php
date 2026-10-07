@@ -145,10 +145,15 @@ class PaymentController extends Controller
         return redirect()->route('payments.index')->with('success', 'Payment updated successfully!');
     }
 
-    public function destroy(Request $request, Payment $payment)
+    public function destroy(Request $request, Payment $payment, FinanceService $financeService)
     {
         if ($payment->user_id !== auth()->id()) {
             abort(403);
+        }
+
+        // Locked / reconciled payments can't be deleted, same as editing
+        if (! $financeService->canEdit('payment', $payment)) {
+            return redirect()->route('payments.index')->with('error', '🔒 This payment is locked or reconciled and cannot be deleted.');
         }
 
         AuditService::log('payment', $payment->id, 'deleted', $payment->toArray(), null, $request->input('reason', 'Payment deleted'));

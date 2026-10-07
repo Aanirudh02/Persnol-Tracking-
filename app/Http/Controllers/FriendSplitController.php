@@ -56,6 +56,11 @@ class FriendSplitController extends Controller
             abort(403);
         }
 
+        // Deleting it here left the expense split-tagged with no split behind it
+        if ($friendSplit->expense_id) {
+            return redirect()->route('friends.index')->with('error', 'This split belongs to an expense — remove the friend split from the expense itself.');
+        }
+
         $linkService->deleteStandaloneSplit($friendSplit);
 
         return redirect()->route('friends.index')->with('success', 'Split record deleted.');

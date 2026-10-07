@@ -86,7 +86,7 @@ class DashboardController extends Controller
             $moneyReceived = $workings['income'];
             $expensesTotal = $workings['expenses'];
             if ($showPersonalInDashboard) {
-                $expensesTotal += (float) PersonalExpense::where('user_id', $user->id)->where('date', $date)->sum('amount');
+                $expensesTotal += (float) PersonalExpense::where('user_id', $user->id)->where('date', $date)->whereNull('expense_id')->where('is_archived', false)->sum('amount');
             }
             $snacksCount = $workings['snack_count'];
             $petrolSpent = $workings['fuel'];
@@ -96,9 +96,9 @@ class DashboardController extends Controller
             $mistakesCount = Mistake::where('user_id', $user->id)->where('date', $date)->count();
         } else {
             $moneyReceived = (float) Income::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->sum('amount');
-            $expensesTotal = (float) Expense::where('user_id', $user->id)->whereNull('parent_id')->whereBetween('date', [$startDate, $endDate])->sum(DB::raw('amount + gst_amount'));
+            $expensesTotal = (float) Expense::where('user_id', $user->id)->whereNull('parent_id')->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))->whereBetween('date', [$startDate, $endDate])->sum(DB::raw('amount + gst_amount'));
             if ($showPersonalInDashboard) {
-                $expensesTotal += (float) PersonalExpense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->sum('amount');
+                $expensesTotal += (float) PersonalExpense::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->whereNull('expense_id')->where('is_archived', false)->sum('amount');
             }
             $snacksCount = FoodEntry::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->where('is_snack', true)->count();
             $petrolSpent = (float) FuelEntry::where('user_id', $user->id)->whereBetween('date', [$startDate, $endDate])->sum('amount');

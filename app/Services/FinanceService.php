@@ -26,7 +26,12 @@ class FinanceService
             return true;
         }
 
-        if (property_exists($record, 'is_locked') && $record->is_locked) {
+        // Eloquent attributes are not PHP properties, so property_exists() never saw the lock
+        if ((bool) ($record->is_locked ?? false)) {
+            return false;
+        }
+
+        if ($module === 'payment' && ($record->status ?? null) === 'Reconciled') {
             return false;
         }
 

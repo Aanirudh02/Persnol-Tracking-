@@ -824,6 +824,7 @@ class ExpenseController extends Controller
 
         if ($expense->trashed()) {
             $expense->restore();
+            $this->relinkRestoredExpense($expense);
         }
 
         $expense->update(['is_archived' => true]);
@@ -839,6 +840,7 @@ class ExpenseController extends Controller
 
         if ($expense->trashed()) {
             $expense->restore();
+            $this->relinkRestoredExpense($expense);
         }
 
         $expense->update(['is_archived' => false]);
@@ -846,7 +848,18 @@ class ExpenseController extends Controller
         return back()->with('success', 'Expense restored to Active expenses.');
     }
 
-    public function destroy(Request $request, Expense $expense, FinanceLinkService $linkService): RedirectResponse
+    /**
+     * Deleting an expense removed its friend split, so a restored split expense
+     * dropped out of friend balances. Rebuild it from the split fields kept on the row.
+     */
+    private function relinkRestoredExpense(Expense $expense): void
+    {
+        if ($expense->split_with_friend_id || $expense->paid_by_friend_id) {
+            app(FinanceLinkService::class)->syncExpenseFriendLink($expense);
+        }
+    }
+
+    public function destroy(Request $request, Expense $expense, FinanceLinkService $linkService, FinanceService $financeService): RedirectResponse
     {
         if ($expense->user_id !== auth()->id()) {
             abort(403);
@@ -856,32 +869,42 @@ class ExpenseController extends Controller
             return $this->archive($request, $expense);
         }
 
+        // Same rule as editing: locked / out-of-window expenses can't be removed either
+        if (! $expense->trashed() && ! $expense->is_archived && ! $financeService->canEdit('expense', $expense)) {
+            return back()->with('error', '🔒 This expense is locked and cannot be deleted.');
+        }
+
         if ($expense->subItems()->exists() || $expense->foodEntries()->exists()) {
             return back()->with('error', 'Cannot delete expense with linked sub-items or food entries.');
         }
 
-        // Gracefully disassociate petrol log if linked
-        if ($expense->fuelEntry()->exists()) {
-            $expense->fuelEntry()->update(['expense_id' => null]);
-        }
+        $permanent = $request->boolean('permanent') || $request->input('action') === 'delete_permanent' || $expense->is_archived || $expense->trashed();
 
-        $linkService->removeExpenseFriendLink($expense);
+        DB::transaction(function () use ($expense, $linkService, $permanent): void {
+            // Gracefully disassociate petrol log if linked
+            if ($expense->fuelEntry()->exists()) {
+                $expense->fuelEntry()->update(['expense_id' => null]);
+            }
 
-        AuditService::log(
-            module: 'expense',
-            recordId: $expense->id,
-            action: 'deleted',
-            oldValues: $expense->toArray(),
-            reason: 'Deleted by user'
-        );
+            $linkService->removeExpenseFriendLink($expense);
 
-        if ($request->boolean('permanent') || $request->input('action') === 'delete_permanent' || $expense->is_archived || $expense->trashed()) {
-            $expense->forceDelete();
+            // Income tallies against a deleted expense would keep inflating "tallied" totals
+            $expense->incomeTallies()->delete();
 
+            AuditService::log(
+                module: 'expense',
+                recordId: $expense->id,
+                action: 'deleted',
+                oldValues: $expense->toArray(),
+                reason: 'Deleted by user'
+            );
+
+            $permanent ? $expense->forceDelete() : $expense->delete();
+        });
+
+        if ($permanent) {
             return back()->with('success', 'Expense permanently deleted.');
         }
-
-        $expense->delete();
 
         return redirect()->route('expenses.index')->with('success', 'Expense moved to Historical records.');
     }
