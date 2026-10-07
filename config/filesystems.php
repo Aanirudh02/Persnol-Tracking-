@@ -33,7 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Off: /storage/{path} is the hardened public-image fallback in routes/web.php
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

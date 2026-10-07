@@ -64,6 +64,26 @@ class OdometerGroup extends Model
     }
 
     /**
+     * The currently active cycle for a vehicle. Legacy cycles without a vehicle
+     * are treated as belonging to whichever vehicle is asked for.
+     */
+    public static function activeFor(int $userId, ?int $vehicleId): ?self
+    {
+        return static::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->where(function ($query) use ($vehicleId): void {
+                $query->whereNull('vehicle_id');
+                if ($vehicleId) {
+                    $query->orWhere('vehicle_id', $vehicleId);
+                }
+            })
+            ->orderByRaw('CASE WHEN vehicle_id IS NULL THEN 1 ELSE 0 END')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Recalculate and update the summary metrics and leg distances for this cycle.
      */
     public function recalculateSummary(): void

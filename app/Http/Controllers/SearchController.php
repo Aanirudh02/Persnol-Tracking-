@@ -39,8 +39,9 @@ class SearchController extends Controller
                 ->take(10)->get(),
 
             'friend_transactions' => FriendTransaction::where('user_id', $user->id)
-                ->whereHas('friend', fn ($friendQuery) => $friendQuery->where('name', 'like', "%{$q}%"))
-                ->orWhere('description', 'like', "%{$q}%")
+                ->where(fn ($query) => $query
+                    ->whereHas('friend', fn ($friendQuery) => $friendQuery->where('name', 'like', "%{$q}%"))
+                    ->orWhere('description', 'like', "%{$q}%"))
                 ->with('friend')
                 ->take(10)->get(),
 

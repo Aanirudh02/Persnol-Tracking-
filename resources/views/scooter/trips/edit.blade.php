@@ -130,12 +130,6 @@
             @endif
 
             document.getElementById('trip-plan-form')?.addEventListener('submit', async (e) => {
-                const startLat = document.getElementById('start_latitude');
-                const endLat = document.getElementById('end_latitude');
-                if (startLat?.value && endLat?.value) {
-                    window.syncStopsInput();
-                    return;
-                }
                 e.preventDefault();
                 const form = e.target;
                 const resolve = async (inputId, latId, lngId, addressId) => {
@@ -158,6 +152,7 @@
                 };
                 await resolve('from_label', 'start_latitude', 'start_longitude', 'start_address');
                 await resolve('to_label', 'end_latitude', 'end_longitude', 'end_address');
+                await window.resolveUnpickedStops();
                 form.submit();
             });
 

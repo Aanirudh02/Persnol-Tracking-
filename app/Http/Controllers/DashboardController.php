@@ -16,6 +16,7 @@ use App\Models\Saving;
 use App\Models\ScooterTrip;
 use App\Models\Setting;
 use App\Services\DailyPromptService;
+use App\Services\DailyRegisterService;
 use App\Services\DayTimelineService;
 use App\Services\WalletService;
 use Carbon\Carbon;
@@ -30,7 +31,7 @@ class DashboardController extends Controller
         DailyPromptService $promptService,
         DayTimelineService $timelineService,
         WalletService $walletService,
-        \App\Services\DailyRegisterService $dailyRegisterService
+        DailyRegisterService $dailyRegisterService
     ) {
         $user = $request->user();
         $today = Carbon::today()->toDateString();
@@ -115,24 +116,10 @@ class DashboardController extends Controller
         $wallets = $walletService->displayWallets($user->id);
         $currentBalance = $walletService->currentBalanceTotal($user->id);
 
-        $last7Days = [];
-        $expenseChartData = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $d = Carbon::today()->subDays($i);
-            $dateStr = $d->toDateString();
-            $last7Days[] = $d->format('D, M j');
-            $daySum = (float) Expense::where('user_id', $user->id)
-                ->whereNull('parent_id')
-                ->where('date', $dateStr)
-                ->sum(DB::raw('amount + gst_amount'));
-
-            if ($showPersonalInDashboard) {
-                $daySum += (float) PersonalExpense::where('user_id', $user->id)
-                    ->where('date', $dateStr)
-                    ->sum('amount');
-            }
-            $expenseChartData[] = $daySum;
-        }
+        $initialChart = $this->buildSpendingChart($user->id, '7d', $request, $showPersonalInDashboard);
+        $last7Days = $initialChart['labels'];
+        $expenseChartData = $initialChart['data'];
+        $expenseChartRanges = $initialChart['ranges'];
 
         $prevDate = Carbon::parse($date)->subDay()->toDateString();
         $nextDate = Carbon::parse($date)->addDay()->toDateString();
@@ -261,6 +248,7 @@ class DashboardController extends Controller
             'timeline',
             'last7Days',
             'expenseChartData',
+            'expenseChartRanges',
             'date',
             'prevDate',
             'nextDate',
@@ -282,102 +270,184 @@ class DashboardController extends Controller
 
     public function chartData(Request $request): JsonResponse
     {
-        $user = $request->user();
         $range = $request->get('range', '7d');
-        $labels = [];
-        $data = [];
-        $title = 'Spending Trend';
-        $sub = '';
-
-        if ($range === 'week') {
-            $refDate = $request->filled('date') ? Carbon::parse($request->get('date')) : Carbon::today();
-            $start = $refDate->copy()->startOfWeek();
-            $title = 'This Week Spending';
-            $sub = $start->format('d M').' - '.$start->copy()->endOfWeek()->format('d M Y');
-            for ($i = 0; $i < 7; $i++) {
-                $d = $start->copy()->addDays($i);
-                $labels[] = $d->format('D (d M)');
-                $sum = (float) Expense::where('user_id', $user->id)
-                    ->whereNull('parent_id')
-                    ->where('date', $d->toDateString())
-                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-                    ->sum(DB::raw('amount + gst_amount'));
-                $data[] = $sum;
-            }
-        } elseif ($range === 'month') {
-            $targetMonth = $request->get('month', Carbon::today()->format('Y-m'));
-            $start = Carbon::parse($targetMonth.'-01')->startOfMonth();
-            $daysInMonth = $start->daysInMonth;
-            $title = $start->format('F Y').' Daily Spending';
-            $sub = $start->format('01 M').' - '.$start->copy()->endOfMonth()->format('d M Y');
-            for ($i = 1; $i <= $daysInMonth; $i++) {
-                $d = $start->copy()->day($i);
-                $labels[] = $d->format('d M');
-                $sum = (float) Expense::where('user_id', $user->id)
-                    ->whereNull('parent_id')
-                    ->where('date', $d->toDateString())
-                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-                    ->sum(DB::raw('amount + gst_amount'));
-                $data[] = $sum;
-            }
-        } elseif ($range === 'custom') {
-            $start = Carbon::parse($request->get('start_date', Carbon::today()->subDays(14)->toDateString()));
-            $end = Carbon::parse($request->get('end_date', Carbon::today()->toDateString()));
-            if ($start->gt($end)) {
-                [$start, $end] = [$end, $start];
-            }
-            $diffDays = $start->diffInDays($end);
-            $title = 'Custom Range Spending';
-            $sub = $start->format('d M Y').' - '.$end->format('d M Y');
-
-            $cursor = $start->copy();
-            while ($cursor->lte($end)) {
-                $labels[] = $diffDays > 31 ? $cursor->format('d M') : $cursor->format('D, d M');
-                $sum = (float) Expense::where('user_id', $user->id)
-                    ->whereNull('parent_id')
-                    ->where('date', $cursor->toDateString())
-                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-                    ->sum(DB::raw('amount + gst_amount'));
-                $data[] = $sum;
-                $cursor->addDay();
-            }
-        } elseif ($range === 'year') {
-            $year = (int) $request->get('year', Carbon::today()->year);
-            $title = $year.' Monthly Spending';
-            $sub = 'Jan '.$year.' - Dec '.$year;
-            for ($m = 1; $m <= 12; $m++) {
-                $d = Carbon::create($year, $m, 1)->startOfMonth();
-                $labels[] = $d->format('M Y');
-                $sum = (float) Expense::where('user_id', $user->id)
-                    ->whereNull('parent_id')
-                    ->whereBetween('date', [$d->toDateString(), $d->copy()->endOfMonth()->toDateString()])
-                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-                    ->sum(DB::raw('amount + gst_amount'));
-                $data[] = $sum;
-            }
-        } else {
-            // Default 7 days
-            $title = '7-Day Spending';
-            $sub = 'Daily expenses breakdown';
-            for ($i = 6; $i >= 0; $i--) {
-                $d = Carbon::today()->subDays($i);
-                $labels[] = $d->format('D, M j');
-                $sum = (float) Expense::where('user_id', $user->id)
-                    ->whereNull('parent_id')
-                    ->where('date', $d->toDateString())
-                    ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-                    ->sum(DB::raw('amount + gst_amount'));
-                $data[] = $sum;
-            }
-        }
+        $includePersonal = (bool) Setting::getVal('show_personal_expenses_in_dashboard', false);
+        $chart = $this->buildSpendingChart($request->user()->id, $range, $request, $includePersonal);
+        $total = round(array_sum($chart['data']), 2);
 
         return response()->json([
             'range' => $range,
-            'labels' => $labels,
-            'data' => $data,
-            'total' => round(array_sum($data), 2),
-            'title' => $title,
-            'sub' => $sub.' (Total: ₹'.number_format(array_sum($data), 2).')',
+            'labels' => $chart['labels'],
+            'data' => $chart['data'],
+            'ranges' => $chart['ranges'],
+            'total' => $total,
+            'title' => $chart['title'],
+            'sub' => $chart['sub'].' (Total: ₹'.number_format($total, 2).')',
         ]);
+    }
+
+    /**
+     * Category breakdown (and items) for one clicked chart bar.
+     */
+    public function chartBreakdown(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start' => 'required|date',
+            'end' => 'required|date|after_or_equal:start',
+        ]);
+
+        $userId = $request->user()->id;
+        $includePersonal = (bool) Setting::getVal('show_personal_expenses_in_dashboard', false);
+
+        $expenses = Expense::where('user_id', $userId)
+            ->whereNull('parent_id')
+            ->whereDate('date', '>=', $validated['start'])->whereDate('date', '<=', $validated['end'])
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->with('category')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (Expense $expense) => [
+                'category' => $expense->category?->name ?? 'Uncategorized',
+                'color' => $expense->category?->color ?? '#94a3b8',
+                'description' => $expense->description ?? 'Expense',
+                'date' => $expense->date?->format('d M Y'),
+                'amount' => round((float) $expense->amount + (float) ($expense->gst_amount ?? 0), 2),
+                'url' => route('expenses.show', $expense),
+            ]);
+
+        if ($includePersonal) {
+            $expenses = $expenses->concat(
+                PersonalExpense::where('user_id', $userId)
+                    ->whereDate('date', '>=', $validated['start'])->whereDate('date', '<=', $validated['end'])
+                    ->where('is_archived', false)
+                    ->with('category')
+                    ->orderByDesc('date')
+                    ->get()
+                    ->map(fn (PersonalExpense $expense) => [
+                        'category' => 'Personal · '.($expense->category?->name ?? 'Uncategorized'),
+                        'color' => $expense->category?->color ?? '#ec4899',
+                        'description' => $expense->description ?? 'Personal expense',
+                        'date' => $expense->date?->format('d M Y'),
+                        'amount' => round((float) $expense->amount, 2),
+                        'url' => route('personal-expenses.index'),
+                    ])
+            );
+        }
+
+        $total = round($expenses->sum('amount'), 2);
+        $categories = $expenses->groupBy('category')
+            ->map(fn ($items, $name) => [
+                'name' => $name,
+                'color' => $items->first()['color'],
+                'count' => $items->count(),
+                'total' => round($items->sum('amount'), 2),
+                'percentage' => $total > 0 ? round($items->sum('amount') / $total * 100, 1) : 0,
+            ])
+            ->sortByDesc('total')
+            ->values();
+
+        $start = Carbon::parse($validated['start']);
+        $end = Carbon::parse($validated['end']);
+
+        return response()->json([
+            'title' => $start->isSameDay($end) ? $start->format('D, d M Y') : $start->format('d M').' – '.$end->format('d M Y'),
+            'total' => $total,
+            'categories' => $categories,
+            'expenses' => $expenses->values(),
+        ]);
+    }
+
+    /**
+     * Build the spending chart buckets for a range with one grouped query
+     * (previously one query per day).
+     *
+     * @return array{labels: array<int, string>, data: array<int, float>, ranges: array<int, array{start: string, end: string}>, title: string, sub: string}
+     */
+    private function buildSpendingChart(int $userId, string $range, Request $request, bool $includePersonal): array
+    {
+        $today = Carbon::today();
+        $monthly = false;
+
+        if ($range === 'week') {
+            $refDate = $request->filled('date') ? Carbon::parse($request->get('date')) : $today;
+            $start = $refDate->copy()->startOfWeek();
+            $end = $start->copy()->endOfWeek()->startOfDay();
+            $title = 'This Week Spending';
+            $sub = $start->format('d M').' - '.$end->format('d M Y');
+            $labelFormat = 'D (d M)';
+        } elseif ($range === 'month') {
+            $start = Carbon::parse($request->get('month', $today->format('Y-m')).'-01')->startOfMonth();
+            $end = $start->copy()->endOfMonth()->startOfDay();
+            $title = $start->format('F Y').' Daily Spending';
+            $sub = $start->format('01 M').' - '.$end->format('d M Y');
+            $labelFormat = 'd M';
+        } elseif ($range === 'custom') {
+            $start = Carbon::parse($request->get('start_date', $today->copy()->subDays(14)->toDateString()))->startOfDay();
+            $end = Carbon::parse($request->get('end_date', $today->toDateString()))->startOfDay();
+            if ($start->gt($end)) {
+                [$start, $end] = [$end, $start];
+            }
+            // Keep the chart readable and the work bounded
+            if ($start->diffInDays($end) > 366) {
+                $start = $end->copy()->subDays(366);
+            }
+            $title = 'Custom Range Spending';
+            $sub = $start->format('d M Y').' - '.$end->format('d M Y');
+            $labelFormat = $start->diffInDays($end) > 31 ? 'd M' : 'D, d M';
+        } elseif ($range === 'year') {
+            $year = (int) $request->get('year', $today->year);
+            $start = Carbon::create($year, 1, 1)->startOfDay();
+            $end = Carbon::create($year, 12, 31)->startOfDay();
+            $title = $year.' Monthly Spending';
+            $sub = 'Jan '.$year.' - Dec '.$year;
+            $labelFormat = 'M Y';
+            $monthly = true;
+        } else {
+            $start = $today->copy()->subDays(6);
+            $end = $today->copy();
+            $title = '7-Day Spending';
+            $sub = 'Daily expenses breakdown';
+            $labelFormat = 'D, M j';
+        }
+
+        $dailyTotals = Expense::where('user_id', $userId)
+            ->whereNull('parent_id')
+            ->whereDate('date', '>=', $start->toDateString())->whereDate('date', '<=', $end->toDateString())
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->get(['date', 'amount', 'gst_amount'])
+            ->groupBy(fn (Expense $expense) => $expense->date->toDateString())
+            ->map(fn ($rows) => $rows->sum(fn ($row) => (float) $row->amount + (float) ($row->gst_amount ?? 0)))
+            ->all();
+
+        if ($includePersonal) {
+            PersonalExpense::where('user_id', $userId)
+                ->whereDate('date', '>=', $start->toDateString())->whereDate('date', '<=', $end->toDateString())
+                ->where('is_archived', false)
+                ->get(['date', 'amount'])
+                ->each(function (PersonalExpense $expense) use (&$dailyTotals): void {
+                    $key = $expense->date->toDateString();
+                    $dailyTotals[$key] = ($dailyTotals[$key] ?? 0) + (float) $expense->amount;
+                });
+        }
+
+        $labels = [];
+        $data = [];
+        $ranges = [];
+        $cursor = $start->copy();
+        while ($cursor->lte($end)) {
+            $bucketEnd = $monthly ? $cursor->copy()->endOfMonth()->startOfDay() : $cursor->copy();
+            $sum = 0.0;
+            for ($day = $cursor->copy(); $day->lte($bucketEnd); $day->addDay()) {
+                $sum += (float) ($dailyTotals[$day->toDateString()] ?? 0);
+            }
+
+            $labels[] = $cursor->format($labelFormat);
+            $data[] = round($sum, 2);
+            $ranges[] = ['start' => $cursor->toDateString(), 'end' => $bucketEnd->toDateString()];
+            $cursor = $bucketEnd->copy()->addDay();
+        }
+
+        return compact('labels', 'data', 'ranges', 'title', 'sub');
     }
 }

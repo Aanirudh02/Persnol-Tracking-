@@ -5,14 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use App\Models\DailyRecord;
 use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\FoodEntry;
 use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\Mistake;
 use App\Models\PersonalExpense;
+use App\Models\PersonalExpenseCategory;
 use App\Models\ScooterTrip;
+use App\Services\CloudinaryService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsController extends Controller
@@ -123,6 +127,7 @@ class AnalyticsController extends Controller
         foreach ($binsDefinition as $bin) {
             $matching = $rawTransactions->filter(function ($t) use ($bin) {
                 $amt = (float) $t->amount;
+
                 return $amt >= $bin['min'] && $amt <= $bin['max'];
             });
             $histogramData[] = [
@@ -137,6 +142,7 @@ class AnalyticsController extends Controller
         // Scatter Plot items
         $scatterPoints = $rawTransactions->map(function ($t) use ($startDate) {
             $parsedDate = Carbon::parse($t->date);
+
             return [
                 'x' => $parsedDate->diffInDays(Carbon::parse($startDate)) + 1,
                 'y' => round((float) $t->amount, 2),
@@ -291,7 +297,7 @@ class AnalyticsController extends Controller
                 ->with('category');
 
             if ($date) {
-                $query->where('date', $date);
+                $query->whereDate('date', $date);
                 $title = 'Personal Expenses on '.Carbon::parse($date)->format('d M Y');
                 $color = '#ec4899';
             } elseif ($binMin !== null && $binMax !== null) {
@@ -307,7 +313,7 @@ class AnalyticsController extends Controller
                     $color = '#94a3b8';
                 } else {
                     $query->where('category_id', $categoryId);
-                    $category = \App\Models\PersonalExpenseCategory::find($categoryId);
+                    $category = PersonalExpenseCategory::find($categoryId);
                     $title = ($category?->name ?? 'Personal Category').' Expenses';
                     $color = $category?->color ?? '#ec4899';
                 }
@@ -349,6 +355,7 @@ class AnalyticsController extends Controller
                 'total_formatted' => '₹'.number_format($total, 2),
                 'count' => $items->count(),
                 'expenses' => $expenses,
+                'categories' => $this->categoryBreakdown($expenses),
             ]);
         }
 
@@ -358,7 +365,7 @@ class AnalyticsController extends Controller
             ->with(['category', 'friendSplits.friend']);
 
         if ($date) {
-            $query->where('date', $date);
+            $query->whereDate('date', $date);
             $title = 'Expenses on '.Carbon::parse($date)->format('d M Y');
             $color = '#6366f1';
         } elseif ($binMin !== null && $binMax !== null) {
@@ -374,7 +381,7 @@ class AnalyticsController extends Controller
                 $color = '#94a3b8';
             } else {
                 $query->where('category_id', $categoryId);
-                $category = \App\Models\ExpenseCategory::find($categoryId);
+                $category = ExpenseCategory::find($categoryId);
                 $title = ($category?->name ?? 'Category').' Expenses';
                 $color = $category?->color ?? '#6366f1';
             }
@@ -407,7 +414,7 @@ class AnalyticsController extends Controller
                 'paid_by' => $item->paid_by ?? 'Me',
                 'friend_splits' => $splitsText,
                 'notes' => $item->notes,
-                'receipt_url' => $item->receipt_image ? \App\Services\CloudinaryService::url($item->receipt_image) : null,
+                'receipt_url' => $item->receipt_image ? CloudinaryService::url($item->receipt_image) : null,
                 'view_url' => route('expenses.show', $item),
             ];
         });
@@ -421,6 +428,7 @@ class AnalyticsController extends Controller
             'total_formatted' => '₹'.number_format($total, 2),
             'count' => $items->count(),
             'expenses' => $expenses,
+            'categories' => $this->categoryBreakdown($expenses),
         ]);
     }
 
@@ -553,5 +561,27 @@ class AnalyticsController extends Controller
             'from_date' => $startDate,
             'to_date' => $endDate,
         ];
+    }
+
+    /**
+     * Group drilldown rows by category so a clicked day/bin shows its categories.
+     *
+     * @param  Collection<int, array<string, mixed>>  $expenses
+     * @return Collection<int, array{name: string, color: string, count: int, total: float, percentage: float}>
+     */
+    private function categoryBreakdown(Collection $expenses): Collection
+    {
+        $grandTotal = (float) $expenses->sum('amount');
+
+        return $expenses->groupBy('category')
+            ->map(fn (Collection $rows, string $name) => [
+                'name' => $name,
+                'color' => $rows->first()['category_color'],
+                'count' => $rows->count(),
+                'total' => round((float) $rows->sum('amount'), 2),
+                'percentage' => $grandTotal > 0 ? round($rows->sum('amount') / $grandTotal * 100, 1) : 0,
+            ])
+            ->sortByDesc('total')
+            ->values();
     }
 }

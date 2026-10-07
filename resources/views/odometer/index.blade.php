@@ -55,6 +55,26 @@
             </div>
         @endif
 
+        <!-- Vehicle Switcher -->
+        @if($vehicles->count() > 1)
+            <div class="flex items-center gap-2 overflow-x-auto pb-1">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0">Vehicle</span>
+                @foreach($vehicles as $vehicle)
+                    @php $snapshot = $vehicleSnapshots[$vehicle->id] ?? null; @endphp
+                    <a href="{{ route('odometer.index', ['vehicle_id' => $vehicle->id]) }}"
+                        class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold border transition {{ $selectedVehicle?->id === $vehicle->id ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700' }}">
+                        🛵 {{ $vehicle->name }}
+                        @if($snapshot && $snapshot['last_km'] !== null)
+                            <span class="ml-1 font-mono opacity-75">{{ number_format($snapshot['last_km'], 1) }} km</span>
+                        @endif
+                        @if($snapshot['has_active_cycle'] ?? false)
+                            <span class="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 align-middle" title="Active cycle"></span>
+                        @endif
+                    </a>
+                @endforeach
+            </div>
+        @endif
+
         <!-- High-level Metric Cards -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -62,7 +82,7 @@
                 <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                     {{ number_format($latestOdometer, 1) }} <span class="text-sm font-medium text-slate-400">km</span>
                 </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Current meter reading</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $selectedVehicle?->name ?? 'Current' }} meter reading</p>
             </div>
 
             <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -70,7 +90,7 @@
                 <div class="text-2xl font-bold text-sky-600 dark:text-sky-400 mt-1">
                     {{ number_format($totalKmLogged, 1) }} <span class="text-sm font-medium text-slate-400">km</span>
                 </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Across all completed cycles</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ $selectedVehicle?->name ?? 'All' }} cycles</p>
             </div>
 
             <div class="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -271,13 +291,27 @@
                 @csrf
                 <input type="hidden" name="reading_type" id="reading_type" value="{{ $activeGroup ? 'intermediate' : 'source' }}">
 
-                <!-- Common Row: Odometer KM, Date, Time -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <!-- Common Row: Vehicle, Odometer KM, Date, Time -->
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div>
+                        <label for="vehicle_id" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                            Vehicle
+                        </label>
+                        <select name="vehicle_id" id="vehicle_id" onchange="window.refreshOdometerPreview(true)"
+                            class="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            @foreach($vehicles as $vehicle)
+                                <option value="{{ $vehicle->id }}" @selected((int) old('vehicle_id', $selectedVehicle?->id) === $vehicle->id)>
+                                    {{ $vehicle->name }} ({{ $vehicle->model ?? 'Scooter' }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
                     <div>
                         <label for="odometer_km" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                             Odometer Reading (km) <span class="text-rose-500">*</span>
                         </label>
-                        <input type="number" step="0.1" name="odometer_km" id="odometer_km" required
+                        <input type="number" step="0.1" name="odometer_km" id="odometer_km" required oninput="window.refreshOdometerPreview(false)"
                             class="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             placeholder="e.g. 38513.6"
                             value="{{ old('odometer_km') }}">
@@ -302,6 +336,25 @@
                         <input type="time" name="reading_time" id="reading_time"
                             class="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             value="{{ old('reading_time', now()->format('H:i')) }}">
+                    </div>
+                </div>
+
+                <!-- Live preview: previous reading of this vehicle → this entry -->
+                <div id="odometer-preview" class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs">
+                    <div>
+                        <span class="block text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-300">Previous reading</span>
+                        <span id="preview-previous-km" class="block text-base font-bold text-slate-900 dark:text-white">—</span>
+                        <span id="preview-previous-meta" class="block text-[11px] text-slate-500 dark:text-slate-400">No readings yet for this vehicle</span>
+                    </div>
+                    <div>
+                        <span class="block text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-300">This entry</span>
+                        <span id="preview-current-km" class="block text-base font-bold text-slate-900 dark:text-white">—</span>
+                        <span class="block text-[11px] text-slate-500 dark:text-slate-400">What you are entering now</span>
+                    </div>
+                    <div>
+                        <span class="block text-[11px] uppercase tracking-wider font-semibold text-indigo-500 dark:text-indigo-300">Distance since previous</span>
+                        <span id="preview-delta-km" class="block text-base font-bold text-emerald-600 dark:text-emerald-400">—</span>
+                        <span id="preview-cycle-meta" class="block text-[11px] text-slate-500 dark:text-slate-400"></span>
                     </div>
                 </div>
 
@@ -374,20 +427,6 @@
                                 class="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                 placeholder="e.g. 25 (auto-computes avg speed km/h)">
                         </div>
-
-                        <div>
-                            <label for="vehicle_id" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                                Vehicle
-                            </label>
-                            <select name="vehicle_id" id="vehicle_id"
-                                class="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                                @foreach($vehicles as $vehicle)
-                                    <option value="{{ $vehicle->id }}" {{ $defaultVehicle?->id === $vehicle->id ? 'selected' : '' }}>
-                                        {{ $vehicle->name }} ({{ $vehicle->model ?? 'Scooter' }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
                     </div>
                 </div>
 
@@ -455,6 +494,118 @@
                     </button>
                 </div>
             </form>
+        </div>
+
+        <!-- READINGS LOG: every entry with the previous reading of the same vehicle -->
+        <div id="readings-log" class="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 scroll-mt-6">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Odometer Log</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Every reading with the previous reading of the same vehicle and the distance covered since.
+                    </p>
+                </div>
+                <form action="{{ route('odometer.index') }}#readings-log" method="GET" class="flex flex-wrap items-center gap-2 text-xs">
+                    @if($selectedVehicle)
+                        <input type="hidden" name="vehicle_id" value="{{ $selectedVehicle->id }}">
+                    @endif
+                    <select name="log_vehicle" class="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                        <option value="">All vehicles</option>
+                        @foreach($vehicles as $vehicle)
+                            <option value="{{ $vehicle->id }}" @selected((int) request('log_vehicle') === $vehicle->id)>{{ $vehicle->name }}</option>
+                        @endforeach
+                    </select>
+                    <select name="type" class="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                        <option value="">All types</option>
+                        @foreach(['source' => 'Source', 'intermediate' => 'Trip leg', 'ending' => 'Ending'] as $typeValue => $typeLabel)
+                            <option value="{{ $typeValue }}" @selected(request('type') === $typeValue)>{{ $typeLabel }}</option>
+                        @endforeach
+                    </select>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search trip, place, notes"
+                        class="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                    <button type="submit" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold cursor-pointer">Filter</button>
+                    @if(request()->hasAny(['log_vehicle', 'type', 'search']))
+                        <a href="{{ route('odometer.index', array_filter(['vehicle_id' => $selectedVehicle?->id])) }}#readings-log" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold">Reset</a>
+                    @endif
+                </form>
+            </div>
+
+            <div class="overflow-x-auto -mx-6 px-6">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 dark:bg-slate-900/60 text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                            <th class="py-3 px-3">Date</th>
+                            <th class="py-3 px-3">Vehicle</th>
+                            <th class="py-3 px-3">Type</th>
+                            <th class="py-3 px-3 text-right">Previous</th>
+                            <th class="py-3 px-3 text-right">This Entry</th>
+                            <th class="py-3 px-3 text-right">Distance</th>
+                            <th class="py-3 px-3">Trip / Route</th>
+                            <th class="py-3 px-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @forelse($allReadings as $reading)
+                            @php
+                                $distanceFromPrevious = $reading->distance_from_previous;
+                                $editPayload = $reading->only(['id', 'odometer_km', 'reading_date', 'reading_time', 'trip_name', 'source_location', 'destination', 'duration_minutes', 'notes']);
+                            @endphp
+                            <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-900/40">
+                                <td class="py-2.5 px-3 whitespace-nowrap font-mono text-slate-600 dark:text-slate-300">
+                                    {{ $reading->reading_date?->format('d M Y') }}
+                                    <span class="block text-[10px] text-slate-400">{{ $reading->reading_time ? \Carbon\Carbon::parse($reading->reading_time)->format('h:i A') : '' }}</span>
+                                </td>
+                                <td class="py-2.5 px-3 whitespace-nowrap text-slate-700 dark:text-slate-200">{{ $reading->vehicle?->name ?? '—' }}</td>
+                                <td class="py-2.5 px-3">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $reading->reading_type === 'source' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : ($reading->reading_type === 'ending' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' : 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300') }}">
+                                        {{ $reading->reading_type === 'intermediate' ? 'Leg' : ucfirst($reading->reading_type) }}
+                                    </span>
+                                </td>
+                                <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap text-slate-500 dark:text-slate-400">
+                                    @if($reading->previous_odometer_km !== null)
+                                        {{ number_format($reading->previous_odometer_km, 1) }} km
+                                        <span class="block text-[10px] text-slate-400">{{ \Carbon\Carbon::parse($reading->previous_reading_date)->format('d M') }}</span>
+                                    @else
+                                        <span class="text-slate-400">First reading</span>
+                                    @endif
+                                </td>
+                                <td class="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap text-slate-900 dark:text-white">{{ number_format($reading->odometer_km, 1) }} km</td>
+                                <td class="py-2.5 px-3 text-right font-mono whitespace-nowrap">
+                                    @if($distanceFromPrevious === null)
+                                        <span class="text-slate-400">—</span>
+                                    @elseif($distanceFromPrevious < 0)
+                                        <span class="font-semibold text-rose-600 dark:text-rose-400" title="Lower than the previous reading — check for a typo">{{ number_format($distanceFromPrevious, 1) }} km ⚠️</span>
+                                    @else
+                                        <span class="font-semibold text-emerald-600 dark:text-emerald-400">+{{ number_format($distanceFromPrevious, 1) }} km</span>
+                                    @endif
+                                </td>
+                                <td class="py-2.5 px-3 text-slate-600 dark:text-slate-300 max-w-[220px]">
+                                    <span class="block truncate font-medium">{{ $reading->trip_name ?: '—' }}</span>
+                                    @if($reading->source_location || $reading->destination)
+                                        <span class="block truncate text-[10px] text-slate-400">{{ $reading->source_location ?: '—' }} → {{ $reading->destination ?: '—' }}</span>
+                                    @endif
+                                </td>
+                                <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                                    @if($reading->image_url)
+                                        <button type="button" onclick="openPhotoModal('{{ $reading->image_url }}', '{{ addslashes($reading->trip_name ?: 'Odometer Reading') }}', '{{ number_format($reading->odometer_km, 1) }} km', '{{ $reading->reading_date?->format('d M Y') }}')" class="mr-2 text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer">Photo</button>
+                                    @endif
+                                    <button type="button" onclick='openEditReadingModal(@json($editPayload))' class="mr-2 text-slate-600 dark:text-slate-300 font-semibold cursor-pointer">Edit</button>
+                                    <form action="{{ route('odometer.readings.destroy', $reading) }}" method="POST" class="inline" onsubmit="return confirm('Delete this reading?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-rose-600 font-semibold cursor-pointer">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="8" class="py-8 text-center text-slate-400">No odometer readings found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                {{ $allReadings->fragment('readings-log')->links() }}
+            </div>
         </div>
 
         <!-- COMPLETED CYCLES HISTORY -->
@@ -585,10 +736,54 @@
             }
         }
 
+        const vehicleSnapshots = @json($vehicleSnapshots);
+
+        // Live "previous reading → this entry" preview for the selected vehicle
+        window.refreshOdometerPreview = function (vehicleChanged) {
+            const vehicleId = document.getElementById('vehicle_id')?.value;
+            const snapshot = vehicleSnapshots[vehicleId] || null;
+            const current = parseFloat(document.getElementById('odometer_km').value);
+            const fmt = (km) => Number(km).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' km';
+
+            const prevKmEl = document.getElementById('preview-previous-km');
+            const prevMetaEl = document.getElementById('preview-previous-meta');
+            const currentEl = document.getElementById('preview-current-km');
+            const deltaEl = document.getElementById('preview-delta-km');
+            const cycleMetaEl = document.getElementById('preview-cycle-meta');
+
+            const hasPrevious = snapshot && snapshot.last_km !== null;
+            prevKmEl.textContent = hasPrevious ? fmt(snapshot.last_km) : '—';
+            prevMetaEl.textContent = hasPrevious
+                ? `${snapshot.name} · ${snapshot.last_date} (${snapshot.last_type === 'intermediate' ? 'leg' : snapshot.last_type})`
+                : 'No readings yet for this vehicle';
+            currentEl.textContent = isNaN(current) ? '—' : fmt(current);
+
+            if (hasPrevious && !isNaN(current)) {
+                const delta = current - snapshot.last_km;
+                deltaEl.textContent = (delta >= 0 ? '+' : '') + fmt(delta);
+                deltaEl.className = 'block text-base font-bold ' + (delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400');
+            } else {
+                deltaEl.textContent = '—';
+                deltaEl.className = 'block text-base font-bold text-emerald-600 dark:text-emerald-400';
+            }
+
+            cycleMetaEl.textContent = snapshot?.has_active_cycle
+                ? `Active cycle: ${snapshot.active_title}`
+                : 'No active cycle — record a Source reading first';
+            if (hasPrevious && !isNaN(current) && current < snapshot.last_km) {
+                cycleMetaEl.textContent = '⚠️ Lower than the previous reading — check for a typo';
+            }
+
+            if (vehicleChanged) {
+                switchToTab(snapshot?.has_active_cycle ? 'intermediate' : 'source');
+            }
+        };
+
         // Initialize with proper active tab on page load
         document.addEventListener('DOMContentLoaded', () => {
             const hasActive = @json((bool)$activeGroup);
             switchToTab(hasActive ? 'intermediate' : 'source');
+            window.refreshOdometerPreview(false);
         });
 
         function openEditReadingModal(reading) {

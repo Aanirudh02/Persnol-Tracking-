@@ -8,6 +8,7 @@ use App\Models\ExpenseCategory;
 use App\Models\FuelEntry;
 use App\Models\Vehicle;
 use App\Services\AuditService;
+use App\Services\CloudinaryService;
 use App\Services\FinanceService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -66,6 +67,19 @@ class PetrolController extends Controller
         $avgPricePerLitre = $totalLitres > 0 ? round($totalSpent / $totalLitres, 2) : 0;
         $latestOdometer = (clone $baseStatsQuery)->max('odometer') ?? 0;
 
+        $fillLog = $this->buildFillLog($user->id);
+
+        // Last fill with an odometer per vehicle, used by the live preview in the add form
+        $vehicleFuelSnapshots = $vehicles->mapWithKeys(function (Vehicle $vehicle) use ($fillLog) {
+            $last = collect($fillLog)->where('vehicle_id', $vehicle->id)->whereNotNull('odometer')->last();
+
+            return [$vehicle->id => [
+                'name' => $vehicle->name,
+                'last_odometer' => $last['odometer'] ?? null,
+                'last_date' => isset($last['date']) ? Carbon::parse($last['date'])->format('d M Y') : null,
+            ]];
+        });
+
         return view('scooter.petrol.index', compact(
             'entries',
             'vehicles',
@@ -73,8 +87,56 @@ class PetrolController extends Controller
             'totalSpent',
             'totalLitres',
             'avgPricePerLitre',
-            'latestOdometer'
+            'latestOdometer',
+            'fillLog',
+            'vehicleFuelSnapshots'
         ));
+    }
+
+    /**
+     * Chronological fill log per vehicle: previous odometer, distance since the
+     * previous fill and full-tank mileage (distance ÷ litres of this fill).
+     *
+     * @return array<int, array{vehicle_id: int|null, date: string, odometer: int|null, previous_odometer: int|null, previous_date: string|null, distance: int|null, mileage: float|null}>
+     */
+    private function buildFillLog(int $userId): array
+    {
+        $fills = FuelEntry::where('user_id', $userId)
+            ->orderBy('date')
+            ->orderByRaw("COALESCE(time, '00:00:00')")
+            ->orderBy('id')
+            ->get(['id', 'vehicle_id', 'date', 'time', 'odometer', 'litres']);
+
+        $lastByVehicle = [];
+        $log = [];
+
+        foreach ($fills as $fill) {
+            $vehicleKey = $fill->vehicle_id ?? 0;
+            $previous = $lastByVehicle[$vehicleKey] ?? null;
+            $distance = null;
+            $mileage = null;
+
+            if ($fill->odometer && $previous && $fill->odometer > $previous['odometer']) {
+                $distance = $fill->odometer - $previous['odometer'];
+                $mileage = (float) $fill->litres > 0 ? round($distance / (float) $fill->litres, 1) : null;
+            }
+
+            $log[$fill->id] = [
+                'vehicle_id' => $fill->vehicle_id,
+                'date' => $fill->date->toDateString(),
+                'odometer' => $fill->odometer,
+                'previous_odometer' => $previous['odometer'] ?? null,
+                'previous_date' => $previous['date'] ?? null,
+                'distance' => $distance,
+                'mileage' => $mileage,
+            ];
+
+            if ($fill->odometer) {
+                $lastByVehicle[$vehicleKey] = ['odometer' => $fill->odometer, 'date' => $fill->date->toDateString()];
+            }
+        }
+
+        return $log;
     }
 
     public function store(Request $request)
@@ -98,11 +160,30 @@ class PetrolController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('receipt_image')) {
-            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'petrol_receipts');
+            $imagePath = app(CloudinaryService::class)->upload($request->file('receipt_image'), 'petrol_receipts');
         }
 
         $pricePerLitre = round($validated['amount'] / $validated['litres'], 2);
-        $vehicleId = $validated['vehicle_id'] ?? $defaultVehicle?->id;
+        $vehicleId = isset($validated['vehicle_id'])
+            ? Vehicle::where('user_id', $user->id)->findOrFail($validated['vehicle_id'])->id
+            : $defaultVehicle?->id;
+
+        if (! empty($validated['odometer'])) {
+            $previousFill = FuelEntry::where('user_id', $user->id)
+                ->where('vehicle_id', $vehicleId)
+                ->whereNotNull('odometer')
+                ->where('date', '<=', $validated['date'])
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($previousFill && (int) $validated['odometer'] < $previousFill->odometer) {
+                return back()->withInput()->with(
+                    'error',
+                    "Odometer {$validated['odometer']} km is lower than the previous fill ({$previousFill->odometer} km on ".$previousFill->date->format('d M Y').') for this vehicle.'
+                );
+            }
+        }
 
         $fuel = DB::transaction(function () use ($request, $validated, $imagePath, $pricePerLitre, $vehicleId): FuelEntry {
             $dailyRecord = DailyRecord::firstOrCreate([
@@ -135,7 +216,12 @@ class PetrolController extends Controller
 
         AuditService::log('fuel', $fuel->id, 'created', null, $fuel->toArray(), 'Petrol record created');
 
-        return redirect()->route('petrol.index')->with('success', '⛽ Petrol entry recorded successfully!');
+        $logEntry = $this->buildFillLog($user->id)[$fuel->id] ?? null;
+        $sinceLastFill = $logEntry && $logEntry['distance']
+            ? " {$logEntry['distance']} km since previous fill ({$logEntry['previous_odometer']} km)".($logEntry['mileage'] ? " · {$logEntry['mileage']} km/L." : '.')
+            : '';
+
+        return redirect()->route('petrol.index')->with('success', '⛽ Petrol entry recorded successfully!'.$sinceLastFill);
     }
 
     public function edit(FuelEntry $petrol, FinanceService $financeService)
@@ -324,28 +410,14 @@ class PetrolController extends Controller
         $totalLitres = round((float) $entries->sum('litres'), 2);
         $avgPricePerLitre = $totalLitres > 0 ? round($totalSpent / $totalLitres, 2) : 0.0;
 
-        // Compute mileage between consecutive fill-ups
-        $enhancedEntries = collect();
-        $lastOdometer = null;
-        foreach ($entries as $entry) {
-            $distance = null;
-            $mileage = null;
-            if ($entry->odometer && $lastOdometer && $entry->odometer > $lastOdometer) {
-                $distance = $entry->odometer - $lastOdometer;
-                if ($entry->litres > 0) {
-                    $mileage = round($distance / $entry->litres, 1);
-                }
-            }
-            if ($entry->odometer) {
-                $lastOdometer = $entry->odometer;
-            }
-
-            $enhancedEntries->push([
-                'entry' => $entry,
-                'distance' => $distance,
-                'mileage' => $mileage,
-            ]);
-        }
+        // Mileage between consecutive fill-ups of the same vehicle (not across vehicles,
+        // and not reset by the period filter cutting off the previous fill)
+        $fillLog = $this->buildFillLog($user->id);
+        $enhancedEntries = $entries->map(fn (FuelEntry $entry) => [
+            'entry' => $entry,
+            'distance' => $fillLog[$entry->id]['distance'] ?? null,
+            'mileage' => $fillLog[$entry->id]['mileage'] ?? null,
+        ]);
 
         $entriesDesc = $enhancedEntries->reverse()->values();
 

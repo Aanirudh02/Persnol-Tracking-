@@ -693,7 +693,7 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                         <div>
                             <h2 class="font-bold text-sm text-slate-900 dark:text-white" id="chart-title">7-Day Spending</h2>
-                            <p class="text-xs text-slate-500" id="chart-sub">Daily expenses breakdown</p>
+                            <p class="text-xs text-slate-500" id="chart-sub">Daily expenses breakdown · click a bar for categories</p>
                         </div>
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px] font-bold">
@@ -730,7 +730,7 @@
                         </button>
                     </div>
                     <div class="h-52 w-full">
-                        <canvas id="weeklyExpenseChart"></canvas>
+                        <canvas id="weeklyExpenseChart" class="cursor-pointer"></canvas>
                     </div>
                 </div>
 
@@ -788,6 +788,7 @@
     <!-- Chart.js Init & Dynamic Switcher Script -->
     <script>
         let expenseChartInstance = null;
+        let expenseChartRanges = [];
 
         document.addEventListener('DOMContentLoaded', function () {
             const ctx = document.getElementById('weeklyExpenseChart');
@@ -795,6 +796,7 @@
 
             const labels = @json($last7Days);
             const data = @json($expenseChartData);
+            expenseChartRanges = @json($expenseChartRanges);
 
             expenseChartInstance = new Chart(ctx, {
                 type: 'bar',
@@ -811,7 +813,8 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: { callbacks: { footer: () => 'Click to see categories' } }
                     },
                     scales: {
                         x: {
@@ -825,10 +828,89 @@
                                 font: { size: 10 }
                             }
                         }
+                    },
+                    onClick: (evt, elements) => {
+                        if (!elements.length) return;
+                        const bucket = expenseChartRanges[elements[0].index];
+                        if (bucket) openChartBreakdown(bucket.start, bucket.end);
                     }
                 }
             });
         });
+
+        let chartBreakdownItems = [];
+
+        async function openChartBreakdown(start, end) {
+            const modal = document.getElementById('chart-breakdown-modal');
+            const categoriesEl = document.getElementById('chart-breakdown-categories');
+            document.getElementById('chart-breakdown-title').textContent = 'Loading…';
+            document.getElementById('chart-breakdown-total').textContent = '';
+            categoriesEl.innerHTML = '<div class="py-6 text-center text-xs text-slate-400">Loading categories…</div>';
+            document.getElementById('chart-breakdown-items').innerHTML = '';
+            modal.classList.remove('hidden');
+
+            try {
+                const res = await fetch(`{{ route('dashboard.chart-breakdown') }}?start=${start}&end=${end}`, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('Request failed');
+                const data = await res.json();
+                chartBreakdownItems = data.expenses || [];
+
+                document.getElementById('chart-breakdown-title').textContent = data.title;
+                document.getElementById('chart-breakdown-total').textContent = '₹' + Number(data.total).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                if (!data.categories.length) {
+                    categoriesEl.innerHTML = '<div class="py-6 text-center text-xs text-slate-400">No expenses recorded for this period.</div>';
+                    return;
+                }
+
+                categoriesEl.innerHTML = data.categories.map((cat, i) => `
+                    <button type="button" data-category-index="${i}" class="chart-breakdown-cat w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 hover:border-indigo-300 flex items-center justify-between text-xs cursor-pointer transition">
+                        <span class="flex items-center gap-2 min-w-0">
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color:${escapeChartHtml(cat.color)}"></span>
+                            <span class="font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeChartHtml(cat.name)}</span>
+                            <span class="text-[10px] text-slate-400">(${cat.count}x)</span>
+                        </span>
+                        <span class="text-right shrink-0">
+                            <span class="font-bold text-slate-900 dark:text-white">₹${Number(cat.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            <span class="block text-[10px] text-slate-400">${cat.percentage}%</span>
+                        </span>
+                    </button>
+                `).join('');
+
+                categoriesEl.querySelectorAll('.chart-breakdown-cat').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        categoriesEl.querySelectorAll('.chart-breakdown-cat').forEach(b => b.classList.remove('ring-2', 'ring-indigo-500'));
+                        btn.classList.add('ring-2', 'ring-indigo-500');
+                        renderChartBreakdownItems(data.categories[btn.dataset.categoryIndex].name);
+                    });
+                });
+                renderChartBreakdownItems(null);
+            } catch (e) {
+                categoriesEl.innerHTML = '<div class="py-6 text-center text-xs text-rose-500">Unable to load the breakdown. Please try again.</div>';
+            }
+        }
+
+        function renderChartBreakdownItems(categoryName) {
+            const items = categoryName ? chartBreakdownItems.filter(item => item.category === categoryName) : chartBreakdownItems;
+            document.getElementById('chart-breakdown-items-title').textContent = categoryName ? `${categoryName} items` : 'All items';
+            document.getElementById('chart-breakdown-items').innerHTML = items.map(item => `
+                <a href="${item.url}" class="py-2 flex items-center justify-between gap-3 text-xs hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg px-2">
+                    <span class="min-w-0">
+                        <span class="block font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeChartHtml(item.description)}</span>
+                        <span class="block text-[10px] text-slate-400">${escapeChartHtml(item.category)} · ${escapeChartHtml(item.date)}</span>
+                    </span>
+                    <span class="font-bold text-slate-900 dark:text-white shrink-0">₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </a>
+            `).join('') || '<div class="py-4 text-center text-xs text-slate-400">No items.</div>';
+        }
+
+        function closeChartBreakdown() {
+            document.getElementById('chart-breakdown-modal').classList.add('hidden');
+        }
+
+        function escapeChartHtml(value) {
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
 
         function switchChartRange(range, btn, queryParams = '') {
             document.querySelectorAll('.chart-range-btn').forEach(b => {
@@ -846,6 +928,7 @@
                     if (!expenseChartInstance) return;
                     expenseChartInstance.data.labels = res.labels;
                     expenseChartInstance.data.datasets[0].data = res.data;
+                    expenseChartRanges = res.ranges || [];
                     expenseChartInstance.update();
 
                     document.getElementById('chart-title').textContent = res.title || 'Spending Trend';
@@ -865,6 +948,26 @@
             switchChartRange('custom', null, `start_date=${start}&end_date=${end}`);
         }
     </script>
+
+    <!-- Chart Bar Category Breakdown Modal -->
+    <div id="chart-breakdown-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" onclick="if(event.target === this) closeChartBreakdown()">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>📊</span> <span id="chart-breakdown-title">Spending</span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Spend by category · <span id="chart-breakdown-total" class="font-bold text-rose-600 dark:text-rose-400"></span></p>
+                </div>
+                <button type="button" onclick="closeChartBreakdown()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold cursor-pointer">&times;</button>
+            </div>
+            <div id="chart-breakdown-categories" class="space-y-1.5"></div>
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <h4 id="chart-breakdown-items-title" class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">All items</h4>
+                <div id="chart-breakdown-items" class="divide-y divide-slate-100 dark:divide-slate-800 max-h-60 overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Monthly Breakdown Modal -->
     <div id="monthly-breakdown-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">

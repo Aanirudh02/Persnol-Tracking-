@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }} - {{ config('app.name', 'LifeTracker') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('head')
 </head>
 <body class="app-body min-h-screen bg-canvas text-slate-900 antialiased font-sans overflow-x-hidden selection:bg-slate-900 selection:text-white">
 

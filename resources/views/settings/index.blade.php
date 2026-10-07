@@ -433,9 +433,13 @@
                     @foreach($expenseCategories ?? [] as $cat)
                         <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
                             <span>{{ $cat->name }} @if($cat->is_archived)<span class="text-xs text-slate-400">Archived</span>@endif</span>
+                            @if(($cat->user_id && (int) $cat->user_id === auth()->id()) || auth()->user()->isAdmin())
                             <form action="{{ route('categories.archive', ['type' => 'expense', 'id' => $cat->id]) }}" method="POST">@csrf
                                 <button class="text-xs font-semibold text-slate-600 hover:underline">{{ $cat->is_archived ? 'Unarchive' : 'Archive' }}</button>
                             </form>
+                            @else
+                                <span class="text-xs text-slate-400">Shared</span>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -444,9 +448,13 @@
                     @foreach($incomeCategories ?? [] as $cat)
                         <div class="flex items-center justify-between py-1.5 border-b border-slate-50">
                             <span>{{ $cat->name }} @if($cat->is_archived)<span class="text-xs text-slate-400">Archived</span>@endif</span>
+                            @if(($cat->user_id && (int) $cat->user_id === auth()->id()) || auth()->user()->isAdmin())
                             <form action="{{ route('categories.archive', ['type' => 'income', 'id' => $cat->id]) }}" method="POST">@csrf
                                 <button class="text-xs font-semibold text-slate-600 hover:underline">{{ $cat->is_archived ? 'Unarchive' : 'Archive' }}</button>
                             </form>
+                            @else
+                                <span class="text-xs text-slate-400">Shared</span>
+                            @endif
                         </div>
                     @endforeach
                 </div>

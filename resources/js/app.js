@@ -199,8 +199,8 @@ window.bindPlaceAutocomplete = function(inputId, suggestId, hiddenIds, onPick) {
                 : await fetch(`/geo/search?q=${encodeURIComponent(q)}`).then((response) => response.json());
             if (!Array.isArray(data) || !data[0]) return;
 
+            // Enter picks the best match only; submitting here saved half-filled trips
             applyPlace(data[0].label, data[0].lat, data[0].lng);
-            input.form?.requestSubmit();
         } catch (e) {
             latestResults = [];
         }
@@ -291,8 +291,35 @@ function _updateDirMapsLink(slat, slng, elat, elng, stops) {
     dirMaps.classList.remove('hidden');
 }
 
+// ─── Resolve stops the user typed but never picked from suggestions ─────────
+window.resolveUnpickedStops = async function() {
+    const rows = document.querySelectorAll('.stop-row');
+    for (const row of rows) {
+        const latEl = row.querySelector('[data-stop-lat]');
+        const text = row.querySelector('input[type="text"]')?.value?.trim() || '';
+        if (latEl?.value || text.length < 3) continue;
+        try {
+            const data = await fetch(`/geo/search?q=${encodeURIComponent(text)}`).then((r) => r.json());
+            if (Array.isArray(data) && data[0]) {
+                row.querySelector('input[type="text"]').value = data[0].label;
+                latEl.value = data[0].lat;
+                row.querySelector('[data-stop-lng]').value = data[0].lng;
+                row.querySelector('[data-stop-label]').value = data[0].label;
+            }
+        } catch (e) {}
+    }
+    window.syncStopsInput();
+};
+
+function _escapeAttr(value) {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+let _tripPreviewToken = 0;
+
 // ─── Main preview & map updater ────────────────────────────────────────────
 window.previewTripRoute = async function(mileage = 40) {
+    const requestToken = ++_tripPreviewToken;
     const slat = document.getElementById('start_latitude')?.value;
     const slng = document.getElementById('start_longitude')?.value;
     const elat = document.getElementById('end_latitude')?.value;
@@ -328,8 +355,9 @@ window.previewTripRoute = async function(mileage = 40) {
     try {
         const res = await fetch(`/geo/route?waypoints=${encodeURIComponent(JSON.stringify(waypoints))}`);
         const data = await res.json();
+        if (requestToken !== _tripPreviewToken) return; // a newer preview is already running
         const oneWay = data.distance_km;
-        if (oneWay == null) return;
+        if (oneWay == null) throw new Error('No route distance');
 
         const toAndFro = document.querySelector('input[name="to_and_fro"]')?.checked;
         const total = toAndFro ? oneWay * 2 : oneWay;
@@ -340,9 +368,16 @@ window.previewTripRoute = async function(mileage = 40) {
         document.getElementById('preview-total').textContent = total.toFixed(2);
         document.getElementById('preview-litres').textContent = litres.toFixed(3);
         _updateDirMapsLink(slat, slng, elat, elng, stops);
-    } catch (e) {}
+    } catch (e) {
+        if (requestToken !== _tripPreviewToken) return;
+        if (hint) {
+            hint.textContent = 'Route distance unavailable right now — the trip will be saved with a straight-line estimate.';
+            hint.classList.remove('hidden');
+        }
+    }
 
     // ── Map preview (Leaflet / OSM) ──
+    if (requestToken !== _tripPreviewToken) return;
     if (!_ensureTripMap()) return;
     _clearTripMapOverlay();
 
@@ -401,11 +436,11 @@ window.addStopRow = function(initialLabel = '', initialLat = '', initialLng = ''
                 class="w-full px-3 py-2.5 bg-slate-50 border border-amber-300 rounded-xl text-sm"
                 autocomplete="off"
                 placeholder="e.g. Gandhipuram Bus Stand, Coimbatore"
-                value="${initialLabel}"
+                value="${_escapeAttr(initialLabel)}"
             >
-            <input type="hidden" data-stop-lat value="${initialLat}">
-            <input type="hidden" data-stop-lng value="${initialLng}">
-            <input type="hidden" data-stop-label value="${initialLabel}">
+            <input type="hidden" data-stop-lat value="${_escapeAttr(initialLat)}">
+            <input type="hidden" data-stop-lng value="${_escapeAttr(initialLng)}">
+            <input type="hidden" data-stop-label value="${_escapeAttr(initialLabel)}">
             <div id="${suggestId}" class="geo-suggest hidden"></div>
         </div>
         <button type="button" class="remove-stop-btn" title="Remove stop" onclick="window.removeStopRow(this)">✕</button>

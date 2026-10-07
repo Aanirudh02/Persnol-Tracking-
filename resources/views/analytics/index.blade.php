@@ -718,6 +718,9 @@
                 </div>
             </div>
 
+            <!-- Category breakdown for the clicked bar / point / slice (click a chip to filter) -->
+            <div id="modal-category-chips" class="hidden px-5 py-3 border-b border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5"></div>
+
             <!-- Modal Content List -->
             <div id="modal-expenses-list" class="p-4 sm:p-6 overflow-y-auto space-y-2.5 flex-1 divide-y divide-slate-100 dark:divide-slate-800/80">
                 <div class="py-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
@@ -1362,6 +1365,7 @@
 
             // Reset modal state
             if (filterInput) filterInput.value = '';
+            renderModalCategoryChips([]);
             colorBar.style.backgroundColor = color || '#6366f1';
             titleEl.textContent = categoryName ? `${categoryName}` : (date ? `Expenses on ${date}` : 'Expense Group');
             subtitleEl.textContent = 'Fetching transactions from database...';
@@ -1403,6 +1407,7 @@
 
                 currentGroupExpenses = data.expenses || [];
                 renderModalExpenses(currentGroupExpenses);
+                renderModalCategoryChips(data.categories || []);
             } catch (err) {
                 console.error(err);
                 listEl.innerHTML = `
@@ -1411,6 +1416,39 @@
                     </div>
                 `;
             }
+        }
+
+        function renderModalCategoryChips(categories) {
+            const chipsEl = document.getElementById('modal-category-chips');
+            if (!chipsEl) return;
+
+            // A single-category drilldown (bar / pie slice) needs no chips
+            if (categories.length < 2) {
+                chipsEl.classList.add('hidden');
+                chipsEl.innerHTML = '';
+                return;
+            }
+
+            const chipClass = 'modal-cat-chip px-2.5 py-1 rounded-full border text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer transition';
+            chipsEl.innerHTML = `<button type="button" data-category="" class="${chipClass} bg-slate-900 text-white border-slate-900">All</button>` +
+                categories.map(cat => `
+                    <button type="button" data-category="${escapeHtml(cat.name)}" class="${chipClass} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200">
+                        <span class="w-2 h-2 rounded-full" style="background-color:${escapeHtml(cat.color)}"></span>
+                        ${escapeHtml(cat.name)} · ₹${Number(cat.total).toLocaleString()} (${cat.percentage}%)
+                    </button>
+                `).join('');
+            chipsEl.classList.remove('hidden');
+
+            chipsEl.querySelectorAll('.modal-cat-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    chipsEl.querySelectorAll('.modal-cat-chip').forEach(c => {
+                        c.classList.remove('bg-slate-900', 'text-white', 'border-slate-900');
+                    });
+                    chip.classList.add('bg-slate-900', 'text-white', 'border-slate-900');
+                    const name = chip.dataset.category;
+                    renderModalExpenses(name ? currentGroupExpenses.filter(item => item.category === name) : currentGroupExpenses);
+                });
+            });
         }
 
         function renderModalExpenses(items) {

@@ -56,7 +56,8 @@
                             <th class="py-3.5 px-4">Amount</th>
                             <th class="py-3.5 px-4">Litres</th>
                             <th class="py-3.5 px-4">Price / L</th>
-                            <th class="py-3.5 px-4">Odometer</th>
+                            <th class="py-3.5 px-4">Odometer (Prev → Now)</th>
+                            <th class="py-3.5 px-4">Since Last Fill</th>
                             <th class="py-3.5 px-4">Station</th>
                             <th class="py-3.5 px-4 text-right">Actions</th>
                         </tr>
@@ -108,7 +109,26 @@
                                 </td>
                                 <td class="py-3 px-4 font-medium">{{ $fuel->litres }} L</td>
                                 <td class="py-3 px-4 font-mono text-slate-500">₹{{ $fuel->price_per_litre }}</td>
-                                <td class="py-3 px-4 font-mono text-slate-500">{{ $fuel->odometer ? number_format($fuel->odometer) . ' km' : '--' }}</td>
+                                @php $fill = $fillLog[$fuel->id] ?? null; @endphp
+                                <td class="py-3 px-4 font-mono whitespace-nowrap">
+                                    @if($fill && $fill['previous_odometer'])
+                                        <span class="text-slate-400">{{ number_format($fill['previous_odometer']) }} →</span>
+                                    @endif
+                                    <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $fuel->odometer ? number_format($fuel->odometer) . ' km' : '--' }}</span>
+                                    @if($fill && $fill['previous_date'])
+                                        <span class="block text-[10px] text-slate-400">prev fill {{ \Carbon\Carbon::parse($fill['previous_date'])->format('d M') }}</span>
+                                    @endif
+                                </td>
+                                <td class="py-3 px-4 font-mono whitespace-nowrap">
+                                    @if($fill && $fill['distance'])
+                                        <span class="font-semibold text-emerald-600 dark:text-emerald-400">+{{ number_format($fill['distance']) }} km</span>
+                                        @if($fill['mileage'])
+                                            <span class="block text-[10px] text-slate-400">{{ $fill['mileage'] }} km/L</span>
+                                        @endif
+                                    @else
+                                        <span class="text-slate-400">--</span>
+                                    @endif
+                                </td>
                                 <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $fuel->petrol_station ?? '--' }}</td>
                                 <td class="py-3 px-4 text-right">
                                     <a href="{{ route('petrol.edit', $fuel) }}" class="mr-3 text-slate-600 hover:underline font-semibold">Edit</a>
@@ -121,7 +141,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="py-8 text-center text-slate-400">No petrol records found.</td></tr>
+                            <tr><td colspan="9" class="py-8 text-center text-slate-400">No petrol records found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -144,7 +164,7 @@
 
                 <div>
                     <label class="block text-slate-500 mb-1">Vehicle *</label>
-                    <select name="vehicle_id" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold">
+                    <select name="vehicle_id" id="petrol-vehicle" onchange="window.refreshFuelPreview()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold">
                         @foreach($vehicles as $veh)
                             <option value="{{ $veh->id }}" {{ ($defaultVehicle && $defaultVehicle->id === $veh->id) || $veh->name === 'TVS Pep+' ? 'selected' : '' }}>
                                 {{ $veh->name }} {{ $veh->is_default ? '(Default)' : '' }}
@@ -172,12 +192,18 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-slate-500 mb-1">Odometer (km)</label>
-                        <input type="number" name="odometer" placeholder="e.g. 12430" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
+                        <input type="number" name="odometer" id="petrol-odometer" oninput="window.refreshFuelPreview()" placeholder="e.g. 12430" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
                     </div>
                     <div>
                         <label class="block text-slate-500 mb-1">Date *</label>
                         <input type="date" name="date" value="{{ date('Y-m-d') }}" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
                     </div>
+                </div>
+
+                <div id="petrol-odometer-preview" class="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 text-xs text-slate-600 dark:text-slate-300 space-y-0.5">
+                    <div class="flex justify-between"><span>Previous fill odometer:</span><span id="petrol-prev-odometer" class="font-mono font-bold">--</span></div>
+                    <div class="flex justify-between"><span>This entry:</span><span id="petrol-current-odometer" class="font-mono font-bold">--</span></div>
+                    <div class="flex justify-between"><span>Distance since last fill:</span><span id="petrol-distance" class="font-mono font-bold text-teal-700 dark:text-teal-300">--</span></div>
                 </div>
 
                 <div>
@@ -227,7 +253,32 @@
             });
         });
 
+        const vehicleFuelSnapshots = @json($vehicleFuelSnapshots);
+
+        window.refreshFuelPreview = function() {
+            const snapshot = vehicleFuelSnapshots[document.getElementById('petrol-vehicle')?.value] || null;
+            const current = parseInt(document.getElementById('petrol-odometer')?.value, 10);
+            const lit = parseFloat(document.getElementById('petrol-litres').value) || 0;
+            const prevEl = document.getElementById('petrol-prev-odometer');
+            const currentEl = document.getElementById('petrol-current-odometer');
+            const distanceEl = document.getElementById('petrol-distance');
+            const hasPrevious = snapshot && snapshot.last_odometer !== null;
+
+            prevEl.textContent = hasPrevious ? `${Number(snapshot.last_odometer).toLocaleString('en-IN')} km (${snapshot.last_date})` : 'No previous fill';
+            currentEl.textContent = isNaN(current) ? '--' : `${current.toLocaleString('en-IN')} km`;
+
+            if (hasPrevious && !isNaN(current)) {
+                const distance = current - snapshot.last_odometer;
+                const mileage = distance > 0 && lit > 0 ? ` · ${(distance / lit).toFixed(1)} km/L` : '';
+                distanceEl.textContent = distance < 0 ? `⚠️ ${distance} km (lower than previous)` : `+${distance.toLocaleString('en-IN')} km${mileage}`;
+            } else {
+                distanceEl.textContent = '--';
+            }
+        };
+        document.addEventListener('DOMContentLoaded', () => window.refreshFuelPreview());
+
         window.calcFuelPrice = function() {
+            window.refreshFuelPreview();
             const amt = parseFloat(document.getElementById('petrol-amt').value) || 0;
             const lit = parseFloat(document.getElementById('petrol-litres').value) || 0;
             const display = document.getElementById('petrol-price-display');

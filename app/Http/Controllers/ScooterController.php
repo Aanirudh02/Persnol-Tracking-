@@ -6,6 +6,7 @@ use App\Models\DailyRecord;
 use App\Models\FuelEntry;
 use App\Models\ScooterTrip;
 use App\Models\Vehicle;
+use App\Services\CloudinaryService;
 use App\Services\Maps\MapProviderInterface;
 use App\Services\TripDistanceService;
 use Carbon\Carbon;
@@ -241,7 +242,7 @@ class ScooterController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('speedometer_image')) {
-            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('speedometer_image'), 'speedometers');
+            $imagePath = app(CloudinaryService::class)->upload($request->file('speedometer_image'), 'speedometers');
         }
 
         $trip->end_time = Carbon::now()->format('H:i:s');
@@ -302,7 +303,11 @@ class ScooterController extends Controller
             'vehicle_id' => 'nullable|exists:vehicles,id',
             'date' => 'nullable|date|before_or_equal:today',
             'notes' => 'nullable|string',
+            'stops' => 'nullable|json',
         ]);
+
+        $stops = ! empty($validated['stops']) ? json_decode($validated['stops'], true) : ($trip->stops ?? []);
+        $stops = is_array($stops) ? $stops : [];
 
         $vehicleId = $validated['vehicle_id'] ?? $trip->vehicle_id;
         $vehicle = $vehicleId ? Vehicle::where('user_id', $request->user()->id)->find($vehicleId) : null;
@@ -334,7 +339,7 @@ class ScooterController extends Controller
         $calc = $distanceService->calculate(
             ['lat' => (float) $startLat, 'lng' => (float) $startLng],
             ['lat' => (float) $endLat, 'lng' => (float) $endLng],
-            [],
+            $stops,
             $request->boolean('to_and_fro'),
             $vehicle,
             $request->user()->id
@@ -357,6 +362,7 @@ class ScooterController extends Controller
             'start_address' => $startAddress,
             'end_address' => $endAddress,
             'to_and_fro' => $request->boolean('to_and_fro'),
+            'stops' => $stops,
             'notes' => $validated['notes'] ?? null,
             'status' => 'completed',
             'one_way_km' => $calc['one_way_km'],

@@ -15,6 +15,7 @@ use App\Models\PersonalExpenseCategory;
 use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\CloudinaryService;
 use App\Services\OptionsService;
 use App\Services\WalletService;
 use Carbon\Carbon;
@@ -182,7 +183,7 @@ class SettingController extends Controller
         ]);
 
         if ($request->hasFile('profile_photo')) {
-            $validated['profile_photo'] = app(\App\Services\CloudinaryService::class)->upload($request->file('profile_photo'), 'profiles');
+            $validated['profile_photo'] = app(CloudinaryService::class)->upload($request->file('profile_photo'), 'profiles');
         }
 
         $user->update($validated);
@@ -280,6 +281,10 @@ class SettingController extends Controller
             'income' => IncomeCategory::findOrFail($id),
             default => abort(404),
         };
+
+        // Own categories only; shared (system) categories are Admin-managed
+        $ownsCategory = $model->user_id !== null && (int) $model->user_id === (int) $request->user()->id;
+        abort_unless($ownsCategory || $request->user()->isAdmin(), 403);
 
         $model->update(['is_archived' => ! $model->is_archived]);
 

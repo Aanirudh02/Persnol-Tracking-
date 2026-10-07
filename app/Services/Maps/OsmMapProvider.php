@@ -16,7 +16,7 @@ class OsmMapProvider implements MapProviderInterface
             return [];
         }
 
-        $cacheKey = 'geo:search:v5:'.md5(mb_strtolower($query));
+        $cacheKey = 'geo:search:v6:'.(auth()->id() ?? 'guest').':'.md5(mb_strtolower($query));
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && $cached !== []) {
             return $cached;
@@ -37,7 +37,8 @@ class OsmMapProvider implements MapProviderInterface
 
         // Layer 3: Dynamic NLP Token Breakdown if exact phrase gave no hits
         if ($results === []) {
-            foreach ($this->queryVariants($query) as $variant) {
+            // Each variant costs two live HTTP calls, so only try the most useful few
+            foreach (array_slice($this->queryVariants($query), 0, 4) as $variant) {
                 $variantResults = array_merge(
                     $this->searchHistoryPlaces($variant),
                     $this->searchPhoton($variant),
@@ -71,8 +72,14 @@ class OsmMapProvider implements MapProviderInterface
                 return [];
             }
 
+            $userId = auth()->id();
+            if (! $userId) {
+                return [];
+            }
+
             $rows = DB::table('scooter_trips')
                 ->select(['from_label', 'start_address', 'start_latitude', 'start_longitude', 'to_label', 'end_address', 'end_latitude', 'end_longitude', 'stops'])
+                ->where('user_id', $userId)
                 ->where(function ($q) use ($term) {
                     $q->where('from_label', 'LIKE', "%{$term}%")
                         ->orWhere('to_label', 'LIKE', "%{$term}%")
@@ -451,7 +458,7 @@ class OsmMapProvider implements MapProviderInterface
                 'User-Agent' => 'LifeTracker/1.0 (personal scooter tracker)',
                 'Accept' => 'application/json',
             ])
-                ->timeout(10)
+                ->timeout(5)
                 ->get('https://photon.komoot.io/api/', [
                     'q' => $query,
                     'limit' => 8,
@@ -512,7 +519,7 @@ class OsmMapProvider implements MapProviderInterface
                 'User-Agent' => 'LifeTracker/1.0 (personal scooter tracker; contact: local)',
                 'Accept' => 'application/json',
             ])
-                ->timeout(10)
+                ->timeout(5)
                 ->get('https://nominatim.openstreetmap.org/search', [
                     'q' => $query,
                     'format' => 'json',

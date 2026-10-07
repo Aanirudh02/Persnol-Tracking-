@@ -18,6 +18,7 @@ use App\Http\Controllers\FriendController;
 use App\Http\Controllers\FriendSplitController;
 use App\Http\Controllers\GeoController;
 use App\Http\Controllers\IncomeController;
+use App\Http\Controllers\MediaUploadController;
 use App\Http\Controllers\MistakeController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\OdometerController;
@@ -55,6 +56,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/', fn () => redirect()->route('dashboard'));
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('permission:dashboard.view');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart-data')->middleware('permission:dashboard.view');
+    Route::get('/dashboard/chart-breakdown', [DashboardController::class, 'chartBreakdown'])->name('dashboard.chart-breakdown')->middleware('permission:dashboard.view');
 
     // Daily Life & Prompts
     Route::post('/daily/wakeup', [DailyRecordController::class, 'recordWakeup'])->name('daily.wakeup');
@@ -234,7 +236,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports/export', [ReportController::class, 'exportCsv'])->name('reports.export');
 
     // Global Media Upload (Cloudinary)
-    Route::post('/media/upload', [\App\Http\Controllers\MediaUploadController::class, 'upload'])->name('media.upload');
+    Route::post('/media/upload', [MediaUploadController::class, 'upload'])->name('media.upload');
 
     // Global Search
     Route::get('/search', [SearchController::class, 'search'])->name('search');
@@ -258,10 +260,14 @@ Route::middleware('auth')->group(function () {
 
 // Fallback image route for storage files when public/storage symlink is missing in container
 Route::get('/storage/{path}', function (string $path) {
-    $fullPath = storage_path('app/public/' . $path);
-    if (! file_exists($fullPath)) {
+    // Only serve files that really live inside storage/app/public (blocks ../ traversal to .env etc.)
+    $publicRoot = realpath(storage_path('app/public'));
+    $fullPath = realpath(storage_path('app/public/'.$path));
+
+    if ($publicRoot === false || $fullPath === false || ! is_file($fullPath)
+        || ! str_starts_with($fullPath, $publicRoot.DIRECTORY_SEPARATOR)) {
         abort(404);
     }
 
     return response()->file($fullPath);
-})->where('path', '.*')->name('storage.local');
+})->where('path', '.*')->name('storage.public-fallback');
