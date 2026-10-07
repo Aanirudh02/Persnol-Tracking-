@@ -76,6 +76,53 @@ class CreditDebt extends Model
         return $this->hasMany(CreditDebtPayment::class);
     }
 
+    /**
+     * Every normal expense filed from this credit/debt (not only the latest one
+     * kept in linked_expense_id).
+     */
+    public function linkedExpenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
+    public function linkedPersonalExpenses(): HasMany
+    {
+        return $this->hasMany(PersonalExpense::class);
+    }
+
+    public function linkedIncomes(): HasMany
+    {
+        return $this->hasMany(Income::class);
+    }
+
+    /**
+     * Amount already recorded as normal + personal expenses for this credit/debt.
+     * A credit/debt must never be expensed for more than its amount.
+     */
+    public function expensedAmount(): float
+    {
+        $normal = (float) $this->linkedExpenses()->get()->sum(fn (Expense $expense) => $expense->totalAmount());
+        $personal = (float) $this->linkedPersonalExpenses()->sum('amount');
+
+        return round($normal + $personal, 2);
+    }
+
+    /**
+     * Amount already recorded as income for this debt.
+     */
+    public function incomeRecordedAmount(): float
+    {
+        return round((float) $this->linkedIncomes()->sum('amount'), 2);
+    }
+
+    /**
+     * How much may still be filed as expense without double counting.
+     */
+    public function unexpensedAmount(): float
+    {
+        return round(max(0, (float) $this->amount - (float) $this->settled_discount_amount - $this->expensedAmount()), 2);
+    }
+
     public function foodEntry(): BelongsTo
     {
         return $this->belongsTo(FoodEntry::class);
@@ -93,6 +140,16 @@ class CreditDebt extends Model
         }
 
         return max(0, (float) $this->amount - (float) $this->amount_paid - (float) $this->settled_discount_amount);
+    }
+
+    /**
+     * Recompute amount_paid from the payment rows and update the status.
+     */
+    public function refreshPaidAmount(bool $allowManualOverride = true): void
+    {
+        $this->amount_paid = (float) $this->payments()->sum('amount');
+        $this->syncStatusFromPayments($allowManualOverride);
+        $this->save();
     }
 
     public function syncStatusFromPayments(bool $allowManualOverride = true): void

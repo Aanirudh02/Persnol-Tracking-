@@ -11,6 +11,8 @@ use App\Models\Friend;
 use App\Models\FriendSplit;
 use App\Models\FuelEntry;
 use App\Services\AuditService;
+use App\Services\CloudinaryService;
+use App\Services\CreditDebtLinkService;
 use App\Services\FinanceLinkService;
 use App\Services\FinanceService;
 use App\Services\OptionsService;
@@ -134,7 +136,7 @@ class ExpenseController extends Controller
         foreach ($matchingExpenses as $item) {
             $method = $item->payment_method ?: 'Other';
             $itemTotal = $item->totalAmount();
-            $itemOwned = $itemTotal;
+            $itemOwned = $item->myShareAmount();
             $itemFriendPaid = $item->totalPaidByFriends();
 
             if (! isset($expensesByPayment[$method])) {
@@ -202,7 +204,8 @@ class ExpenseController extends Controller
 
         arsort($friendPaidBreakdown);
         $totalFriendPaid = array_sum($friendPaidBreakdown);
-        $ownedTotalAmount = round($totalAmount, 2);
+        // Out-of-pocket = each row's own share (older full-bill split rows minus what friends paid)
+        $ownedTotalAmount = round((float) (clone $baseQuery)->with(['friendSplits', 'friendSplit', 'paidByFriend'])->get()->sum(fn (Expense $item) => $item->myShareAmount()), 2);
 
         return view('finance.expenses.index', compact(
             'expenses',
@@ -232,20 +235,7 @@ class ExpenseController extends Controller
             })
             ->orderBy('name')
             ->get();
-
-        $hasSnacks = $categories->contains(fn ($c) => strcasecmp($c->name, 'Snacks') === 0);
-        if (! $hasSnacks) {
-            ExpenseCategory::firstOrCreate(
-                ['name' => 'Snacks', 'user_id' => null],
-                ['icon' => 'cookie', 'color' => '#eab308', 'is_archived' => false, 'is_voluntary' => false]
-            );
-            $categories = ExpenseCategory::query()
-                ->where(function ($q) {
-                    $q->whereNull('is_archived')->orWhere('is_archived', false);
-                })
-                ->orderBy('name')
-                ->get();
-        }
+        // The shared "Snacks" category is created once by migration, not on every visit
 
         $friends = Friend::query()->where('user_id', auth()->id())->orderBy('name')->get();
         $paymentMethods = $options->names('payment_method');
@@ -325,7 +315,7 @@ class ExpenseController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('receipt_image')) {
-            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
+            $imagePath = app(CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
         } elseif ($uploadedFile = $request->file('receipt_image')) {
             if (! $uploadedFile->isValid()) {
                 return back()->withInput()->with('error', 'Receipt upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
@@ -659,7 +649,7 @@ class ExpenseController extends Controller
         return back()->with('success', 'Food/snack items linked under this expense.');
     }
 
-    public function edit(Expense $expense, FinanceService $financeService, OptionsService $options): View|RedirectResponse
+    public function edit(Expense $expense, FinanceService $financeService, OptionsService $options, CreditDebtLinkService $creditLinkService): View|RedirectResponse
     {
         if ($expense->user_id !== auth()->id()) {
             abort(403);
@@ -684,10 +674,12 @@ class ExpenseController extends Controller
             $paymentMethods[] = 'Split';
         }
 
-        return view('finance.expenses.edit', compact('expense', 'categories', 'friends', 'paymentMethods', 'isCombination', 'originalBillTotal'));
+        $creditLinked = $creditLinkService->describeCreditFor($expense);
+
+        return view('finance.expenses.edit', compact('expense', 'categories', 'friends', 'paymentMethods', 'isCombination', 'originalBillTotal', 'creditLinked'));
     }
 
-    public function update(Request $request, Expense $expense, FinanceService $financeService, FinanceLinkService $linkService): RedirectResponse
+    public function update(Request $request, Expense $expense, FinanceService $financeService, FinanceLinkService $linkService, CreditDebtLinkService $creditLinkService): RedirectResponse
     {
         if ($expense->user_id !== auth()->id()) {
             abort(403);
@@ -699,9 +691,14 @@ class ExpenseController extends Controller
 
         $validated = $this->validateExpense($request, false);
         $oldValues = $expense->only(['amount', 'gst_amount', 'category_id', 'date', 'description', 'payment_method']);
+        $valuesBeforeEdit = [
+            'payment_method' => $expense->payment_method,
+            'date' => $expense->date?->toDateString(),
+            'amount' => $expense->totalAmount(),
+        ];
 
         if ($request->hasFile('receipt_image')) {
-            $validated['receipt_image'] = app(\App\Services\CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
+            $validated['receipt_image'] = app(CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
         } elseif ($uploadedFile = $request->file('receipt_image')) {
             if (! $uploadedFile->isValid()) {
                 return back()->withInput()->with('error', 'Receipt upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
@@ -789,7 +786,14 @@ class ExpenseController extends Controller
             reason: $request->input('reason', 'Updated by user')
         );
 
-        return redirect()->route('expenses.index')->with('success', 'Expense updated successfully!');
+        // Only when the user confirmed "update both places" in the prompt
+        $syncSummary = $creditLinkService->syncCreditFromRecord(
+            $expense->fresh(),
+            $valuesBeforeEdit,
+            $creditLinkService->requestedFields($request->input('sync_linked', []))
+        );
+
+        return redirect()->route('expenses.index')->with('success', trim('Expense updated successfully! '.implode(' ', $syncSummary)));
     }
 
     public function detachFromGroup(Request $request, ExpenseGroup $expenseGroup, Expense $expense): RedirectResponse

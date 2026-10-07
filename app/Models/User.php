@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\OptionsService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,15 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
+
+    protected static function booted(): void
+    {
+        // Starter categories / classifications are created once, when the account is created
+        static::created(function (User $user): void {
+            PersonalExpenseCategory::ensureDefaultsFor($user->id);
+            app(OptionsService::class)->ensureClassifications($user->id);
+        });
+    }
 
     protected $fillable = [
         'name',

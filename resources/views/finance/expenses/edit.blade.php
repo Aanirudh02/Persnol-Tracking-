@@ -208,6 +208,7 @@
                     Update Expense
                 </button>
             </form>
+            <x-linked-sync-prompt form-id="edit-expense-form" :linked="$creditLinked ?? []" target-label="the linked credit / debt" />
         </div>
     </div>
 

@@ -73,7 +73,7 @@ class DailyRecordController extends Controller
 
     public function dismissPrompt(Request $request, string $type)
     {
-        $date = $request->get('date', Carbon::today()->toDateString());
+        $date = $request->validate(['date' => 'nullable|date'])['date'] ?? Carbon::today()->toDateString();
         $record = DailyRecord::firstOrCreate(
             ['user_id' => $request->user()->id, 'record_date' => $date]
         );

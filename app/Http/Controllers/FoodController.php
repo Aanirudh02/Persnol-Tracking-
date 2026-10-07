@@ -155,73 +155,78 @@ class FoodController extends Controller
                 return back()->withInput()->with('error', 'The food items exceed the remaining amount of the selected expense.');
             }
             $expenseId = $parent->id;
-        } elseif (in_array($mode, ['separate', 'voluntary'], true) && $totalAmount + $gstAmount > 0) {
-            $expCat = null;
-            if ($mode === 'voluntary') {
-                $expCat = ExpenseCategory::where('is_voluntary', true)->first()
-                    ?? ExpenseCategory::whereRaw('LOWER(name) = ?', ['voluntary'])->first();
-            } else {
-                $settingKey = $request->boolean('is_snack')
-                    ? 'snack_default_expense_category_id'
-                    : 'food_default_expense_category_id';
-                $categoryId = Setting::getVal($settingKey);
-                if ($categoryId) {
-                    $expCat = ExpenseCategory::query()
-                        ->where('is_archived', false)
-                        ->find($categoryId);
+        }
+
+        // Expense + entries are written together so a failure can't leave an orphan expense
+        DB::transaction(function () use ($request, $validated, $options, $mode, $allocatedGst, $dailyRecord, $totalAmount, $gstAmount, $names, &$expenseId, &$autoCreated): void {
+            if (in_array($mode, ['separate', 'voluntary'], true) && $totalAmount + $gstAmount > 0) {
+                $expCat = null;
+                if ($mode === 'voluntary') {
+                    $expCat = ExpenseCategory::where('is_voluntary', true)->first()
+                        ?? ExpenseCategory::whereRaw('LOWER(name) = ?', ['voluntary'])->first();
+                } else {
+                    $settingKey = $request->boolean('is_snack')
+                        ? 'snack_default_expense_category_id'
+                        : 'food_default_expense_category_id';
+                    $categoryId = Setting::getVal($settingKey);
+                    if ($categoryId) {
+                        $expCat = ExpenseCategory::query()
+                            ->where('is_archived', false)
+                            ->find($categoryId);
+                    }
+                    if (! $expCat) {
+                        $catName = $request->boolean('is_snack') ? 'Snacks' : 'Food';
+                        $expCat = ExpenseCategory::whereRaw('LOWER(name) = ?', [strtolower($catName)])->first()
+                            ?? ExpenseCategory::firstOrCreate(
+                                ['name' => $catName, 'user_id' => null],
+                                ['icon' => $request->boolean('is_snack') ? 'cookie' : 'utensils', 'color' => '#f97316', 'is_archived' => false, 'is_voluntary' => false]
+                            );
+                    }
                 }
-                if (! $expCat) {
-                    $catName = $request->boolean('is_snack') ? 'Snacks' : 'Food';
-                    $expCat = ExpenseCategory::whereRaw('LOWER(name) = ?', [strtolower($catName)])->first()
-                        ?? ExpenseCategory::firstOrCreate(
-                            ['name' => $catName, 'user_id' => null],
-                            ['icon' => $request->boolean('is_snack') ? 'cookie' : 'utensils', 'color' => '#f97316', 'is_archived' => false, 'is_voluntary' => false]
-                        );
-                }
+
+                $defaultMethod = $validated['payment_method']
+                    ?? ($options->names('payment_method')[0] ?? 'Cash');
+
+                $expense = Expense::create([
+                    'user_id' => $request->user()->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $expCat?->id,
+                    'parent_id' => null,
+                    'description' => $names,
+                    'amount' => $totalAmount,
+                    'gst_amount' => $gstAmount,
+                    'date' => $validated['date'],
+                    'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
+                    'payment_method' => $defaultMethod,
+                    'notes' => '(From Food / Snack log)',
+                    'is_voluntary' => $mode === 'voluntary',
+                    'paid_by' => 'Me',
+                    'paid_by_type' => 'me',
+                ]);
+                $expenseId = $expense->id;
+                $autoCreated = true;
             }
 
-            $defaultMethod = $validated['payment_method']
-                ?? ($options->names('payment_method')[0] ?? 'Cash');
-
-            $expense = Expense::create([
-                'user_id' => $request->user()->id,
-                'daily_record_id' => $dailyRecord->id,
-                'category_id' => $expCat?->id,
-                'parent_id' => null,
-                'description' => $names,
-                'amount' => $totalAmount,
-                'gst_amount' => $gstAmount,
-                'date' => $validated['date'],
-                'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
-                'payment_method' => $defaultMethod,
-                'notes' => '(From Food / Snack log)',
-                'is_voluntary' => $mode === 'voluntary',
-                'paid_by' => 'Me',
-                'paid_by_type' => 'me',
-            ]);
-            $expenseId = $expense->id;
-            $autoCreated = true;
-        }
-
-        foreach ($allocatedGst as $row) {
-            FoodEntry::create([
-                'user_id' => $request->user()->id,
-                'daily_record_id' => $dailyRecord->id,
-                'category_id' => $row['category_id'],
-                'expense_id' => $expenseId,
-                'auto_create_expense' => $autoCreated,
-                'item_name' => $row['item_name'],
-                'is_snack' => $request->boolean('is_snack'),
-                'quantity' => $row['quantity'],
-                'amount' => $row['amount'],
-                'gst_amount' => $row['gst_amount'],
-                'date' => $validated['date'],
-                'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
-                'location' => $validated['location'] ?? null,
-                'paid_by' => 'Me',
-                'notes' => $validated['notes'] ?? null,
-            ]);
-        }
+            foreach ($allocatedGst as $row) {
+                FoodEntry::create([
+                    'user_id' => $request->user()->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $row['category_id'],
+                    'expense_id' => $expenseId,
+                    'auto_create_expense' => $autoCreated,
+                    'item_name' => $row['item_name'],
+                    'is_snack' => $request->boolean('is_snack'),
+                    'quantity' => $row['quantity'],
+                    'amount' => $row['amount'],
+                    'gst_amount' => $row['gst_amount'],
+                    'date' => $validated['date'],
+                    'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
+                    'location' => $validated['location'] ?? null,
+                    'paid_by' => 'Me',
+                    'notes' => $validated['notes'] ?? null,
+                ]);
+            }
+        });
 
         $msg = $items->count().' food/snack item(s) recorded!';
         if ($mode === 'sub_item' && $expenseId) {
@@ -269,7 +274,12 @@ class FoodController extends Controller
         $currentGst = (float) $food->gst_amount;
         $newAmount = (float) ($validated['amount'] ?? 0);
         $newGst = (float) ($validated['gst_amount'] ?? 0);
-        if ($expenseId) {
+
+        // The expense this entry auto-created follows the entry instead of capping it
+        $ownAutoExpenseId = $food->auto_create_expense ? $food->expense_id : null;
+        $keepsOwnAutoExpense = $ownAutoExpenseId !== null && $expenseId === $ownAutoExpenseId;
+
+        if ($expenseId && ! $keepsOwnAutoExpense) {
             $remaining = $parent->remainingAmount();
             if ($food->expense_id === $expenseId) {
                 $remaining += $currentAmount + $currentGst;
@@ -279,19 +289,26 @@ class FoodController extends Controller
             }
         }
 
-        $food->update([
-            'item_name' => $validated['item_name'],
-            'category_id' => $validated['category_id'] ?? null,
-            'quantity' => max(1, (int) ($validated['quantity'] ?? 1)),
-            'amount' => (float) ($validated['amount'] ?? 0),
-            'gst_amount' => $newGst,
-            'date' => $validated['date'],
-            'time' => $validated['time'] ?? $food->time,
-            'location' => $validated['location'] ?? null,
-            'is_snack' => $request->boolean('is_snack'),
-            'expense_id' => $expenseId,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        DB::transaction(function () use ($food, $validated, $request, $newGst, $expenseId, $keepsOwnAutoExpense, $ownAutoExpenseId): void {
+            $food->update([
+                'item_name' => $validated['item_name'],
+                'category_id' => $validated['category_id'] ?? null,
+                'quantity' => max(1, (int) ($validated['quantity'] ?? 1)),
+                'amount' => (float) ($validated['amount'] ?? 0),
+                'gst_amount' => $newGst,
+                'date' => $validated['date'],
+                'time' => $validated['time'] ?? $food->time,
+                'location' => $validated['location'] ?? null,
+                'is_snack' => $request->boolean('is_snack'),
+                'expense_id' => $expenseId,
+                'auto_create_expense' => $keepsOwnAutoExpense,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            if ($ownAutoExpenseId) {
+                $this->syncAutoCreatedExpense($ownAutoExpenseId);
+            }
+        });
 
         return back()->with('success', 'Food/snack item updated.');
     }
@@ -301,8 +318,42 @@ class FoodController extends Controller
         if ($food->user_id !== auth()->id()) {
             abort(403);
         }
-        $food->delete();
+
+        DB::transaction(function () use ($food): void {
+            $ownAutoExpenseId = $food->auto_create_expense ? $food->expense_id : null;
+            $food->delete();
+
+            if ($ownAutoExpenseId) {
+                $this->syncAutoCreatedExpense($ownAutoExpenseId);
+            }
+        });
 
         return redirect()->route('food.index')->with('success', 'Food entry deleted.');
+    }
+
+    /**
+     * Keep an expense that was auto-created from food entries equal to those entries;
+     * remove it when none are left so it stops being counted.
+     */
+    private function syncAutoCreatedExpense(int $expenseId): void
+    {
+        $expense = Expense::find($expenseId);
+        if (! $expense || $expense->is_locked) {
+            return;
+        }
+
+        $entries = FoodEntry::where('expense_id', $expenseId)->where('auto_create_expense', true)->get();
+        if ($entries->isEmpty()) {
+            $expense->delete();
+
+            return;
+        }
+
+        $expense->update([
+            'amount' => round((float) $entries->sum('amount'), 2),
+            'gst_amount' => round((float) $entries->sum('gst_amount'), 2),
+            'description' => $entries->pluck('item_name')->implode(', '),
+            'date' => $entries->min('date'),
+        ]);
     }
 }

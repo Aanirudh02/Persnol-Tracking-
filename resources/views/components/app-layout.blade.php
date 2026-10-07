@@ -123,7 +123,7 @@
                                         <input type="time" name="wake_up_time" value="{{ $prompt['currentTime'] }}" class="px-3 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold">
                                         <button type="submit" class="px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-sm">Save</button>
                                         @if(isset($prompt['dismissUrl']))
-                                            <a href="{{ $prompt['dismissUrl'] }}" class="p-2 text-white/60 hover:text-white text-sm">&times;</a>
+                                            <button type="submit" formaction="{{ $prompt['dismissUrl'] }}" formnovalidate class="p-2 text-white/60 hover:text-white text-sm cursor-pointer" title="Dismiss">&times;</button>
                                         @endif
                                     </form>
                                 @elseif($prompt['type'] === 'sleep')
@@ -140,7 +140,7 @@
                                         </select>
                                         <button type="submit" class="px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-sm">Save</button>
                                         @if(isset($prompt['dismissUrl']))
-                                            <a href="{{ $prompt['dismissUrl'] }}" class="p-2 text-white/60 hover:text-white text-sm">&times;</a>
+                                            <button type="submit" formaction="{{ $prompt['dismissUrl'] }}" formnovalidate class="p-2 text-white/60 hover:text-white text-sm cursor-pointer" title="Dismiss">&times;</button>
                                         @endif
                                     </form>
                                 @elseif($prompt['type'] === 'petrol')

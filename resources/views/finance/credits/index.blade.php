@@ -228,9 +228,15 @@
                                 </button>
                             @endif
 
-                            {{-- Delete with prompt if linked to normal expense --}}
-                            @if($item->linked_expense_id && $item->linkedExpense)
-                                <button type="button" onclick="openDeleteCreditModal({{ $item->id }}, '{{ $item->type }}', '{{ addslashes($item->linkedExpense->description) }}', '{{ number_format($item->linkedExpense->amount, 2) }}')" class="font-semibold text-rose-600 hover:underline">
+                            {{-- Delete with prompt if linked to expenses / personal expenses / incomes --}}
+                            @php
+                                $linkedForDelete = collect()
+                                    ->concat($item->linkedExpenses->map(fn ($record) => 'Normal Expense: '.$record->description.' (₹'.number_format($record->totalAmount(), 2).')'))
+                                    ->concat($item->linkedPersonalExpenses->map(fn ($record) => 'Personal Expense: '.$record->description.' (₹'.number_format((float) $record->amount, 2).')'))
+                                    ->concat($item->linkedIncomes->map(fn ($record) => 'Income: '.($record->description ?: $record->source).' (₹'.number_format((float) $record->amount, 2).')'));
+                            @endphp
+                            @if($linkedForDelete->isNotEmpty())
+                                <button type="button" onclick="openDeleteCreditModal({{ $item->id }}, @js($item->type), @js($linkedForDelete->values()->all()))" class="font-semibold text-rose-600 hover:underline">
                                     Delete
                                 </button>
                             @else
@@ -555,12 +561,11 @@
                 <span>⚠️</span> Delete <span id="del-modal-type">Credit</span>
             </h3>
             <p class="mt-2 text-xs text-slate-600 leading-relaxed">
-                This item is linked to a Normal Expense:
-                <span id="del-modal-exp-desc" class="font-bold text-slate-900 block mt-1"></span>
-                <span id="del-modal-exp-amt" class="text-emerald-600 font-bold block mt-0.5"></span>
+                This item is linked to:
             </p>
+            <ul id="del-modal-linked-list" class="mt-1 space-y-0.5 text-xs font-bold text-slate-900 list-disc pl-5"></ul>
             <p class="mt-3 text-xs text-slate-700 font-medium">
-                Would you like to delete the linked Normal Expense as well, or delete the <span id="del-modal-type-2">credit</span> alone?
+                Would you like to delete the linked records as well, or delete the <span id="del-modal-type-2">credit</span> alone?
             </p>
             <div class="mt-5 flex flex-col gap-2">
                 <form id="del-form-alone" method="POST">
@@ -568,7 +573,7 @@
                     @method('DELETE')
                     <input type="hidden" name="delete_linked_expense" value="0">
                     <button type="submit" class="w-full py-2.5 px-4 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-800 transition cursor-pointer">
-                        Delete <span id="del-btn-type">Credit</span> Alone (Keep Expense)
+                        Delete <span id="del-btn-type">Credit</span> Alone (Keep Linked Records)
                     </button>
                 </form>
                 <form id="del-form-both" method="POST">
@@ -576,7 +581,7 @@
                     @method('DELETE')
                     <input type="hidden" name="delete_linked_expense" value="1">
                     <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white shadow-md shadow-rose-600/20 transition cursor-pointer">
-                        Delete Both (<span id="del-btn-type-2">Credit</span> & Linked Normal Expense)
+                        Delete Both (<span id="del-btn-type-2">Credit</span> & Linked Records)
                     </button>
                 </form>
                 <button type="button" onclick="document.getElementById('delete-linked-modal').classList.add('hidden')" class="w-full py-2 text-xs text-slate-400 hover:text-slate-600 font-semibold cursor-pointer">
@@ -587,14 +592,19 @@
     </div>
 
     <script>
-        function openDeleteCreditModal(id, type, expDesc, expAmt) {
+        function openDeleteCreditModal(id, type, linkedRecords) {
             const capitalized = type.charAt(0).toUpperCase() + type.slice(1);
             document.getElementById('del-modal-type').textContent = capitalized;
             document.getElementById('del-modal-type-2').textContent = type;
             document.getElementById('del-btn-type').textContent = capitalized;
             document.getElementById('del-btn-type-2').textContent = capitalized;
-            document.getElementById('del-modal-exp-desc').textContent = '“' + expDesc + '”';
-            document.getElementById('del-modal-exp-amt').textContent = 'Amount: ₹' + expAmt;
+            const list = document.getElementById('del-modal-linked-list');
+            list.innerHTML = '';
+            linkedRecords.forEach((text) => {
+                const li = document.createElement('li');
+                li.textContent = text;
+                list.appendChild(li);
+            });
             
             const destroyUrl = "{{ url('/finance/credits') }}/" + id;
             document.getElementById('del-form-alone').action = destroyUrl;

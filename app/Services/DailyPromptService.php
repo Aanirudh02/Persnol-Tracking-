@@ -23,7 +23,7 @@ class DailyPromptService
             ->first();
 
         if (! $dailyRecord) {
-            $dailyRecord = DailyRecord::create([
+            $dailyRecord = new DailyRecord([ // unsaved: showing a prompt must not write a row
                 'user_id' => $userId,
                 'record_date' => $today,
                 'wake_up_prompt_dismissed' => false,
@@ -42,7 +42,7 @@ class DailyPromptService
                 ->first();
 
             if (! $yesterdayRecord) {
-                $yesterdayRecord = DailyRecord::create([
+                $yesterdayRecord = new DailyRecord([ // unsaved: showing a prompt must not write a row
                     'user_id' => $userId,
                     'record_date' => $yesterday,
                     'sleep_prompt_dismissed' => false,

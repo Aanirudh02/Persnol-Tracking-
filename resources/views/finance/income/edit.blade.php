@@ -20,7 +20,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('income.update', $income) }}" method="POST" class="space-y-4 text-xs">
+            <form id="edit-income-form" action="{{ route('income.update', $income) }}" method="POST" class="space-y-4 text-xs">
                 @csrf
                 @method('PUT')
 
@@ -148,6 +148,7 @@
                     <button type="submit" class="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-semibold shadow-sm transition active:scale-95">Save Changes</button>
                 </div>
             </form>
+            <x-linked-sync-prompt form-id="edit-income-form" :linked="$creditLinked ?? []" target-label="the linked debt" />
         </div>
     </div>
 </x-app-layout>

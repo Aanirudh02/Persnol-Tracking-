@@ -22,26 +22,9 @@ class PetrolController extends Controller
     {
         $user = $request->user();
 
-        // Ensure default TVS Pep+ vehicle exists
-        $defaultVehicle = Vehicle::firstOrCreate(
-            ['user_id' => $user->id, 'name' => 'TVS Pep+'],
-            [
-                'make' => 'TVS',
-                'model' => 'Scooty Pep+',
-                'default_mileage_kmpl' => 45,
-                'fuel_type' => 'Petrol',
-                'is_default' => true,
-            ]
-        );
-
-        if (! Vehicle::where('user_id', $user->id)->where('is_default', true)->exists()) {
-            $defaultVehicle->update(['is_default' => true]);
-        }
-
-        // Associate any unassigned petrol records to TVS Pep+
-        FuelEntry::where('user_id', $user->id)
-            ->whereNull('vehicle_id')
-            ->update(['vehicle_id' => $defaultVehicle->id]);
+        // Read only: the default vehicle / unassigned fuel rows are handled once by migration,
+        // not re-created on every visit (a deleted or renamed vehicle used to come back).
+        $defaultVehicle = Vehicle::defaultFor($user->id);
 
         $vehicles = Vehicle::where('user_id', $user->id)->orderByDesc('is_default')->orderBy('name')->get();
 

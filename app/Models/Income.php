@@ -25,6 +25,7 @@ class Income extends Model
         'description',
         'notes',
         'is_locked',
+        'credit_debt_id',
     ];
 
     protected $casts = [
@@ -32,6 +33,22 @@ class Income extends Model
         'date' => 'date',
         'is_locked' => 'boolean',
     ];
+
+    /**
+     * The debt this income was recovered from.
+     */
+    public function creditDebt(): BelongsTo
+    {
+        return $this->belongsTo(CreditDebt::class);
+    }
+
+    /**
+     * Debt payments that were recorded as this income.
+     */
+    public function creditDebtPayments(): HasMany
+    {
+        return $this->hasMany(CreditDebtPayment::class);
+    }
 
     public function user(): BelongsTo
     {

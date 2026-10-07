@@ -711,6 +711,7 @@
             document.getElementById('personal-time-input').value = "{{ date('H:i') }}";
             document.getElementById('personal-dual-input').checked = false;
             document.getElementById('personal-category-input').value = '';
+            document.getElementById('personal-expense-form').dataset.linkedRecords = '[]';
             
             const modal = document.getElementById('personal-expense-modal');
             modal.classList.remove('hidden');
@@ -736,6 +737,13 @@
             }
             document.getElementById('personal-notes-input').value = exp.notes || '';
             document.getElementById('personal-dual-input').checked = !!exp.expense_id;
+
+            // Ask before changing the credit this expense was filed from
+            const personalForm = document.getElementById('personal-expense-form');
+            personalForm.dataset.linkedRecords = JSON.stringify(exp.credit_debt_id
+                ? [{ label: `Credit #${exp.credit_debt_id} (repayment filed as this expense)`, url: `/finance/credits/${exp.credit_debt_id}/edit` }]
+                : []);
+            window.resetLinkedSyncPrompt?.['personal-expense-form']?.();
 
             const modal = document.getElementById('personal-expense-modal');
             modal.classList.remove('hidden');
@@ -822,4 +830,5 @@
             if (label) label.textContent = count + ' selected';
         }
     </script>
+    <x-linked-sync-prompt form-id="personal-expense-form" :dynamic="true" target-label="the linked credit" />
 </x-app-layout>

@@ -67,12 +67,11 @@ class DashboardController extends Controller
             ->whereDate('record_date', $date)
             ->first();
 
-        if (! $dayRecord) {
-            $dayRecord = DailyRecord::create([
-                'user_id' => $user->id,
-                'record_date' => $date,
-            ]);
-        }
+        // Viewing a day must not create a record for it; an unsaved one renders the same
+        $dayRecord ??= new DailyRecord([
+            'user_id' => $user->id,
+            'record_date' => $date,
+        ]);
 
         $yesterday = Carbon::parse($date)->subDay()->toDateString();
         $yesterdayRecord = DailyRecord::where('user_id', $user->id)

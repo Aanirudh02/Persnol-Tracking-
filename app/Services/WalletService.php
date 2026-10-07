@@ -16,8 +16,6 @@ class WalletService
 
     public function enabledWallets(int $userId): Collection
     {
-        $this->ensureDefaults($userId);
-
         return PaymentWallet::query()
             ->where('user_id', $userId)
             ->where('is_enabled', true)
@@ -32,12 +30,9 @@ class WalletService
 
     public function displayWallets(int $userId): Collection
     {
-        $this->ensureDefaults($userId);
         $order = $this->options->names('payment_method', $userId);
 
-        return PaymentWallet::query()
-            ->where('user_id', $userId)
-            ->get()
+        return $this->walletsWithPlaceholders($userId)
             ->sortBy(function (PaymentWallet $wallet) use ($order): int {
                 $index = array_search($wallet->payment_method, $order, true);
 
@@ -87,6 +82,29 @@ class WalletService
     public function currentBalanceTotal(int $userId): float
     {
         return round((float) $this->enabledWallets($userId)->sum('current_balance'), 2);
+    }
+
+    /**
+     * Saved wallets plus unsaved, disabled placeholders for payment methods that have
+     * no wallet yet — so pages can list every method without writing rows on view.
+     *
+     * @return Collection<int, PaymentWallet>
+     */
+    public function walletsWithPlaceholders(int $userId): Collection
+    {
+        $saved = PaymentWallet::query()->where('user_id', $userId)->get();
+
+        $placeholders = collect($this->options->names('payment_method', $userId))
+            ->reject(fn (string $method) => $saved->contains('payment_method', $method))
+            ->map(fn (string $method) => new PaymentWallet([
+                'user_id' => $userId,
+                'payment_method' => $method,
+                'is_enabled' => false,
+                'opening_balance' => 0,
+                'opening_as_of' => now()->toDateString(),
+            ]));
+
+        return $saved->toBase()->concat($placeholders)->values();
     }
 
     public function ensureDefaults(int $userId): void

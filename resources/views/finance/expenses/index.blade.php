@@ -303,7 +303,7 @@
                                     $displayMethods = $groupExpenses->pluck('payment_method')->unique()->implode(' + ');
                                     $displayPaidBy = $groupExpenses->pluck('paid_by')->unique()->implode(' + ');
                                     $friendsPaid = $groupExpenses->sum(fn ($item) => $item->totalPaidByFriends());
-                                    $myPaid = max(0, $displayAmount - $friendsPaid);
+                                    $myPaid = $groupExpenses->sum(fn ($item) => $item->myShareAmount());
                                     $displayBreakdown = $isGroup
                                         ? $groupExpenses->groupBy('payment_method')->map(fn ($items, $method) => $method.' ₹'.number_format($items->sum(fn ($item) => $item->totalAmount()), 2))->implode(' · ')
                                         : null;
@@ -447,7 +447,7 @@
                                                             @foreach($groupExpenses as $child)
                                                                 @php
                                                                     $childFriendsPaid = $child->totalPaidByFriends();
-                                                                    $childMyPaid = max(0, $child->totalAmount() - $childFriendsPaid);
+                                                                    $childMyPaid = $child->myShareAmount();
                                                                 @endphp
                                                                 <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                                                                     <td class="py-2 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">

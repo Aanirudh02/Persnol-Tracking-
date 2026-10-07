@@ -21,7 +21,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('credits.update', $creditDebt) }}" method="POST" class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+            <form id="credit-edit-form" action="{{ route('credits.update', $creditDebt) }}" method="POST" class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 @csrf
                 @method('PUT')
 
@@ -108,6 +108,8 @@
                 </div>
             </form>
         </div>
+
+        <x-linked-sync-prompt form-id="credit-edit-form" :linked="$linkedRecords" target-label="linked expenses, income & payments" />
 
         @if($creditDebt->payments->isNotEmpty())
             <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

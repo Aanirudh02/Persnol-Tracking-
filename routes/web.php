@@ -61,7 +61,7 @@ Route::middleware('auth')->group(function () {
     // Daily Life & Prompts
     Route::post('/daily/wakeup', [DailyRecordController::class, 'recordWakeup'])->name('daily.wakeup');
     Route::post('/daily/sleep', [DailyRecordController::class, 'recordSleep'])->name('daily.sleep');
-    Route::get('/daily/dismiss/{type}', [DailyRecordController::class, 'dismissPrompt'])->name('daily.dismiss');
+    Route::post('/daily/dismiss/{type}', [DailyRecordController::class, 'dismissPrompt'])->name('daily.dismiss')->whereIn('type', ['wakeup', 'sleep']);
     Route::get('/calendar', [DailyRecordController::class, 'calendar'])->name('calendar')->middleware('permission:calendar.view');
     Route::get('/timeline/{date?}', [DailyRecordController::class, 'timeline'])->name('timeline')->middleware('permission:calendar.view');
 

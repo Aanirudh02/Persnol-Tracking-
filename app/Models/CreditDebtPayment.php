@@ -13,6 +13,9 @@ class CreditDebtPayment extends Model
         'paid_on',
         'payment_method',
         'notes',
+        'expense_id',
+        'personal_expense_id',
+        'income_id',
     ];
 
     protected $casts = [
@@ -23,5 +26,20 @@ class CreditDebtPayment extends Model
     public function creditDebt(): BelongsTo
     {
         return $this->belongsTo(CreditDebt::class);
+    }
+
+    public function expense(): BelongsTo
+    {
+        return $this->belongsTo(Expense::class);
+    }
+
+    public function personalExpense(): BelongsTo
+    {
+        return $this->belongsTo(PersonalExpense::class);
+    }
+
+    public function income(): BelongsTo
+    {
+        return $this->belongsTo(Income::class);
     }
 }

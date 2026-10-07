@@ -55,7 +55,7 @@
                                     <button type="button" onclick="document.getElementById('prompt-wake-time').value='{{ now()->format('H:i') }}'" class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-xs text-white transition">Current Time</button>
                                     <button type="submit" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-md transition">Save</button>
                                     @if(isset($prompt['dismissUrl']))
-                                        <a href="{{ $prompt['dismissUrl'] }}" class="p-2 text-white/60 hover:text-white text-xs" title="Dismiss">&times;</a>
+                                        <button type="submit" formaction="{{ $prompt['dismissUrl'] }}" formnovalidate class="p-2 text-white/60 hover:text-white text-xs cursor-pointer" title="Dismiss">&times;</button>
                                     @endif
                                 </form>
                             @elseif($prompt['type'] === 'sleep')
@@ -69,7 +69,7 @@
                                     </select>
                                     <button type="submit" class="px-4 py-2 rounded-xl bg-purple-400 hover:bg-purple-300 text-slate-950 font-bold text-xs shadow-md transition">Save Sleep</button>
                                     @if(isset($prompt['dismissUrl']))
-                                        <a href="{{ $prompt['dismissUrl'] }}" class="p-2 text-white/60 hover:text-white text-xs">&times;</a>
+                                        <button type="submit" formaction="{{ $prompt['dismissUrl'] }}" formnovalidate class="p-2 text-white/60 hover:text-white text-xs cursor-pointer" title="Dismiss">&times;</button>
                                     @endif
                                 </form>
                             @elseif($prompt['type'] === 'petrol')

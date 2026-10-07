@@ -186,6 +186,9 @@
                                         <input type="text" name="location" value="{{ $item->location }}" placeholder="Location" class="px-2 py-2 border border-slate-300 rounded-xl">
                                         <select name="parent_expense_id" class="px-2 py-2 border border-slate-300 rounded-xl sm:col-span-2">
                                             <option value="">No linked expense</option>
+                                            @if($item->auto_create_expense && $item->expense_id && ! $parentExpenses->contains('id', $item->expense_id))
+                                                <option value="{{ $item->expense_id }}" selected>Its own expense #{{ $item->expense_id }} (auto-created)</option>
+                                            @endif
                                             @foreach($parentExpenses as $pe)
                                                 <option value="{{ $pe->id }}" @selected($item->expense_id === $pe->id) @disabled($pe->remaining_amount <= 0 && $item->expense_id !== $pe->id)>{{ $pe->description }} · ₹{{ number_format($pe->remaining_amount, 2) }} remaining</option>
                                             @endforeach

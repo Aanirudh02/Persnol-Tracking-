@@ -17,7 +17,7 @@ class ExpenseClassificationController extends Controller
     public function index(Request $request, OptionsService $options): View
     {
         $user = $request->user();
-        $classifications = $options->ensureClassifications($user->id);
+        $classifications = $options->for('expense_classification', $user->id);
 
         $domain = $request->get('domain', 'normal');
         $period = $request->get('period', 'all');
@@ -136,7 +136,7 @@ class ExpenseClassificationController extends Controller
     public function printReport(Request $request, OptionsService $options): View
     {
         $user = $request->user();
-        $classifications = $options->ensureClassifications($user->id);
+        $classifications = $options->for('expense_classification', $user->id);
 
         $domain = $request->get('domain', 'normal');
         $period = $request->get('period', 'month');

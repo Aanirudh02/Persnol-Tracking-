@@ -9,7 +9,6 @@ use App\Models\CustomQuestion;
 use App\Models\ExpenseCategory;
 use App\Models\FoodCategory;
 use App\Models\IncomeCategory;
-use App\Models\PaymentWallet;
 use App\Models\Permission;
 use App\Models\PersonalExpenseCategory;
 use App\Models\Role;
@@ -142,11 +141,10 @@ class SettingController extends Controller
         $foodCategories = FoodCategory::where('user_id', $user->id)->orderBy('name')->get();
         $activityCategories = ActivityCategory::where('user_id', $user->id)->orderBy('name')->get();
 
-        $walletService->ensureDefaults($user->id);
-        $wallets = PaymentWallet::where('user_id', $user->id)->orderBy('payment_method')->get();
+        $wallets = $walletService->walletsWithPlaceholders($user->id)->sortBy('payment_method')->values();
         $friendRoles = $options->names('friend_role');
         $paymentMethods = $options->for('payment_method', $user->id);
-        $expenseClassifications = $options->ensureClassifications($user->id);
+        $expenseClassifications = $options->for('expense_classification', $user->id);
         $financeDashboardSections = array_merge([
             'show_wallet_balances' => true,
             'show_total_expense' => true,

@@ -9,6 +9,7 @@ use App\Models\FamilyMember;
 use App\Models\PersonalExpense;
 use App\Models\PersonalExpenseCategory;
 use App\Models\PersonalExpenseGroup;
+use App\Services\CreditDebtLinkService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -97,38 +98,7 @@ class PersonalExpenseController extends Controller
             ->where('is_archived', false)
             ->orderBy('name')
             ->get();
-
-        // Ensure default seeded personal categories including 'Me'
-        if ($categories->isEmpty()) {
-            $defaults = [
-                ['name' => 'Me', 'icon' => 'user-check', 'color' => '#6366f1'],
-                ['name' => 'Personal', 'icon' => 'user', 'color' => '#3b82f6'],
-                ['name' => 'Family', 'icon' => 'heart', 'color' => '#8b5cf6'],
-                ['name' => 'Shopping', 'icon' => 'shopping-bag', 'color' => '#ec4899'],
-                ['name' => 'Weekend Snacks', 'icon' => 'cookie', 'color' => '#f59e0b'],
-                ['name' => 'Tour', 'icon' => 'compass', 'color' => '#06b6d4'],
-            ];
-            foreach ($defaults as $cat) {
-                PersonalExpenseCategory::create([
-                    'user_id' => $user->id,
-                    'name' => $cat['name'],
-                    'icon' => $cat['icon'],
-                    'color' => $cat['color'],
-                ]);
-            }
-            $categories = PersonalExpenseCategory::query()->where('is_archived', false)->orderBy('name')->get();
-        }
-
-        // Ensure category "Me" exists
-        if (! $categories->contains('name', 'Me')) {
-            PersonalExpenseCategory::create([
-                'user_id' => $user->id,
-                'name' => 'Me',
-                'icon' => 'user-check',
-                'color' => '#6366f1',
-            ]);
-            $categories = PersonalExpenseCategory::query()->where('is_archived', false)->orderBy('name')->get();
-        }
+        // Default categories are seeded once (migration / new user), not on every visit
 
         $paymentMethods = $options->names('payment_method');
         $familyMembers = FamilyMember::query()
@@ -196,9 +166,15 @@ class PersonalExpenseController extends Controller
         return redirect()->route('personal-expenses.index')->with('success', 'Personal expense recorded successfully!');
     }
 
-    public function update(Request $request, PersonalExpense $personalExpense): RedirectResponse
+    public function update(Request $request, PersonalExpense $personalExpense, CreditDebtLinkService $creditLinkService): RedirectResponse
     {
         abort_if($personalExpense->user_id !== auth()->id(), 403);
+
+        $valuesBeforeEdit = [
+            'payment_method' => $personalExpense->payment_method,
+            'date' => $personalExpense->date?->toDateString(),
+            'amount' => (float) $personalExpense->amount,
+        ];
 
         $validated = $request->validate([
             'category_id' => 'required|exists:personal_expense_categories,id',
@@ -238,7 +214,14 @@ class PersonalExpenseController extends Controller
             }
         }
 
-        return redirect()->route('personal-expenses.index')->with('success', 'Personal expense updated.');
+        // Only when the user confirmed "update both places" in the prompt
+        $syncSummary = $creditLinkService->syncCreditFromRecord(
+            $personalExpense->fresh(),
+            $valuesBeforeEdit,
+            $creditLinkService->requestedFields($request->input('sync_linked', []))
+        );
+
+        return redirect()->route('personal-expenses.index')->with('success', trim('Personal expense updated. '.implode(' ', $syncSummary)));
     }
 
     public function group(Request $request): RedirectResponse

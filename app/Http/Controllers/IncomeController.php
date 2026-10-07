@@ -8,6 +8,7 @@ use App\Models\Income;
 use App\Models\IncomeCategory;
 use App\Models\IncomeExpenseTally;
 use App\Services\AuditService;
+use App\Services\CreditDebtLinkService;
 use App\Services\FinanceService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
@@ -32,7 +33,7 @@ class IncomeController extends Controller
             $query->where('date', '<=', $request->to_date);
         }
         if ($request->filled('month')) {
-            $m = \Carbon\Carbon::parse($request->get('month').'-01');
+            $m = Carbon::parse($request->get('month').'-01');
             $query->whereBetween('date', [$m->copy()->startOfMonth()->toDateString(), $m->copy()->endOfMonth()->toDateString()]);
         }
 
@@ -91,7 +92,7 @@ class IncomeController extends Controller
         return redirect()->route('income.index')->with('success', 'Income recorded successfully!');
     }
 
-    public function edit(Income $income, FinanceService $financeService, OptionsService $options)
+    public function edit(Income $income, FinanceService $financeService, OptionsService $options, CreditDebtLinkService $creditLinkService)
     {
         if ($income->user_id !== auth()->id()) {
             abort(403);
@@ -104,11 +105,12 @@ class IncomeController extends Controller
         $categories = IncomeCategory::all();
         $paymentMethods = $options->names('payment_method');
         $incomeSources = $options->names('income_source');
+        $creditLinked = $creditLinkService->describeCreditFor($income);
 
-        return view('finance.income.edit', compact('income', 'categories', 'paymentMethods', 'incomeSources'));
+        return view('finance.income.edit', compact('income', 'categories', 'paymentMethods', 'incomeSources', 'creditLinked'));
     }
 
-    public function update(Request $request, Income $income, FinanceService $financeService)
+    public function update(Request $request, Income $income, FinanceService $financeService, CreditDebtLinkService $creditLinkService)
     {
         if ($income->user_id !== auth()->id()) {
             abort(403);
@@ -132,6 +134,11 @@ class IncomeController extends Controller
         ]);
 
         $oldValues = $income->only(['amount', 'source', 'date', 'payment_method', 'tally_mode']);
+        $valuesBeforeEdit = [
+            'payment_method' => $income->payment_method,
+            'date' => $income->date?->toDateString(),
+            'amount' => (float) $income->amount,
+        ];
         $income->update([
             'amount' => $validated['amount'],
             'category_id' => $validated['category_id'] ?? null,
@@ -153,7 +160,14 @@ class IncomeController extends Controller
             reason: $request->input('reason', 'Updated by user')
         );
 
-        return redirect()->route('income.index')->with('success', 'Income record updated!');
+        // Only when the user confirmed "update both places" in the prompt
+        $syncSummary = $creditLinkService->syncCreditFromRecord(
+            $income->fresh(),
+            $valuesBeforeEdit,
+            $creditLinkService->requestedFields($request->input('sync_linked', []))
+        );
+
+        return redirect()->route('income.index')->with('success', trim('Income record updated! '.implode(' ', $syncSummary)));
     }
 
     public function show(Request $request, Income $income): View

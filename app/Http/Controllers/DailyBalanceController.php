@@ -13,7 +13,6 @@ use App\Services\WalletService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DailyBalanceController extends Controller
@@ -172,7 +171,7 @@ class DailyBalanceController extends Controller
             ->where('date', $todayStr)
             ->whereNull('parent_id')
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-            ->where(fn ($q) => $q->whereNull('paid_by')->orWhere('paid_by', '!=', 'friend'))
+            ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend')) // friend paid the whole bill: nothing left your wallet
             ->with(['category', 'friendSplits.friend'])
             ->orderByDesc('id')
             ->get();

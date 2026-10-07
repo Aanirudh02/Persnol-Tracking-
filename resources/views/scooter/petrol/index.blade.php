@@ -67,8 +67,8 @@
                             <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                                 <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ $fuel->date->format('d M Y') }}</td>
                                 <td class="py-3 px-4 whitespace-nowrap">
-                                    <a href="{{ route('petrol.index', ['vehicle_id' => $fuel->vehicle_id]) }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 hover:bg-amber-100 transition cursor-pointer" title="Click to filter by {{ $fuel->vehicle?->name ?? 'TVS Pep+' }}">
-                                        🛵 {{ $fuel->vehicle?->name ?? 'TVS Pep+' }}
+                                    <a href="{{ route('petrol.index', ['vehicle_id' => $fuel->vehicle_id]) }}" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 hover:bg-amber-100 transition cursor-pointer" title="Click to filter by {{ $fuel->vehicle?->name ?? 'No vehicle' }}">
+                                        🛵 {{ $fuel->vehicle?->name ?? 'No vehicle' }}
                                     </a>
                                 </td>
                                 <td class="py-3 px-4 whitespace-nowrap">
@@ -166,7 +166,7 @@
                     <label class="block text-slate-500 mb-1">Vehicle *</label>
                     <select name="vehicle_id" id="petrol-vehicle" onchange="window.refreshFuelPreview()" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold">
                         @foreach($vehicles as $veh)
-                            <option value="{{ $veh->id }}" {{ ($defaultVehicle && $defaultVehicle->id === $veh->id) || $veh->name === 'TVS Pep+' ? 'selected' : '' }}>
+                            <option value="{{ $veh->id }}" @selected($defaultVehicle?->id === $veh->id)>
                                 {{ $veh->name }} {{ $veh->is_default ? '(Default)' : '' }}
                             </option>
                         @endforeach

@@ -130,7 +130,7 @@ class DailyRegisterService
             ->where('user_id', $user->id)
             ->whereNull('parent_id')
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-            ->where(fn ($q) => $q->whereNull('paid_by')->orWhere('paid_by', '!=', 'friend'))
+            ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend')) // friend paid the whole bill: nothing left your wallet
             ->whereBetween('date', [$startOfMonth->toDateString(), $maxHistoryDate->toDateString()])
             ->with('category')
             ->orderBy('time', 'desc')

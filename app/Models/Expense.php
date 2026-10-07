@@ -39,6 +39,7 @@ class Expense extends Model
         'is_voluntary',
         'is_archived',
         'classification',
+        'credit_debt_id',
     ];
 
     protected $casts = [
@@ -100,6 +101,22 @@ class Expense extends Model
     public function friendSplits(): HasMany
     {
         return $this->hasMany(FriendSplit::class);
+    }
+
+    /**
+     * The credit / debt this expense was filed from (repayment, lending or closing).
+     */
+    public function creditDebt(): BelongsTo
+    {
+        return $this->belongsTo(CreditDebt::class);
+    }
+
+    /**
+     * Credit payments that were filed as this expense.
+     */
+    public function creditDebtPayments(): HasMany
+    {
+        return $this->hasMany(CreditDebtPayment::class);
     }
 
     public function incomeTallies(): HasMany
@@ -184,6 +201,46 @@ class Expense extends Model
     public function totalAmount(): float
     {
         return round((float) $this->amount + (float) $this->gst_amount, 2);
+    }
+
+    /**
+     * Split bills saved since the share logic was added store only the user's
+     * share in `amount` and record the full bill in a "Total bill:" note.
+     */
+    public function isAmountNetOfFriendPayments(): bool
+    {
+        if ($this->notes !== null && str_contains($this->notes, 'Total bill:')) {
+            return true;
+        }
+
+        $total = $this->totalAmount();
+
+        // Stored amount equals the user's recorded share → already net
+        if ((float) $this->split_my_share > 0 && (float) $this->split_friend_share > 0) {
+            return abs($total - (float) $this->split_my_share) < 0.01;
+        }
+
+        // Stored amount is below the bill recorded on the split → already net
+        $splits = $this->relationLoaded('friendSplits') ? $this->friendSplits : $this->friendSplits()->get();
+        $billTotal = (float) ($splits->max('total_amount') ?? 0);
+        if ($billTotal > 0) {
+            return $total < $billTotal - 0.01;
+        }
+
+        return false;
+    }
+
+    /**
+     * What the user actually spent. Net rows already exclude friends' payments;
+     * older rows stored the full bill, so friends' payments are subtracted once.
+     */
+    public function myShareAmount(): float
+    {
+        if ($this->isAmountNetOfFriendPayments()) {
+            return $this->totalAmount();
+        }
+
+        return round(max(0, $this->totalAmount() - $this->totalPaidByFriends()), 2);
     }
 
     public function subItemsExplainedTotal(): float

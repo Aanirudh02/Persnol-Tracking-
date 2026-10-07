@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PersonalExpense extends Model
@@ -26,6 +27,7 @@ class PersonalExpense extends Model
         'is_voluntary',
         'is_archived',
         'classification',
+        'credit_debt_id',
     ];
 
     protected $casts = [
@@ -34,6 +36,22 @@ class PersonalExpense extends Model
         'is_voluntary' => 'boolean',
         'is_archived' => 'boolean',
     ];
+
+    /**
+     * The credit this personal expense was filed from.
+     */
+    public function creditDebt(): BelongsTo
+    {
+        return $this->belongsTo(CreditDebt::class);
+    }
+
+    /**
+     * Credit payments that were filed as this personal expense.
+     */
+    public function creditDebtPayments(): HasMany
+    {
+        return $this->hasMany(CreditDebtPayment::class);
+    }
 
     public function user(): BelongsTo
     {
