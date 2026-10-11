@@ -48,11 +48,17 @@ return new class extends Migration
 
     private function backfillRecordLinks(): void
     {
-        $credits = DB::table('credit_debts')->get(['id', 'user_id', 'linked_expense_id', 'linked_personal_expense_id', 'linked_income_id'])->keyBy('id');
+        // Only read link columns this database really has (production drifted from the migrations)
+        $linkColumns = array_filter(
+            ['expenses' => 'linked_expense_id', 'personal_expenses' => 'linked_personal_expense_id', 'incomes' => 'linked_income_id'],
+            fn (string $column) => Schema::hasColumn('credit_debts', $column)
+        );
+
+        $credits = DB::table('credit_debts')->get(['id', 'user_id', ...array_values($linkColumns)])->keyBy('id');
 
         // 1. The single link column each credit kept
         foreach ($credits as $credit) {
-            foreach (['expenses' => 'linked_expense_id', 'personal_expenses' => 'linked_personal_expense_id', 'incomes' => 'linked_income_id'] as $tableName => $column) {
+            foreach ($linkColumns as $tableName => $column) {
                 if ($credit->{$column}) {
                     DB::table($tableName)
                         ->where('id', $credit->{$column})
