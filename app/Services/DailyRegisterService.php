@@ -65,7 +65,8 @@ class DailyRegisterService
         // 1. Saved Daily Balances for this month
         $savedBalances = DailyBalance::query()
             ->where('user_id', $user->id)
-            ->whereBetween('record_date', [$startOfMonth->toDateString(), $maxHistoryDate->toDateString()])
+            ->whereDate('record_date', '>=', $startOfMonth->toDateString())
+            ->whereDate('record_date', '<=', $maxHistoryDate->toDateString())
             ->get()
             ->keyBy(fn ($b) => $b->record_date->toDateString());
 
@@ -104,7 +105,8 @@ class DailyRegisterService
         // 3. Fetch Incomes & Expenses for the month
         $monthIncomes = Income::query()
             ->where('user_id', $user->id)
-            ->whereBetween('date', [$startOfMonth->toDateString(), $maxHistoryDate->toDateString()])
+            ->whereDate('date', '>=', $startOfMonth->toDateString())
+            ->whereDate('date', '<=', $maxHistoryDate->toDateString())
             ->with('category')
             ->orderBy('time', 'desc')
             ->orderBy('id', 'desc')
@@ -131,7 +133,8 @@ class DailyRegisterService
             ->whereNull('parent_id')
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend')) // friend paid the whole bill: nothing left your wallet
-            ->whereBetween('date', [$startOfMonth->toDateString(), $maxHistoryDate->toDateString()])
+            ->whereDate('date', '>=', $startOfMonth->toDateString())
+            ->whereDate('date', '<=', $maxHistoryDate->toDateString())
             ->with('category')
             ->orderBy('time', 'desc')
             ->orderBy('id', 'desc')

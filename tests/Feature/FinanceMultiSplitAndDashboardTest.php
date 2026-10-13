@@ -93,12 +93,14 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
             'user_id' => $user->id,
             'payment_method' => 'UPI',
             'opening_balance' => 500,
+            'opening_as_of' => '2026-09-01',
             'is_enabled' => true,
         ]);
         PaymentWallet::query()->create([
             'user_id' => $user->id,
             'payment_method' => 'Cash',
             'opening_balance' => 300,
+            'opening_as_of' => '2026-09-01',
             'is_enabled' => true,
         ]);
 
@@ -200,7 +202,7 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
         // Today view
         $responseToday = $this->actingAs($user)->get(route('dashboard', ['period' => 'today']));
         $responseToday->assertOk();
-        $responseToday->assertSee('Total Current Balance');
+        $responseToday->assertSee('Daily Cash Register');
         $responseToday->assertSee('Cash');
         $responseToday->assertSee('UPI');
 
