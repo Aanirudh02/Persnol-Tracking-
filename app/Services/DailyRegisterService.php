@@ -141,17 +141,20 @@ class DailyRegisterService
         $expenseDetailsByDateAndMethod = [];
         foreach ($monthExpenses as $exp) {
             $d = Carbon::parse($exp->date)->toDateString();
-            $method = $exp->payment_method ?: 'Cash';
-            $tot = (float) $exp->amount + (float) ($exp->gst_amount ?? 0);
-            $expensesByDateAndMethod[$d][$method] = ($expensesByDateAndMethod[$d][$method] ?? 0.0) + $tot;
-            $expenseDetailsByDateAndMethod[$d][$method][] = [
-                'id' => $exp->id,
-                'description' => $exp->description ?: 'Expense',
-                'amount' => $tot,
-                'category' => $exp->category?->name ?? 'General',
-                'time' => $exp->time ? substr($exp->time, 0, 5) : null,
-                'notes' => $exp->notes,
-            ];
+            $breakdown = $exp->paymentBreakdownAmounts();
+
+            foreach ($breakdown as $method => $amount) {
+                $amount = (float) $amount;
+                $expensesByDateAndMethod[$d][$method] = ($expensesByDateAndMethod[$d][$method] ?? 0.0) + $amount;
+                $expenseDetailsByDateAndMethod[$d][$method][] = [
+                    'id' => $exp->id,
+                    'description' => $exp->description ?: 'Expense',
+                    'amount' => $amount,
+                    'category' => $exp->category?->name ?? 'General',
+                    'time' => $exp->time ? substr($exp->time, 0, 5) : null,
+                    'notes' => $exp->notes,
+                ];
+            }
         }
 
         // 4. Build sequence day by day

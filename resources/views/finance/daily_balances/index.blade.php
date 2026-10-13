@@ -320,8 +320,14 @@
                             <div class="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                                 <div>
                                     <div class="font-bold text-slate-800 dark:text-slate-200">{{ $exp->description ?: 'Expense' }}</div>
-                                    <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                    <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
                                         <span class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">{{ $exp->payment_method ?: 'Cash' }}</span>
+                                        @php
+                                            $bd = $exp->paymentBreakdownAmounts();
+                                        @endphp
+                                        @if(count($bd) > 1)
+                                            <span class="text-slate-500 font-medium">({{ collect($bd)->map(fn ($a, $m) => $m.': ₹'.number_format($a, 2))->implode(', ') }})</span>
+                                        @endif
                                         <span>&bull;</span>
                                         <span>{{ $exp->category->name ?? 'General' }}</span>
                                         @if($exp->time)

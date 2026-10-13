@@ -67,7 +67,9 @@ class FoodController extends Controller
             ->take(40)
             ->get();
         $parentExpenses->each(function (Expense $expense): void {
-            $expense->remaining_amount = round(max(0, $expense->totalAmount() - (float) ($expense->sub_items_total ?? 0) - (float) ($expense->sub_items_gst_total ?? 0) - (float) ($expense->food_entries_total ?? 0) - (float) ($expense->food_entries_gst_total ?? 0)), 2);
+            $capacity = $expense->isSplit() ? $expense->originalBillTotal() : $expense->totalAmount();
+            $consumed = (float) ($expense->sub_items_total ?? 0) + (float) ($expense->sub_items_gst_total ?? 0) + (float) ($expense->food_entries_total ?? 0) + (float) ($expense->food_entries_gst_total ?? 0);
+            $expense->remaining_amount = round(max(0, $capacity - $consumed), 2);
         });
 
         return view('food.index', compact(

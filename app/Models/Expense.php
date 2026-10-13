@@ -256,7 +256,64 @@ class Expense extends Model
 
     public function remainingAmount(): float
     {
-        return round(max(0, $this->totalAmount() - $this->consumedAmount()), 2);
+        $billCapacity = $this->isSplit() ? $this->originalBillTotal() : $this->totalAmount();
+
+        return round(max(0, $billCapacity - $this->consumedAmount()), 2);
+    }
+
+    /**
+     * Breakdown of amounts paid by payment method for this expense.
+     * E.g. ['UPI' => 120.0, 'Cash' => 50.0].
+     *
+     * @return array<string, float>
+     */
+    public function paymentBreakdownAmounts(): array
+    {
+        // 1. Try parsing "Payment breakdown: UPI ₹120.00, Cash ₹50.00" from notes
+        if ($this->notes && preg_match('/Payment breakdown:\s*([^\r\n]+)/i', $this->notes, $matches)) {
+            $breakdown = [];
+            $parts = explode(',', $matches[1]);
+            foreach ($parts as $part) {
+                if (preg_match('/^\s*(.+?)\s*:?\s*(?:₹|Rs\.?)?\s*([0-9,]+(?:\.[0-9]+)?)\s*$/u', trim($part), $m)) {
+                    $method = trim($m[1]);
+                    $amount = (float) str_replace(',', '', $m[2]);
+                    if ($amount > 0) {
+                        $breakdown[$method] = ($breakdown[$method] ?? 0.0) + $amount;
+                    }
+                }
+            }
+            if (! empty($breakdown)) {
+                return $breakdown;
+            }
+        }
+
+        // 2. If payment_method has composite methods like "UPI + Cash" but no breakdown in notes
+        $rawMethod = trim((string) ($this->payment_method ?: 'Cash'));
+        if (str_contains($rawMethod, '+')) {
+            $methods = array_values(array_filter(array_map('trim', explode('+', $rawMethod))));
+            if (! empty($methods)) {
+                $total = $this->totalAmount();
+                $equalShare = round($total / count($methods), 2);
+                $breakdown = [];
+                $allocated = 0.0;
+                foreach ($methods as $idx => $m) {
+                    if ($idx === count($methods) - 1) {
+                        $amt = round($total - $allocated, 2);
+                    } else {
+                        $amt = $equalShare;
+                        $allocated += $amt;
+                    }
+                    $breakdown[$m] = $amt;
+                }
+
+                return $breakdown;
+            }
+        }
+
+        // 3. Fallback: single payment method
+        $defaultMethod = $rawMethod ?: 'Cash';
+
+        return [$defaultMethod => $this->totalAmount()];
     }
 
     public function getTimeAttribute(?string $value): ?string

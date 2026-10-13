@@ -185,7 +185,7 @@
                                         <div class="text-[11px] text-slate-400">{{ $exp->category?->name ?? 'Expense' }} · {{ $exp->time ? substr($exp->time, 0, 5) : 'Today' }}</div>
                                     </div>
                                     <div class="font-bold text-rose-600 dark:text-rose-400 text-sm">
-                                        -₹{{ number_format((float)$exp->amount + (float)($exp->gst_amount ?? 0), 2) }}
+                                        -₹{{ number_format((float)($exp->display_amount ?? ((float)$exp->amount + (float)($exp->gst_amount ?? 0))), 2) }}
                                     </div>
                                 </div>
                             @endforeach
@@ -233,7 +233,7 @@
                                         <div class="text-[11px] text-slate-400">{{ $exp->category?->name ?? 'Expense' }} · {{ $exp->time ? substr($exp->time, 0, 5) : 'Today' }}</div>
                                     </div>
                                     <div class="font-bold text-rose-600 dark:text-rose-400 text-sm">
-                                        -₹{{ number_format((float)$exp->amount + (float)($exp->gst_amount ?? 0), 2) }}
+                                        -₹{{ number_format((float)($exp->display_amount ?? ((float)$exp->amount + (float)($exp->gst_amount ?? 0))), 2) }}
                                     </div>
                                 </div>
                             @endforeach

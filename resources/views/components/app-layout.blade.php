@@ -221,5 +221,82 @@
     @if (session('info'))
         <script>document.addEventListener('DOMContentLoaded', () => window.showToast(@json(session('info')), 'info'));</script>
     @endif
+    <!-- GLOBAL IMAGE LIGHTBOX DIALOG MODAL -->
+    <div id="global-image-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6" onclick="if(event.target === this) window.closeImageModal()">
+        <div class="relative max-w-4xl w-full max-h-[92vh] bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                <div class="min-w-0 pr-4">
+                    <h4 id="global-image-modal-title" class="text-sm font-bold text-white truncate">Image Preview</h4>
+                    <p id="global-image-modal-subtitle" class="text-xs text-slate-400 truncate"></p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a id="global-image-modal-external" href="#" target="_blank" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium transition flex items-center gap-1.5" title="Open full original image in new tab">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        <span class="hidden sm:inline">Open Original</span>
+                    </a>
+                    <button type="button" onclick="window.closeImageModal()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer" title="Close">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Image Area -->
+            <div class="p-3 sm:p-5 bg-black/60 flex items-center justify-center overflow-auto max-h-[calc(92vh-75px)]">
+                <img id="global-image-modal-img" src="" alt="Preview" class="max-w-full max-h-[75vh] w-auto h-auto object-contain rounded-xl shadow-lg border border-slate-800">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.openImageModal = function(url, title = 'Image Preview', subtitle = '') {
+            const modal = document.getElementById('global-image-modal');
+            const img = document.getElementById('global-image-modal-img');
+            const titleEl = document.getElementById('global-image-modal-title');
+            const subEl = document.getElementById('global-image-modal-subtitle');
+            const extEl = document.getElementById('global-image-modal-external');
+
+            if (!modal || !img) return;
+
+            img.src = url;
+            if (extEl) extEl.href = url;
+            if (titleEl) titleEl.textContent = title;
+            if (subEl) subEl.textContent = subtitle;
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        };
+
+        window.closeImageModal = function() {
+            const modal = document.getElementById('global-image-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        };
+
+        window.openPhotoModal = window.openImageModal;
+        window.closePhotoModal = window.closeImageModal;
+
+        document.addEventListener('click', function(e) {
+            const trigger = e.target.closest('[data-lightbox-img]');
+            if (trigger) {
+                e.preventDefault();
+                const url = trigger.getAttribute('data-lightbox-img') || trigger.getAttribute('href');
+                const title = trigger.getAttribute('data-lightbox-title') || 'Image Preview';
+                const sub = trigger.getAttribute('data-lightbox-sub') || '';
+                window.openImageModal(url, title, sub);
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                window.closeImageModal();
+            }
+        });
+    </script>
 </body>
 </html>

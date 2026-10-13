@@ -76,6 +76,30 @@ class WalletService
             })
             ->sum(DB::raw('CASE WHEN friend_splits.id IS NULL THEN expenses.amount + expenses.gst_amount ELSE friend_splits.paid_by_me_amount END'));
 
+        $multiExpenses = Expense::query()
+            ->where('expenses.user_id', $userId)
+            ->where('expenses.date', '>=', $asOf)
+            ->where('expenses.is_voluntary', false)
+            ->whereNull('expenses.parent_id')
+            ->where('expenses.payment_method', '!=', $method)
+            ->where(function ($q) {
+                $q->where('expenses.payment_method', 'like', '%+%')
+                    ->orWhere('expenses.notes', 'like', '%Payment breakdown%');
+            })
+            ->leftJoin('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
+            ->where(function ($query) {
+                $query->whereNull('expense_categories.is_archived')
+                    ->orWhere('expense_categories.is_archived', false);
+            })
+            ->get();
+
+        foreach ($multiExpenses as $mExp) {
+            $bd = $mExp->paymentBreakdownAmounts();
+            if (isset($bd[$method])) {
+                $expense += (float) $bd[$method];
+            }
+        }
+
         return round((float) $wallet->opening_balance + $income - $expense, 2);
     }
 

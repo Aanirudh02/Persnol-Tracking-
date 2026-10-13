@@ -190,11 +190,15 @@
                 </div>
 
                 <div>
-                    <label class="mb-1 block font-semibold text-slate-700">Receipt</label>
-                    <input type="file" name="receipt_image" accept="image/*" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2">
+                    <label class="mb-1 block font-semibold text-slate-700">Receipt Image</label>
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-2.5 hover:bg-slate-100/70 transition">
+                        <input type="file" name="receipt_image" accept="image/*" class="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800 file:cursor-pointer file:transition cursor-pointer">
+                    </div>
                     @if($expense->receipt_image)
-                        <div class="mt-1.5 text-xs">
-                            <button type="button" onclick="window.openImageModal('{{ \App\Services\CloudinaryService::url($expense->receipt_image) }}', 'Receipt: {{ addslashes($expense->description) }}', '₹{{ number_format($expense->amount, 2) }} · {{ $expense->date?->format('d M Y') }}')" class="font-semibold text-indigo-600 hover:underline cursor-pointer">📷 View current uploaded receipt</button>
+                        <div class="mt-2 text-xs">
+                            <button type="button" onclick="window.openImageModal('{{ \App\Services\CloudinaryService::url($expense->receipt_image) }}', 'Receipt: {{ addslashes($expense->description) }}', '₹{{ number_format($expense->amount, 2) }} · {{ $expense->date?->format('d M Y') }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold transition cursor-pointer">
+                                <span>📷</span> View current uploaded receipt
+                            </button>
                         </div>
                     @endif
                 </div>

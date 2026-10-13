@@ -215,7 +215,9 @@
 
                 <div>
                     <label class="mb-1 block font-semibold text-slate-700">Receipt Image</label>
-                    <input type="file" name="receipt_image" accept="image/*" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2">
+                    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-2.5 hover:bg-slate-100/70 transition">
+                        <input type="file" name="receipt_image" accept="image/*" class="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-slate-800 file:cursor-pointer file:transition cursor-pointer">
+                    </div>
                 </div>
 
                 <div>

@@ -535,3 +535,58 @@ function _renumberStops() {
     });
 }
 
+// Global Image Lightbox Modal Functions
+window.openImageModal = window.openImageModal || function(url, title = 'Image Preview', subtitle = '') {
+    let modal = document.getElementById('global-image-modal');
+    if (!modal) {
+        // Create fallback dialog on the fly if missing
+        modal = document.createElement('div');
+        modal.id = 'global-image-modal';
+        modal.className = 'fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6';
+        modal.onclick = (e) => { if (e.target === modal) window.closeImageModal(); };
+        modal.innerHTML = `
+            <div class="relative max-w-4xl w-full max-h-[92vh] bg-slate-900 border border-slate-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden" onclick="event.stopPropagation()">
+                <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
+                    <div class="min-w-0 pr-4">
+                        <h4 id="global-image-modal-title" class="text-sm font-bold text-white truncate">${title}</h4>
+                        <p id="global-image-modal-subtitle" class="text-xs text-slate-400 truncate">${subtitle}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a id="global-image-modal-external" href="${url}" target="_blank" class="p-2 rounded-xl bg-slate-800 text-slate-300 text-xs">Open Original</a>
+                        <button type="button" onclick="window.closeImageModal()" class="p-2 rounded-xl bg-slate-800 text-slate-300 text-sm font-bold">&times;</button>
+                    </div>
+                </div>
+                <div class="p-3 sm:p-5 bg-black/60 flex items-center justify-center overflow-auto max-h-[calc(92vh-75px)]">
+                    <img id="global-image-modal-img" src="${url}" alt="Preview" class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-lg border border-slate-800">
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        document.body.classList.add('overflow-hidden');
+        return;
+    }
+
+    const img = document.getElementById('global-image-modal-img');
+    const titleEl = document.getElementById('global-image-modal-title');
+    const subEl = document.getElementById('global-image-modal-subtitle');
+    const extEl = document.getElementById('global-image-modal-external');
+
+    if (img) img.src = url;
+    if (extEl) extEl.href = url;
+    if (titleEl) titleEl.textContent = title;
+    if (subEl) subEl.textContent = subtitle;
+
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+};
+
+window.closeImageModal = window.closeImageModal || function() {
+    const modal = document.getElementById('global-image-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+};
+
+window.openPhotoModal = window.openImageModal;
+window.closePhotoModal = window.closeImageModal;
+

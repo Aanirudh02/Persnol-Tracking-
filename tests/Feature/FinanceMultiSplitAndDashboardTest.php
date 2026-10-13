@@ -11,6 +11,7 @@ use App\Models\LookupOption;
 use App\Models\PaymentWallet;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\DailyRegisterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -80,6 +81,62 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
         $this->assertEquals(70.0, (float) $split->friend_share);
         $this->assertEquals(70.0, (float) $split->paid_by_friend_amount);
         $this->assertEquals(0.0, $split->netAmount());
+    }
+
+    public function test_split_expense_payment_breakdown_reduces_daily_cash_register(): void
+    {
+        $user = $this->createUser();
+        $friend = Friend::query()->create(['user_id' => $user->id, 'name' => 'Kiran', 'role' => 'Friend']);
+        $category = ExpenseCategory::query()->create(['user_id' => $user->id, 'name' => 'Food', 'is_archived' => false]);
+
+        PaymentWallet::query()->create([
+            'user_id' => $user->id,
+            'payment_method' => 'UPI',
+            'opening_balance' => 500,
+            'is_enabled' => true,
+        ]);
+        PaymentWallet::query()->create([
+            'user_id' => $user->id,
+            'payment_method' => 'Cash',
+            'opening_balance' => 300,
+            'is_enabled' => true,
+        ]);
+
+        // Total bill ₹300: Kiran pays ₹130, user pays ₹170.
+        // User breakdown: ₹120 UPI, ₹50 Cash = ₹170.
+        $response = $this->actingAs($user)->post(route('expenses.store'), [
+            'amount' => 300,
+            'gst_amount' => 0,
+            'description' => 'Team Lunch',
+            'category_id' => $category->id,
+            'payment_method' => 'UPI',
+            'date' => '2026-09-10',
+            'split_with_friend_id' => $friend->id,
+            'split_my_share' => 170,
+            'split_friend_share' => 130,
+            'split_paid_by_type' => 'split',
+            'split_paid_by_me_amount' => 170,
+            'split_paid_by_friend_amount' => 130,
+            'add_group_expense' => '1',
+            'group_expenses' => [
+                ['amount' => 120, 'payment_method' => 'UPI'],
+                ['amount' => 50, 'payment_method' => 'Cash'],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $registerService = app(DailyRegisterService::class);
+        $data = $registerService->getRegisterForDate($user, '2026-09-10');
+
+        $this->assertEquals(120.0, $data['categories']['UPI']['outflow']);
+        $this->assertEquals(380.0, $data['categories']['UPI']['closing']); // 500 - 120 = 380
+
+        $this->assertEquals(50.0, $data['categories']['Cash']['outflow']);
+        $this->assertEquals(250.0, $data['categories']['Cash']['closing']); // 300 - 50 = 250
+
+        $this->assertEquals(170.0, $data['total']['outflow']);
+        $this->assertEquals(630.0, $data['total']['closing']); // 800 - 170 = 630
     }
 
     public function test_credit_amount_paid_can_be_edited_smoothly(): void

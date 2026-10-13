@@ -105,6 +105,7 @@ class DailyBalanceController extends Controller
             ->where('date', $selectedDateStr)
             ->whereNull('parent_id')
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend'))
             ->orderBy('time', 'desc')
             ->orderBy('id', 'desc')
             ->get();
@@ -203,10 +204,22 @@ class DailyBalanceController extends Controller
 
         foreach ($activeCategories as $cat) {
             $catIncomes = $todayIncomes->filter(fn ($i) => ($i->payment_method ?: 'Cash') === $cat);
-            $catExpenses = $todayExpenses->filter(fn ($e) => ($e->payment_method ?: 'Cash') === $cat);
+
+            $catExpensesList = [];
+            $outflow = 0.0;
+            foreach ($todayExpenses as $exp) {
+                $bd = $exp->paymentBreakdownAmounts();
+                if (isset($bd[$cat]) && (float) $bd[$cat] > 0) {
+                    $amt = (float) $bd[$cat];
+                    $outflow += $amt;
+                    $catExp = clone $exp;
+                    $catExp->display_amount = $amt;
+                    $catExpensesList[] = $catExp;
+                }
+            }
 
             $inflow = (float) $catIncomes->sum('amount');
-            $outflow = (float) $catExpenses->sum(fn ($e) => (float) $e->amount + (float) ($e->gst_amount ?? 0));
+            $outflow = round($outflow, 2);
 
             // Determine opening
             $savedOpening = $savedToday?->categories_data[$cat]['opening'] ?? null;
@@ -235,7 +248,7 @@ class DailyBalanceController extends Controller
                 'adjustment_note' => $adjNote,
                 'closing' => $closing,
                 'incomes' => $catIncomes,
-                'expenses' => $catExpenses,
+                'expenses' => collect($catExpensesList),
             ];
 
             $totalOpening += $opening;
