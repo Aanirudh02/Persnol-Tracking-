@@ -8,7 +8,18 @@
             </a>
 
             <div class="flex items-center gap-2">
-                <button type="button" onclick="openFuelModal({{ $group->id }}, '{{ addslashes($group->title) }}', {{ $group->end_fuel_entry_id ?? 'null' }}, {{ $group->total_litres ?? 'null' }}, {{ $group->total_fuel_cost ?? 'null' }}, '{{ addslashes($group->notes ?? '') }}', {{ $group->vehicle_id ?? 'null' }})" class="px-3.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900 transition flex items-center gap-1.5 cursor-pointer">
+                <button type="button"
+                    onclick="openFuelModalFromButton(this)"
+                    data-group-id="{{ $group->id }}"
+                    data-title="{{ $group->title }}"
+                    data-end-fuel-id="{{ $group->end_fuel_entry_id ?? '' }}"
+                    data-start-fuel-id="{{ $group->start_fuel_entry_id ?? '' }}"
+                    data-total-litres="{{ $group->total_litres ?? '' }}"
+                    data-total-cost="{{ $group->total_fuel_cost ?? '' }}"
+                    data-notes="{{ $group->notes ?? '' }}"
+                    data-vehicle-id="{{ $group->vehicle_id ?? '' }}"
+                    data-total-km="{{ $group->total_km ?? 0 }}"
+                    class="px-3.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900 transition flex items-center gap-1.5 cursor-pointer">
                     <span>⛽</span> Edit Petrol & Details
                 </button>
 
@@ -43,13 +54,35 @@
                         <div class="text-[11px] uppercase tracking-wider text-indigo-200">Fuel Efficiency</div>
                         <div class="text-2xl font-black text-emerald-400">{{ number_format($group->calculated_mileage, 1) }} <span class="text-sm font-semibold text-white">km/L</span></div>
                         <div class="text-xs text-indigo-200 mt-0.5">₹{{ number_format($group->cost_per_km, 2) }} / km</div>
-                        <button type="button" onclick="openFuelModal({{ $group->id }}, '{{ addslashes($group->title) }}', {{ $group->end_fuel_entry_id ?? 'null' }}, {{ $group->total_litres ?? 'null' }}, {{ $group->total_fuel_cost ?? 'null' }}, '{{ addslashes($group->notes ?? '') }}', {{ $group->vehicle_id ?? 'null' }})" class="mt-1 text-[11px] text-indigo-300 hover:text-white underline cursor-pointer">Edit Petrol Refill</button>
+                        <button type="button"
+                            onclick="openFuelModalFromButton(this)"
+                            data-group-id="{{ $group->id }}"
+                            data-title="{{ $group->title }}"
+                            data-end-fuel-id="{{ $group->end_fuel_entry_id ?? '' }}"
+                            data-start-fuel-id="{{ $group->start_fuel_entry_id ?? '' }}"
+                            data-total-litres="{{ $group->total_litres ?? '' }}"
+                            data-total-cost="{{ $group->total_fuel_cost ?? '' }}"
+                            data-notes="{{ $group->notes ?? '' }}"
+                            data-vehicle-id="{{ $group->vehicle_id ?? '' }}"
+                            data-total-km="{{ $group->total_km ?? 0 }}"
+                            class="mt-1 text-[11px] text-indigo-300 hover:text-white underline cursor-pointer">Edit Petrol Refill</button>
                     </div>
                 @else
                     <div class="text-right bg-amber-500/10 px-4 py-2.5 rounded-xl border border-amber-500/30">
                         <div class="text-[11px] uppercase tracking-wider text-amber-300 font-semibold">Mileage Pending</div>
                         <div class="text-xs text-amber-200 mt-0.5 mb-1.5">No fuel refill linked yet</div>
-                        <button type="button" onclick="openFuelModal({{ $group->id }}, '{{ addslashes($group->title) }}', {{ $group->end_fuel_entry_id ?? 'null' }}, {{ $group->total_litres ?? 'null' }}, {{ $group->total_fuel_cost ?? 'null' }}, '{{ addslashes($group->notes ?? '') }}', {{ $group->vehicle_id ?? 'null' }})" class="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-1">
+                        <button type="button"
+                            onclick="openFuelModalFromButton(this)"
+                            data-group-id="{{ $group->id }}"
+                            data-title="{{ $group->title }}"
+                            data-end-fuel-id="{{ $group->end_fuel_entry_id ?? '' }}"
+                            data-start-fuel-id="{{ $group->start_fuel_entry_id ?? '' }}"
+                            data-total-litres="{{ $group->total_litres ?? '' }}"
+                            data-total-cost="{{ $group->total_fuel_cost ?? '' }}"
+                            data-notes="{{ $group->notes ?? '' }}"
+                            data-vehicle-id="{{ $group->vehicle_id ?? '' }}"
+                            data-total-km="{{ $group->total_km ?? 0 }}"
+                            class="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition shadow-xs cursor-pointer inline-flex items-center gap-1">
                             <span>⛽</span> Add Petrol Entry
                         </button>
                     </div>

@@ -64,6 +64,27 @@ class OdometerGroup extends Model
     }
 
     /**
+     * Data used by the "Add / Edit Petrol" modal (passed to JS as safe JSON).
+     *
+     * @return array{id: int, action: string, title: string, end_fuel_entry_id: int|null, start_fuel_entry_id: int|null, total_litres: float|null, total_fuel_cost: float|null, notes: string, vehicle_id: int|null, total_km: float|null}
+     */
+    public function fuelModalPayload(): array
+    {
+        return [
+            'id' => $this->id,
+            'action' => route('odometer.groups.update', $this),
+            'title' => (string) $this->title,
+            'end_fuel_entry_id' => $this->end_fuel_entry_id,
+            'start_fuel_entry_id' => $this->start_fuel_entry_id,
+            'total_litres' => $this->total_litres !== null ? (float) $this->total_litres : null,
+            'total_fuel_cost' => $this->total_fuel_cost !== null ? (float) $this->total_fuel_cost : null,
+            'notes' => (string) ($this->notes ?? ''),
+            'vehicle_id' => $this->vehicle_id,
+            'total_km' => $this->total_km !== null ? (float) $this->total_km : null,
+        ];
+    }
+
+    /**
      * The currently active cycle for a vehicle. Legacy cycles without a vehicle
      * are treated as belonging to whichever vehicle is asked for.
      */
@@ -124,9 +145,12 @@ class OdometerGroup extends Model
         $litres = 0;
         $cost = 0;
 
-        if ($this->end_fuel_entry_id && $this->endFuelEntry) {
-            $litres = (float) $this->endFuelEntry->litres;
-            $cost = (float) $this->endFuelEntry->amount;
+        if ($this->end_fuel_entry_id) {
+            $endFuel = FuelEntry::withTrashed()->find($this->end_fuel_entry_id);
+            if ($endFuel) {
+                $litres = (float) $endFuel->litres;
+                $cost = (float) $endFuel->amount;
+            }
         } elseif ($this->total_litres && (float) $this->total_litres > 0) {
             $litres = (float) $this->total_litres;
             $cost = (float) ($this->total_fuel_cost ?? 0);

@@ -579,16 +579,27 @@
                                         <span class="font-semibold text-emerald-600 dark:text-emerald-400">+{{ number_format($distanceFromPrevious, 1) }} km</span>
                                     @endif
 
-                                    @if($reading->group && ($reading->reading_type === 'ending' || $reading->group->status === 'completed'))
+                                    @if($reading->group && $reading->reading_type === 'ending')
                                         @if($reading->group->calculated_mileage > 0)
                                             <div class="mt-0.5">
                                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 shadow-xs" title="Cycle mileage: {{ $reading->group->calculated_mileage }} km/L">
                                                     ⚡ {{ number_format($reading->group->calculated_mileage, 1) }} km/L
                                                 </span>
                                             </div>
-                                        @elseif($reading->reading_type === 'ending')
+                                        @else
                                             <div class="mt-0.5">
-                                                <button type="button" onclick="openFuelModal({{ $reading->group->id }}, '{{ addslashes($reading->group->title) }}', {{ $reading->group->end_fuel_entry_id ?? 'null' }}, {{ $reading->group->total_litres ?? 'null' }}, {{ $reading->group->total_fuel_cost ?? 'null' }}, '{{ addslashes($reading->group->notes ?? '') }}', {{ $reading->group->vehicle_id ?? 'null' }})" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 transition cursor-pointer" title="Add petrol entry to calculate mileage">
+                                                <button type="button"
+                                                    onclick="openFuelModalFromButton(this)"
+                                                    data-group-id="{{ $reading->group->id }}"
+                                                    data-title="{{ $reading->group->title }}"
+                                                    data-end-fuel-id="{{ $reading->group->end_fuel_entry_id ?? '' }}"
+                                                    data-start-fuel-id="{{ $reading->group->start_fuel_entry_id ?? '' }}"
+                                                    data-total-litres="{{ $reading->group->total_litres ?? '' }}"
+                                                    data-total-cost="{{ $reading->group->total_fuel_cost ?? '' }}"
+                                                    data-notes="{{ $reading->group->notes ?? '' }}"
+                                                    data-vehicle-id="{{ $reading->group->vehicle_id ?? '' }}"
+                                                    data-total-km="{{ $reading->group->total_km ?? 0 }}"
+                                                    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 transition cursor-pointer" title="Add petrol entry to calculate mileage">
                                                     ⛽ Add Petrol
                                                 </button>
                                             </div>
@@ -602,8 +613,19 @@
                                     @endif
                                 </td>
                                 <td class="py-2.5 px-3 text-right whitespace-nowrap">
-                                    @if($reading->group)
-                                        <button type="button" onclick="openFuelModal({{ $reading->group->id }}, '{{ addslashes($reading->group->title) }}', {{ $reading->group->end_fuel_entry_id ?? 'null' }}, {{ $reading->group->total_litres ?? 'null' }}, {{ $reading->group->total_fuel_cost ?? 'null' }}, '{{ addslashes($reading->group->notes ?? '') }}', {{ $reading->group->vehicle_id ?? 'null' }})" class="mr-2 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer" title="Add / Edit Petrol for Cycle">⛽ Petrol</button>
+                                    @if($reading->group && $reading->reading_type === 'ending')
+                                        <button type="button"
+                                            onclick="openFuelModalFromButton(this)"
+                                            data-group-id="{{ $reading->group->id }}"
+                                            data-title="{{ $reading->group->title }}"
+                                            data-end-fuel-id="{{ $reading->group->end_fuel_entry_id ?? '' }}"
+                                            data-start-fuel-id="{{ $reading->group->start_fuel_entry_id ?? '' }}"
+                                            data-total-litres="{{ $reading->group->total_litres ?? '' }}"
+                                            data-total-cost="{{ $reading->group->total_fuel_cost ?? '' }}"
+                                            data-notes="{{ $reading->group->notes ?? '' }}"
+                                            data-vehicle-id="{{ $reading->group->vehicle_id ?? '' }}"
+                                            data-total-km="{{ $reading->group->total_km ?? 0 }}"
+                                            class="mr-2 text-emerald-600 dark:text-emerald-400 font-semibold cursor-pointer" title="Add / Edit Petrol for Cycle">⛽ Petrol</button>
                                     @endif
                                     @if($reading->image_url)
                                         <button type="button" onclick="openPhotoModal('{{ $reading->image_url }}', '{{ addslashes($reading->trip_name ?: 'Odometer Reading') }}', '{{ number_format($reading->odometer_km, 1) }} km', '{{ $reading->reading_date?->format('d M Y') }}')" class="mr-2 text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer">Photo</button>
@@ -689,7 +711,18 @@
                                 </div>
 
                                 <div class="flex items-center gap-2">
-                                    <button type="button" onclick="openFuelModal({{ $group->id }}, '{{ addslashes($group->title) }}', {{ $group->end_fuel_entry_id ?? 'null' }}, {{ $group->total_litres ?? 'null' }}, {{ $group->total_fuel_cost ?? 'null' }}, '{{ addslashes($group->notes ?? '') }}', {{ $group->vehicle_id ?? 'null' }})" class="px-3 py-1.5 rounded-lg {{ $group->calculated_mileage > 0 ? 'bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-600 hover:bg-emerald-700 text-white' }} text-xs font-semibold transition flex items-center gap-1 cursor-pointer">
+                                    <button type="button"
+                                        onclick="openFuelModalFromButton(this)"
+                                        data-group-id="{{ $group->id }}"
+                                        data-title="{{ $group->title }}"
+                                        data-end-fuel-id="{{ $group->end_fuel_entry_id ?? '' }}"
+                                        data-start-fuel-id="{{ $group->start_fuel_entry_id ?? '' }}"
+                                        data-total-litres="{{ $group->total_litres ?? '' }}"
+                                        data-total-cost="{{ $group->total_fuel_cost ?? '' }}"
+                                        data-notes="{{ $group->notes ?? '' }}"
+                                        data-vehicle-id="{{ $group->vehicle_id ?? '' }}"
+                                        data-total-km="{{ $group->total_km ?? 0 }}"
+                                        class="px-3 py-1.5 rounded-lg {{ $group->calculated_mileage > 0 ? 'bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'bg-emerald-600 hover:bg-emerald-700 text-white' }} text-xs font-semibold transition flex items-center gap-1 cursor-pointer">
                                         <span>⛽</span> {{ $group->calculated_mileage > 0 ? 'Edit Petrol' : 'Add Petrol' }}
                                     </button>
 

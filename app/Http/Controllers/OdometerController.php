@@ -49,12 +49,13 @@ class OdometerController extends Controller
             ->paginate(10, ['*'], 'cycles_page')
             ->withQueryString();
 
-        // Recent fuel entries to link as start or end refuel
+        // Recent fuel entries to link as start or end refuel (across all vehicles, latest first)
         $recentFuelEntries = FuelEntry::where('user_id', $user->id)
-            ->when($selectedVehicleId, fn ($q) => $q->where(fn ($inner) => $inner->where('vehicle_id', $selectedVehicleId)->orWhereNull('vehicle_id')))
+            ->with('vehicle')
             ->orderByDesc('date')
             ->orderByDesc('time')
-            ->limit(50)
+            ->orderByDesc('id')
+            ->limit(100)
             ->get();
 
         // Per-vehicle statistics
@@ -397,10 +398,11 @@ class OdometerController extends Controller
         $group->load(['readings', 'startFuelEntry', 'endFuelEntry', 'vehicle']);
 
         $recentFuelEntries = FuelEntry::where('user_id', $user->id)
-            ->when($group->vehicle_id, fn ($q) => $q->where(fn ($inner) => $inner->where('vehicle_id', $group->vehicle_id)->orWhereNull('vehicle_id')))
+            ->with('vehicle')
             ->orderByDesc('date')
             ->orderByDesc('time')
-            ->limit(50)
+            ->orderByDesc('id')
+            ->limit(100)
             ->get();
 
         $vehicles = Vehicle::where('user_id', $user->id)->orderByDesc('is_default')->orderBy('name')->get();
@@ -562,6 +564,11 @@ class OdometerController extends Controller
             $group->total_fuel_cost = (float) $request->input('manual_fuel_cost', 0);
         } elseif ($request->filled('end_fuel_entry_id')) {
             $group->end_fuel_entry_id = (int) $request->input('end_fuel_entry_id');
+            $endFuel = FuelEntry::withTrashed()->find($group->end_fuel_entry_id);
+            if ($endFuel) {
+                $group->total_litres = (float) $endFuel->litres;
+                $group->total_fuel_cost = (float) $endFuel->amount;
+            }
         }
 
         if ($request->has('start_fuel_entry_id')) {
@@ -570,6 +577,8 @@ class OdometerController extends Controller
                 : null;
         }
 
+        $group->unsetRelation('endFuelEntry');
+        $group->unsetRelation('startFuelEntry');
         $group->save();
         $group->recalculateSummary();
 
