@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Note;
+use App\Services\CloudinaryService;
 use Illuminate\Http\Request;
 
 class NoteController extends Controller
@@ -43,7 +44,7 @@ class NoteController extends Controller
 
         $imagePath = null;
         if ($request->hasFile('image')) {
-            $imagePath = app(\App\Services\CloudinaryService::class)->upload($request->file('image'), 'notes');
+            $imagePath = app(CloudinaryService::class)->upload($request->file('image'), 'notes');
         }
 
         Note::create([
@@ -85,7 +86,7 @@ class NoteController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $validated['image_path'] = app(\App\Services\CloudinaryService::class)->upload($request->file('image'), 'notes');
+            $validated['image_path'] = app(CloudinaryService::class)->upload($request->file('image'), 'notes');
         }
         $validated['is_pinned'] = $request->boolean('is_pinned');
 

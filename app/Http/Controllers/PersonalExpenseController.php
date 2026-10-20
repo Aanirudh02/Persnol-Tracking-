@@ -55,9 +55,17 @@ class PersonalExpenseController extends Controller
             $period = 'month';
         }
 
+        if (($fromDate || $toDate) && $period === 'all') {
+            $period = 'custom';
+        }
+
         [$startDate, $endDate] = $this->resolveDates($period, $fromDate, $toDate, $customMonth);
         if ($startDate && $endDate) {
             $query->whereBetween('date', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $query->where('date', '>=', $startDate);
+        } elseif ($endDate) {
+            $query->where('date', '<=', $endDate);
         }
 
         if ($request->filled('category_id')) {
@@ -69,11 +77,30 @@ class PersonalExpenseController extends Controller
         }
 
         if ($request->filled('done_by')) {
-            $query->where('done_by', 'like', "%{$request->string('done_by')}%");
+            $doneBy = (string) $request->string('done_by')->trim();
+            if (strcasecmp($doneBy, 'me') === 0) {
+                $query->where(function ($q) use ($doneBy) {
+                    $q->where('done_by', 'like', "%{$doneBy}%")
+                        ->orWhereNull('done_by')
+                        ->orWhere('done_by', '');
+                });
+            } else {
+                $query->where('done_by', 'like', "%{$doneBy}%");
+            }
         }
 
         if ($request->filled('done_to')) {
-            $query->where('done_to', 'like', "%{$request->string('done_to')}%");
+            $doneTo = (string) $request->string('done_to')->trim();
+            if (strcasecmp($doneTo, 'me') === 0 || strcasecmp($doneTo, 'self') === 0) {
+                $query->where(function ($q) use ($doneTo) {
+                    $q->where('done_to', 'like', "%{$doneTo}%")
+                        ->orWhere('done_to', 'like', '%Self%')
+                        ->orWhereNull('done_to')
+                        ->orWhere('done_to', '');
+                });
+            } else {
+                $query->where('done_to', 'like', "%{$doneTo}%");
+            }
         }
 
         if ($request->boolean('voluntary_only')) {
@@ -468,10 +495,13 @@ class PersonalExpenseController extends Controller
             'month' => [$today->copy()->startOfMonth()->toDateString(), $today->copy()->endOfMonth()->toDateString()],
             'year' => [$today->copy()->startOfYear()->toDateString(), $today->copy()->endOfYear()->toDateString()],
             'custom' => [
-                $start ?: $today->copy()->startOfMonth()->toDateString(),
-                $end ?: $today->toDateString(),
+                $start ?: null,
+                $end ?: null,
             ],
-            default => [null, null],
+            default => [
+                $start ?: null,
+                $end ?: null,
+            ],
         };
     }
 }

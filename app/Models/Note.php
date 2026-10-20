@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CloudinaryService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -29,6 +30,6 @@ class Note extends Model
 
     public function imageUrl(): ?string
     {
-        return \App\Services\CloudinaryService::url($this->image_path);
+        return CloudinaryService::url($this->image_path);
     }
 }

@@ -158,4 +158,78 @@ class PersonalExpenseAndArchivingTest extends TestCase
         $response->assertRedirect(route('family-members.index'));
         $this->assertSoftDeleted($member);
     }
+
+    public function test_personal_expense_filtering_by_date_range_and_done_to(): void
+    {
+        $user = User::factory()->create();
+        $cat = PersonalExpenseCategory::create([
+            'user_id' => $user->id,
+            'name' => 'Shopping',
+            'color' => '#ec4899',
+        ]);
+
+        // 1. Within range (01/10/2026 - 19/10/2026), done_to = Me (or null/self)
+        $exp1 = PersonalExpense::create([
+            'user_id' => $user->id,
+            'category_id' => $cat->id,
+            'amount' => 350.00,
+            'date' => '2026-10-10',
+            'description' => 'Shirt for Me',
+            'payment_method' => 'UPI',
+            'done_by' => 'Me',
+            'done_to' => 'Me',
+        ]);
+
+        // 2. Within range, done_to is null (Self/None)
+        $exp2 = PersonalExpense::create([
+            'user_id' => $user->id,
+            'category_id' => $cat->id,
+            'amount' => 150.00,
+            'date' => '2026-10-15',
+            'description' => 'Coffee for Self',
+            'payment_method' => 'Cash',
+            'done_by' => 'Me',
+            'done_to' => null,
+        ]);
+
+        // 3. Within range, done_to is Sister
+        $exp3 = PersonalExpense::create([
+            'user_id' => $user->id,
+            'category_id' => $cat->id,
+            'amount' => 500.00,
+            'date' => '2026-10-12',
+            'description' => 'Gift for Sister',
+            'payment_method' => 'UPI',
+            'done_by' => 'Me',
+            'done_to' => 'Sister',
+        ]);
+
+        // 4. Outside range (25/10/2026), done_to = Me
+        $exp4 = PersonalExpense::create([
+            'user_id' => $user->id,
+            'category_id' => $cat->id,
+            'amount' => 800.00,
+            'date' => '2026-10-25',
+            'description' => 'Future Shoes',
+            'payment_method' => 'Card',
+            'done_by' => 'Me',
+            'done_to' => 'Me',
+        ]);
+
+        // Filter: from_date 2026-10-01 to 2026-10-19, done_to = Me
+        $response = $this->actingAs($user)->get(route('personal-expenses.index', [
+            'from_date' => '2026-10-01',
+            'to_date' => '2026-10-19',
+            'done_to' => 'Me',
+        ]));
+        $response->assertOk();
+
+        $filteredExpenses = $response->viewData('expenses');
+        $ids = $filteredExpenses->pluck('id')->all();
+
+        $this->assertContains($exp1->id, $ids);
+        $this->assertContains($exp2->id, $ids); // done_to null is considered Me / Self
+        $this->assertNotContains($exp3->id, $ids); // Sister excluded
+        $this->assertNotContains($exp4->id, $ids); // Outside date range excluded
+    }
 }

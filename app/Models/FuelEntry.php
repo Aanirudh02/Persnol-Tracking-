@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CloudinaryService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,7 +47,7 @@ class FuelEntry extends Model
 
     public function receiptUrl(): ?string
     {
-        return \App\Services\CloudinaryService::url($this->receipt_image);
+        return CloudinaryService::url($this->receipt_image);
     }
 
     public function dailyRecord(): BelongsTo

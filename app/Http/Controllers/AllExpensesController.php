@@ -24,6 +24,10 @@ class AllExpensesController extends Controller
             $period = 'month';
         }
 
+        if (($fromDate || $toDate) && $period === 'all') {
+            $period = 'custom';
+        }
+
         [$startDate, $endDate] = $this->resolveDates($period, $fromDate, $toDate, $customMonth);
 
         // 1. Normal Expenses query
@@ -34,6 +38,10 @@ class AllExpensesController extends Controller
 
         if ($startDate && $endDate) {
             $normalQuery->whereBetween('date', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $normalQuery->where('date', '>=', $startDate);
+        } elseif ($endDate) {
+            $normalQuery->where('date', '<=', $endDate);
         }
 
         if ($typeFilter === 'voluntary') {
@@ -53,6 +61,10 @@ class AllExpensesController extends Controller
 
             if ($startDate && $endDate) {
                 $pQuery->whereBetween('date', [$startDate, $endDate]);
+            } elseif ($startDate) {
+                $pQuery->where('date', '>=', $startDate);
+            } elseif ($endDate) {
+                $pQuery->where('date', '<=', $endDate);
             }
 
             if ($typeFilter === 'voluntary') {
@@ -164,10 +176,13 @@ class AllExpensesController extends Controller
             'month' => [$today->copy()->startOfMonth()->toDateString(), $today->copy()->endOfMonth()->toDateString()],
             'year' => [$today->copy()->startOfYear()->toDateString(), $today->copy()->endOfYear()->toDateString()],
             'custom' => [
-                $start ?: $today->copy()->startOfMonth()->toDateString(),
-                $end ?: $today->toDateString(),
+                $start ?: null,
+                $end ?: null,
             ],
-            default => [null, null],
+            default => [
+                $start ?: null,
+                $end ?: null,
+            ],
         };
     }
 }

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DailyRecord;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\FuelEntry;
 use App\Models\OdometerGroup;
 use App\Models\OdometerReading;
@@ -51,7 +54,7 @@ class OdometerController extends Controller
             ->when($selectedVehicleId, fn ($q) => $q->where(fn ($inner) => $inner->where('vehicle_id', $selectedVehicleId)->orWhereNull('vehicle_id')))
             ->orderByDesc('date')
             ->orderByDesc('time')
-            ->limit(20)
+            ->limit(50)
             ->get();
 
         // Per-vehicle statistics
@@ -386,13 +389,23 @@ class OdometerController extends Controller
      */
     public function show(Request $request, OdometerGroup $group): View
     {
-        if ($group->user_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($group->user_id !== $user->id) {
             abort(403);
         }
 
         $group->load(['readings', 'startFuelEntry', 'endFuelEntry', 'vehicle']);
 
-        return view('odometer.show', compact('group'));
+        $recentFuelEntries = FuelEntry::where('user_id', $user->id)
+            ->when($group->vehicle_id, fn ($q) => $q->where(fn ($inner) => $inner->where('vehicle_id', $group->vehicle_id)->orWhereNull('vehicle_id')))
+            ->orderByDesc('date')
+            ->orderByDesc('time')
+            ->limit(50)
+            ->get();
+
+        $vehicles = Vehicle::where('user_id', $user->id)->orderByDesc('is_default')->orderBy('name')->get();
+
+        return view('odometer.show', compact('group', 'recentFuelEntries', 'vehicles'));
     }
 
     /**
@@ -448,18 +461,127 @@ class OdometerController extends Controller
      */
     public function updateGroup(Request $request, OdometerGroup $group): RedirectResponse
     {
-        if ($group->user_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($group->user_id !== $user->id) {
             abort(403);
         }
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'notes' => 'nullable|string',
+            'vehicle_id' => 'nullable|exists:vehicles,id',
+            'status' => 'nullable|in:active,completed',
+            'fuel_action' => 'nullable|string|in:link_existing,create_new,manual,unlink',
+            'end_fuel_entry_id' => 'nullable|exists:fuel_entries,id',
+            'start_fuel_entry_id' => 'nullable|exists:fuel_entries,id',
+            'manual_litres' => 'nullable|numeric|min:0',
+            'manual_fuel_cost' => 'nullable|numeric|min:0',
+            'new_fuel_litres' => 'nullable|numeric|min:0.01',
+            'new_fuel_amount' => 'nullable|numeric|min:1',
+            'new_fuel_date' => 'nullable|date',
+            'new_fuel_time' => 'nullable|string|max:10',
+            'new_fuel_payment_method' => 'nullable|string|max:50',
+            'new_fuel_station' => 'nullable|string|max:150',
+            'new_fuel_notes' => 'nullable|string',
+            'new_fuel_add_as_expense' => 'nullable|boolean',
         ]);
 
-        $group->update($validated);
+        $group->title = $validated['title'];
+        $group->notes = $validated['notes'] ?? null;
+        if (! empty($validated['vehicle_id'])) {
+            $group->vehicle_id = (int) $validated['vehicle_id'];
+        }
+        if (! empty($validated['status'])) {
+            $group->status = $validated['status'];
+        }
 
-        return back()->with('success', 'Cycle updated successfully!');
+        $fuelAction = $request->input('fuel_action');
+
+        if ($fuelAction === 'create_new' && $request->filled('new_fuel_litres') && $request->filled('new_fuel_amount')) {
+            $fuelDate = $request->input('new_fuel_date') ?: Carbon::today()->toDateString();
+            $fuelTime = $request->input('new_fuel_time') ? Carbon::parse($request->input('new_fuel_time'))->format('H:i') : Carbon::now()->format('H:i');
+            $litres = (float) $request->input('new_fuel_litres');
+            $amount = (float) $request->input('new_fuel_amount');
+            $pricePerLitre = round($amount / $litres, 2);
+            $paymentMethod = $request->input('new_fuel_payment_method') ?: 'UPI';
+            $station = $request->input('new_fuel_station');
+            $fuelNotes = $request->input('new_fuel_notes') ?: 'Refuel for cycle: '.$group->title;
+
+            $dailyRecord = DailyRecord::firstOrCreate([
+                'user_id' => $user->id,
+                'record_date' => $fuelDate,
+            ]);
+
+            $fuel = FuelEntry::create([
+                'user_id' => $user->id,
+                'vehicle_id' => $group->vehicle_id,
+                'daily_record_id' => $dailyRecord->id,
+                'date' => $fuelDate,
+                'time' => $fuelTime,
+                'amount' => $amount,
+                'litres' => $litres,
+                'price_per_litre' => $pricePerLitre,
+                'odometer' => $group->end_odometer ? (int) round($group->end_odometer) : null,
+                'petrol_station' => $station,
+                'payment_method' => $paymentMethod,
+                'notes' => $fuelNotes,
+            ]);
+
+            if ($request->boolean('new_fuel_add_as_expense')) {
+                $fuelCat = ExpenseCategory::firstOrCreate(
+                    ['user_id' => $user->id, 'name' => 'Petrol'],
+                    ['color' => '#f97316', 'is_archived' => false]
+                );
+
+                $expense = Expense::create([
+                    'user_id' => $user->id,
+                    'daily_record_id' => $dailyRecord->id,
+                    'category_id' => $fuelCat->id,
+                    'amount' => $amount,
+                    'date' => $fuelDate,
+                    'time' => $fuelTime,
+                    'description' => 'Petrol Refuel (Odometer Cycle: '.$group->title.')',
+                    'payment_method' => $paymentMethod,
+                    'paid_by' => 'Me',
+                    'paid_by_type' => 'me',
+                ]);
+
+                $fuel->update(['expense_id' => $expense->id]);
+            }
+
+            $group->end_fuel_entry_id = $fuel->id;
+        } elseif ($fuelAction === 'unlink') {
+            $group->end_fuel_entry_id = null;
+            $group->total_litres = null;
+            $group->total_fuel_cost = null;
+            $group->calculated_mileage = null;
+            $group->cost_per_km = null;
+        } elseif ($fuelAction === 'manual' || ($request->filled('manual_litres') && ! $request->filled('end_fuel_entry_id'))) {
+            $group->end_fuel_entry_id = null;
+            $group->total_litres = (float) $request->input('manual_litres', 0);
+            $group->total_fuel_cost = (float) $request->input('manual_fuel_cost', 0);
+        } elseif ($request->filled('end_fuel_entry_id')) {
+            $group->end_fuel_entry_id = (int) $request->input('end_fuel_entry_id');
+        }
+
+        if ($request->has('start_fuel_entry_id')) {
+            $group->start_fuel_entry_id = $request->filled('start_fuel_entry_id')
+                ? (int) $request->input('start_fuel_entry_id')
+                : null;
+        }
+
+        $group->save();
+        $group->recalculateSummary();
+
+        $mileageSummary = '';
+        if ($group->calculated_mileage > 0) {
+            $mileageSummary = " · True Mileage: {$group->calculated_mileage} km/L";
+            if ($group->cost_per_km > 0) {
+                $mileageSummary .= " (₹{$group->cost_per_km}/km)";
+            }
+        }
+
+        return back()->with('success', "Cycle \"{$group->title}\" updated successfully!{$mileageSummary}");
     }
 
     /**

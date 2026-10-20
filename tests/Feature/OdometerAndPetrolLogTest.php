@@ -172,4 +172,75 @@ class OdometerAndPetrolLogTest extends TestCase
 
         $this->assertSame(1, FuelEntry::count());
     }
+
+    public function test_user_can_edit_completed_cycle_and_add_petrol_entry_later(): void
+    {
+        $user = $this->createAdminUser();
+        [$scooter] = $this->createVehicles($user);
+
+        // 1. Start cycle and end cycle without petrol entry
+        $this->recordReading($user, $scooter, 'source', 1000, '2026-10-01');
+        $this->recordReading($user, $scooter, 'ending', 1200, '2026-10-05');
+
+        $group = OdometerGroup::where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('completed', $group->status);
+        $this->assertEquals(200, (float) $group->total_km);
+        $this->assertNull($group->calculated_mileage);
+
+        // 2. Add petrol entry later via updateGroup (create_new mode)
+        $response = $this->actingAs($user)->put(route('odometer.groups.update', $group), [
+            'title' => $group->title,
+            'fuel_action' => 'create_new',
+            'new_fuel_litres' => 4.0,
+            'new_fuel_amount' => 400.0,
+            'new_fuel_date' => '2026-10-05',
+            'new_fuel_payment_method' => 'UPI',
+        ]);
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $group->refresh();
+        $this->assertNotNull($group->end_fuel_entry_id);
+        $this->assertEquals(4.0, (float) $group->total_litres);
+        $this->assertEquals(400.0, (float) $group->total_fuel_cost);
+        $this->assertEquals(50.0, (float) $group->calculated_mileage); // 200 km / 4 L = 50 km/L
+        $this->assertEquals(2.0, (float) $group->cost_per_km); // 400 / 200 = 2 Rs/km
+    }
+
+    public function test_editing_petrol_entry_recalculates_linked_odometer_cycle(): void
+    {
+        $user = $this->createAdminUser();
+        [$scooter] = $this->createVehicles($user);
+
+        $this->recordReading($user, $scooter, 'source', 1000, '2026-10-01');
+        $this->recordReading($user, $scooter, 'ending', 1200, '2026-10-05');
+
+        $group = OdometerGroup::where('user_id', $user->id)->firstOrFail();
+
+        $fuel = FuelEntry::create([
+            'user_id' => $user->id,
+            'vehicle_id' => $scooter->id,
+            'date' => '2026-10-05',
+            'amount' => 500,
+            'litres' => 5,
+            'price_per_litre' => 100,
+            'payment_method' => 'UPI',
+        ]);
+
+        $group->update(['end_fuel_entry_id' => $fuel->id]);
+        $group->recalculateSummary();
+        $this->assertEquals(40.0, (float) $group->calculated_mileage); // 200 / 5 = 40 km/L
+
+        // Now edit the fuel entry via PetrolController::update
+        $this->actingAs($user)->put(route('petrol.update', $fuel), [
+            'vehicle_id' => $scooter->id,
+            'date' => '2026-10-05',
+            'amount' => 400,
+            'litres' => 4,
+            'payment_method' => 'UPI',
+        ])->assertRedirect();
+
+        $group->refresh();
+        $this->assertEquals(50.0, (float) $group->calculated_mileage); // 200 / 4 = 50 km/L
+    }
 }

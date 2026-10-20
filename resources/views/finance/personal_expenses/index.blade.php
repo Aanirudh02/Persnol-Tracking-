@@ -77,6 +77,7 @@
         <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
             <form action="{{ route('personal-expenses.index') }}" method="GET" class="space-y-3 text-xs">
                 <input type="hidden" name="status" value="{{ $status ?? 'active' }}">
+                <input type="hidden" name="period" value="custom">
                 <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-3">
                     <div>
                         <label class="block text-slate-400 mb-1">Category</label>

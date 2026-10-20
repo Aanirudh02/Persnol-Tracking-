@@ -116,19 +116,30 @@ class OdometerGroup extends Model
         if ($readings->count() > 1 && ($this->status === 'completed' || $last->reading_type === 'ending')) {
             $this->end_odometer = (float) $last->odometer_km;
             $this->total_km = max(0, round($this->end_odometer - $this->start_odometer, 2));
+        } elseif ($this->end_odometer && $this->end_odometer >= $this->start_odometer) {
+            $this->total_km = max(0, round((float) $this->end_odometer - $this->start_odometer, 2));
+        }
 
-            // If end fuel entry is linked, use its refill litres as fuel consumed to full
-            if ($this->end_fuel_entry_id && $this->endFuelEntry) {
-                $litres = (float) $this->endFuelEntry->litres;
-                $cost = (float) $this->endFuelEntry->amount;
+        // Resolve fuel consumed and calculate mileage
+        $litres = 0;
+        $cost = 0;
 
-                if ($litres > 0) {
-                    $this->total_litres = $litres;
-                    $this->total_fuel_cost = $cost;
-                    $this->calculated_mileage = $this->total_km > 0 ? round($this->total_km / $litres, 2) : 0;
-                    $this->cost_per_km = $this->total_km > 0 ? round($cost / $this->total_km, 2) : 0;
-                }
-            }
+        if ($this->end_fuel_entry_id && $this->endFuelEntry) {
+            $litres = (float) $this->endFuelEntry->litres;
+            $cost = (float) $this->endFuelEntry->amount;
+        } elseif ($this->total_litres && (float) $this->total_litres > 0) {
+            $litres = (float) $this->total_litres;
+            $cost = (float) ($this->total_fuel_cost ?? 0);
+        }
+
+        if ($litres > 0) {
+            $this->total_litres = $litres;
+            $this->total_fuel_cost = $cost;
+            $this->calculated_mileage = $this->total_km > 0 ? round($this->total_km / $litres, 2) : 0;
+            $this->cost_per_km = ($this->total_km > 0 && $cost > 0) ? round($cost / $this->total_km, 2) : 0;
+        } else {
+            $this->calculated_mileage = null;
+            $this->cost_per_km = null;
         }
 
         $this->save();

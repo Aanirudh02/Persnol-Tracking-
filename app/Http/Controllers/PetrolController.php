@@ -6,6 +6,7 @@ use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\FuelEntry;
+use App\Models\OdometerGroup;
 use App\Models\Vehicle;
 use App\Services\AuditService;
 use App\Services\CloudinaryService;
@@ -260,6 +261,14 @@ class PetrolController extends Controller
             }
         });
 
+        // Recalculate any odometer cycles that use this fuel entry
+        $linkedGroups = OdometerGroup::where('start_fuel_entry_id', $petrol->id)
+            ->orWhere('end_fuel_entry_id', $petrol->id)
+            ->get();
+        foreach ($linkedGroups as $lg) {
+            $lg->recalculateSummary();
+        }
+
         AuditService::log(
             module: 'fuel',
             recordId: $petrol->id,
@@ -290,6 +299,21 @@ class PetrolController extends Controller
             }
 
             $petrol->delete();
+
+            // Recalculate any odometer cycles that use this fuel entry
+            $linkedGroups = OdometerGroup::where('start_fuel_entry_id', $petrol->id)
+                ->orWhere('end_fuel_entry_id', $petrol->id)
+                ->get();
+            foreach ($linkedGroups as $lg) {
+                if ($lg->start_fuel_entry_id === $petrol->id) {
+                    $lg->start_fuel_entry_id = null;
+                }
+                if ($lg->end_fuel_entry_id === $petrol->id) {
+                    $lg->end_fuel_entry_id = null;
+                }
+                $lg->save();
+                $lg->recalculateSummary();
+            }
         });
 
         return redirect()->route('petrol.index')->with('success', $deleteLinkedExpense
