@@ -17,6 +17,7 @@ use App\Http\Controllers\FoodController;
 use App\Http\Controllers\FriendController;
 use App\Http\Controllers\FriendSplitController;
 use App\Http\Controllers\GeoController;
+use App\Http\Controllers\GPayAuditorController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\MediaUploadController;
 use App\Http\Controllers\MistakeController;
@@ -126,6 +127,9 @@ Route::middleware('auth')->group(function () {
         // Payments & Reconciliation
         Route::resource('payments', PaymentController::class)->names('payments');
         Route::post('/payments/{payment}/reconcile', [PaymentController::class, 'reconcile'])->name('payments.reconcile')->middleware('permission:payments.reconcile');
+        Route::get('/reconcile/gpay-auditor', [GPayAuditorController::class, 'index'])->name('finance.gpay-auditor.index');
+        Route::post('/reconcile/gpay-auditor', [GPayAuditorController::class, 'audit'])->name('finance.gpay-auditor.audit');
+        Route::post('/reconcile/gpay-auditor/action', [GPayAuditorController::class, 'quickAction'])->name('finance.gpay-auditor.action');
 
         // Friends & Settlements
         Route::get('/friends', [FriendController::class, 'index'])->name('friends.index');

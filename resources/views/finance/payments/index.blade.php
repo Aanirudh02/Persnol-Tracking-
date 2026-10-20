@@ -8,9 +8,14 @@
                     Reconciled: <span class="font-bold text-emerald-600">₹{{ number_format($totalReconciled, 2) }}</span>
                 </p>
             </div>
-            <a href="{{ route('payments.create') }}" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 self-start">
-                <span>+</span> Record Payment
-            </a>
+            <div class="flex items-center gap-2 self-start sm:self-auto">
+                <a href="{{ route('finance.gpay-auditor.index') }}" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition">
+                    <span>📱</span> GPay Screenshot Auditor
+                </a>
+                <a href="{{ route('payments.create') }}" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition">
+                    <span>+</span> Record Payment
+                </a>
+            </div>
         </div>
 
         <!-- Payments Table -->
