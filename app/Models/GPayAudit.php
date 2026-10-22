@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GPayAudit extends Model
 {
+    protected $table = 'gpay_audits';
+
     protected $fillable = [
         'user_id',
         'screenshot_path',
