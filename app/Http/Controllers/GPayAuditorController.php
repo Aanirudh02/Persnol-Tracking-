@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
 use App\Models\GPayAudit;
@@ -9,7 +10,6 @@ use App\Models\Income;
 use App\Models\IncomeCategory;
 use App\Models\PaymentWallet;
 use App\Services\CloudinaryService;
-use App\Services\DailyRecordService;
 use App\Services\GPayAuditorService;
 use App\Services\WalletService;
 use Carbon\Carbon;
@@ -23,8 +23,7 @@ class GPayAuditorController extends Controller
     public function __construct(
         private readonly GPayAuditorService $auditorService,
         private readonly CloudinaryService $cloudinary,
-        private readonly WalletService $walletService,
-        private readonly DailyRecordService $dailyRecordService
+        private readonly WalletService $walletService
     ) {}
 
     /**
@@ -193,7 +192,10 @@ class GPayAuditorController extends Controller
 
             if ($action === 'add_expense') {
                 $date = $validated['date'] ?? Carbon::today()->toDateString();
-                $dailyRecord = $this->dailyRecordService->getOrCreateRecord($user, $date);
+                $dailyRecord = DailyRecord::query()->firstOrCreate([
+                    'user_id' => $user->id,
+                    'record_date' => $date,
+                ]);
 
                 // General category fallback
                 $category = ExpenseCategory::query()

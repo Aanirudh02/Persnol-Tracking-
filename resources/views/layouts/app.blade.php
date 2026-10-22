@@ -74,6 +74,9 @@
             <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">
                 Payments & Reconcile
             </x-nav-link>
+            <x-nav-link href="{{ route('finance.gpay-auditor.index') }}" :active="request()->routeIs('finance.gpay-auditor.*')" icon="smartphone">
+                GPay Auditor
+            </x-nav-link>
             <x-nav-link href="{{ route('savings.index') }}" :active="request()->routeIs('savings.*')" icon="trending-up">
                 Savings & Funds
             </x-nav-link>
@@ -290,6 +293,9 @@
                 </a>
                 <a href="{{ route('classification.index') }}" class="p-3 rounded-2xl bg-violet-50/70 hover:bg-violet-100 border border-violet-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">🏷️</span> Classifications
+                </a>
+                <a href="{{ route('finance.gpay-auditor.index') }}" class="p-3 rounded-2xl bg-emerald-50/70 hover:bg-emerald-100 border border-emerald-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
+                    <span class="text-xl">📱</span> GPay Auditor
                 </a>
                 <a href="{{ route('food.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">🍔</span> Food & Snacks
