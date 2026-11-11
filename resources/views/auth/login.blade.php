@@ -79,8 +79,8 @@
             </div>
         </aside>
 
-        <main class="flex min-w-0 items-center justify-center bg-[radial-gradient(ellipse_at_100%_0,rgba(184,214,255,.34),transparent_43%),#f3f7ff] px-4 py-7 sm:px-6 lg:justify-start lg:py-10 lg:pl-[clamp(2rem,5vw,5rem)] lg:pr-8">
-            <div class="w-full max-w-[430px] rounded-[1.5rem] border border-white/90 bg-white/95 px-5 py-7 shadow-[0_18px_50px_rgba(23,64,139,.12)] sm:px-8 sm:py-8">
+        <main class="flex min-w-0 items-center justify-center bg-[radial-gradient(ellipse_at_100%_0,rgba(184,214,255,.34),transparent_43%),#f3f7ff] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
+            <div class="w-full max-w-[448px] rounded-[1.5rem] border border-white/90 bg-white/95 px-5 py-7 shadow-[0_18px_50px_rgba(23,64,139,.12)] sm:px-8 sm:py-9">
                 <div class="flex justify-center">
                     <a href="{{ url('/') }}" class="inline-flex items-center gap-3 text-slate-900 no-underline">
                         <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-violet-600 text-lg text-white shadow-md shadow-blue-500/20" aria-hidden="true">
@@ -95,7 +95,7 @@
                     </a>
                 </div>
 
-                <div class="my-5 flex items-center gap-2 text-sky-600" aria-hidden="true">
+                <div class="my-6 flex items-center gap-2 text-sky-600" aria-hidden="true">
                     <span class="h-px flex-1 bg-gradient-to-r from-transparent to-indigo-200"></span>
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h5l3-8 4 16 3-8h3" /></svg>
                     <span class="h-px flex-1 bg-gradient-to-l from-transparent to-indigo-200"></span>
@@ -122,7 +122,7 @@
                     </div>
                 @endif
 
-                <form action="{{ route('login.submit') }}" method="POST" class="mt-6 space-y-4">
+                <form action="{{ route('login.submit') }}" method="POST" class="mt-7 space-y-4">
                     @csrf
 
                     <div>
@@ -143,7 +143,7 @@
                                 required
                                 value="{{ old('login') }}"
                                 placeholder="Email or phone number"
-                                class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-10 pr-4 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                             />
                         </div>
                     </div>
@@ -170,7 +170,7 @@
                                 autocomplete="current-password"
                                 required
                                 placeholder="Password"
-                                class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-11 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                                class="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-10 pr-11 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
                             />
                             <button
                                 type="button"
@@ -203,7 +203,7 @@
 
                     <button
                         type="submit"
-                        class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition-all duration-200 hover:from-sky-600 hover:to-blue-700 hover:shadow-sky-500/30 active:scale-[0.99]"
+                        class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition-all duration-200 hover:from-sky-600 hover:to-blue-700 hover:shadow-sky-500/30 active:scale-[0.99]"
                     >
                         <span>Sign In to LifeTracker</span>
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
