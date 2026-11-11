@@ -79,8 +79,10 @@
             </div>
         </aside>
 
-        <main class="flex min-w-0 items-center justify-center bg-[radial-gradient(ellipse_at_100%_0,rgba(184,214,255,.34),transparent_43%),#f3f7ff] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
-            <div class="w-full max-w-[448px] rounded-[1.5rem] border border-white/90 bg-white/95 px-5 py-7 shadow-[0_18px_50px_rgba(23,64,139,.12)] sm:px-8 sm:py-9">
+        <main class="relative isolate flex min-w-0 items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_100%_0,rgba(184,214,255,.34),transparent_43%),#f3f7ff] px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
+            <div class="pointer-events-none absolute -right-56 top-[18%] h-[32rem] w-[32rem] rounded-full border-[38px] border-blue-100/30 bg-blue-100/20"></div>
+            <div class="pointer-events-none absolute -bottom-[24rem] -right-28 h-[40rem] w-[40rem] rounded-full border-[34px] border-white/60 bg-blue-100/25"></div>
+            <div class="relative z-10 w-full max-w-[510px] rounded-[1.5rem] border border-white/90 bg-white/95 px-5 py-7 shadow-[0_18px_50px_rgba(23,64,139,.12)] sm:px-10 sm:py-9">
                 <div class="flex justify-center">
                     <a href="{{ url('/') }}" class="inline-flex items-center gap-3 text-slate-900 no-underline">
                         <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-violet-600 text-lg text-white shadow-md shadow-blue-500/20" aria-hidden="true">
