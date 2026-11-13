@@ -141,7 +141,7 @@
                         <tbody class="divide-y divide-slate-100">
                             @forelse($items as $index => $item)
                                 @php
-                                    $itemAmount = $statement->isNormal() ? $item->totalAmount() : (float) $item->amount;
+                                    $itemAmount = $item->totalAmount();
                                     $itemDate = $statement->isNormal() ? $item->date : ($item->date ?? $item->created_at);
                                 @endphp
                                 <tr class="hover:bg-slate-50/70">
@@ -210,6 +210,13 @@
                                                 }
                                             @endphp
                                             <span class="block text-[11px] text-slate-500 italic mt-0.5">{!! $formattedNotes !!}</span>
+                                        @endif
+                                        @if($statement->isNormal() && $item->relationLoaded('friendSplits'))
+                                            @foreach($item->friendSplits->filter(fn ($split) => (float) $split->paid_by_friend_amount > 0 && filled($split->payment_method)) as $split)
+                                                <span class="block text-[11px] text-slate-500 mt-0.5"><strong>{{ $split->friend?->name ?? 'Payer' }}</strong> paid via {{ $split->payment_method }}</span>
+                                            @endforeach
+                                        @elseif($statement->isNormal() && $item->relationLoaded('friendSplit') && (float) $item->friendSplit?->paid_by_friend_amount > 0 && filled($item->friendSplit?->payment_method))
+                                            <span class="block text-[11px] text-slate-500 mt-0.5"><strong>{{ $item->friendSplit->friend?->name ?? 'Payer' }}</strong> paid via {{ $item->friendSplit->payment_method }}</span>
                                         @endif
                                     </td>
                                     <td class="py-3 px-4 whitespace-nowrap">

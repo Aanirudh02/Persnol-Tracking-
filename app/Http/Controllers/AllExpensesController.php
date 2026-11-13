@@ -75,13 +75,17 @@ class AllExpensesController extends Controller
         }
 
         // Totals
-        $normalTotal = (float) $normalExpenses->sum(fn ($e) => $e->totalAmount());
-        $personalTotal = (float) $personalExpenses->sum('amount');
+        $normalTotal = (float) $normalExpenses
+            ->where('is_voluntary', false)
+            ->sum(fn ($expense) => $expense->totalAmount());
+        $personalTotal = (float) $personalExpenses
+            ->where('is_voluntary', false)
+            ->sum(fn ($expense) => $expense->totalAmount());
         $combinedTotal = round($normalTotal + $personalTotal, 2);
 
         $voluntaryTotal = round(
-            $normalExpenses->where('is_voluntary', true)->sum(fn ($e) => $e->totalAmount()) +
-            $personalExpenses->where('is_voluntary', true)->sum('amount'),
+            $normalExpenses->where('is_voluntary', true)->sum(fn ($expense) => $expense->totalAmount()) +
+            $personalExpenses->where('is_voluntary', true)->sum(fn ($expense) => $expense->totalAmount()),
             2
         );
 
@@ -115,7 +119,7 @@ class AllExpensesController extends Controller
                     'description' => $pexp->description ?: ($pexp->category?->name ?? 'Personal Expense'),
                     'category' => $pexp->category?->name ?? 'Personal',
                     'category_color' => $pexp->category?->color ?? '#ec4899',
-                    'amount' => (float) $pexp->amount,
+                    'amount' => $pexp->totalAmount(),
                     'payment_method' => $pexp->payment_method ?: 'Cash',
                     'is_voluntary' => $pexp->is_voluntary,
                     'is_archived' => (bool) ($pexp->category?->is_archived),

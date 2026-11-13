@@ -77,48 +77,33 @@
             @endif
 
             <!-- Attach New Expense Tally Form -->
-            @if($untalliedTotal > 0 && ($availableExpenses->isNotEmpty() || $talliedExpenses->isNotEmpty()))
+            @if($untalliedTotal > 0 && $availableExpenses->isNotEmpty())
                 <form action="{{ route('income.tally', $income) }}" method="POST" class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 text-xs space-y-3">
                     @csrf
-                    <div class="font-bold text-indigo-950">Tally Another Expense against this Income</div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div class="sm:col-span-1">
-                            <label class="font-semibold text-slate-700 block mb-1">Select Expense</label>
-                            <select name="expense_id" id="tally_expense_select" required class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold">
-                                <option value="">Choose an expense...</option>
-
-                                @if($availableExpenses->isNotEmpty())
-                                    <optgroup label="✅ Available to Tally">
-                                        @foreach($availableExpenses as $exp)
-                                            <option value="{{ $exp->id }}" data-amount="{{ $exp->available_to_tally }}" data-total="{{ $exp->totalAmount() }}">
-                                                {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }})@if($exp->total_tallied_amount > 0) · [₹{{ number_format($exp->available_to_tally, 2) }} available]@endif
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                @endif
-
-                                @if($talliedExpenses->isNotEmpty())
-                                    <optgroup label="🔒 Already Tallied (Cannot Re-Tally)">
-                                        @foreach($talliedExpenses as $exp)
-                                            <option value="{{ $exp->id }}" disabled class="text-slate-400 bg-slate-100 italic">
-                                                {{ $exp->date->format('d M') }}: {{ $exp->description }} (₹{{ number_format($exp->totalAmount(), 2) }}) — [{{ $exp->tally_badge }}]
-                                            </option>
-                                        @endforeach
-                                    </optgroup>
-                                @endif
-                            </select>
-                        </div>
-                        <div>
-                            <label class="font-semibold text-slate-700 block mb-1">Allocated Amount (₹)</label>
-                            <input type="number" step="0.01" min="0.01" max="{{ $untalliedTotal }}" name="allocated_amount" id="tally_allocated_amount" required placeholder="Amount" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-bold text-indigo-700">
+                    <div class="font-bold text-indigo-950">Tally multiple expenses against this income</div>
+                    <p class="text-slate-600">Select expenses to apply each one’s full remaining untallied amount. Income available: ₹{{ number_format($untalliedTotal, 2) }}</p>
+                    <div class="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-indigo-100 bg-white p-2">
+                        @foreach($availableExpenses as $exp)
+                            <label class="flex cursor-pointer items-start gap-2 rounded-lg p-2 hover:bg-indigo-50">
+                                <input type="checkbox" name="expense_ids[]" value="{{ $exp->id }}" data-amount="{{ $exp->available_to_tally }}" @checked(in_array($exp->id, old('expense_ids', []))) class="tally-expense-checkbox mt-0.5 rounded border-slate-300 text-indigo-600">
+                                <span class="min-w-0 flex-1">
+                                    <span class="block truncate font-semibold text-slate-800">{{ $exp->description ?: 'Expense' }}</span>
+                                    <span class="text-[11px] text-slate-500">{{ $exp->date->format('d M Y') }} · ₹{{ number_format($exp->available_to_tally, 2) }} available</span>
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div id="bulk-tally-summary" class="rounded-xl bg-white px-3 py-2 font-semibold text-indigo-800">
+                            0 expenses selected · ₹0.00 total
                         </div>
                         <div>
                             <label class="font-semibold text-slate-700 block mb-1">Notes (optional)</label>
-                            <input type="text" name="notes" placeholder="e.g. Paid full bill from salary" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
+                            <input type="text" name="notes" value="{{ old('notes') }}" placeholder="e.g. Paid from salary" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
                         </div>
                     </div>
                     <div class="flex justify-end pt-1">
-                        <button type="submit" class="rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 transition">Attach Tally</button>
+                        <button type="submit" id="bulk-tally-submit" disabled class="rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-50">Attach Selected Expenses</button>
                     </div>
                 </form>
             @endif
@@ -126,17 +111,24 @@
     </div>
 
     <script>
-        const expSelect = document.getElementById('tally_expense_select');
-        const amountInput = document.getElementById('tally_allocated_amount');
-        const maxUntallied = {{ $untalliedTotal }};
+        const tallyCheckboxes = Array.from(document.querySelectorAll('.tally-expense-checkbox'));
+        const tallyLimit = {{ $untalliedTotal }};
+        const tallySubmit = document.getElementById('bulk-tally-submit');
+        const tallySummary = document.getElementById('bulk-tally-summary');
 
-        expSelect?.addEventListener('change', () => {
-            const opt = expSelect.options[expSelect.selectedIndex];
-            const amt = opt ? Number(opt.dataset.amount || 0) : 0;
-            if (amt > 0) {
-                amountInput.value = Math.min(amt, maxUntallied).toFixed(2);
-                amountInput.max = Math.min(amt, maxUntallied).toFixed(2);
-            }
+        function updateBulkTallySummary() {
+            const selected = tallyCheckboxes.filter(checkbox => checkbox.checked);
+            const total = selected.reduce((sum, checkbox) => sum + Number(checkbox.dataset.amount || 0), 0);
+            tallySummary.textContent = `${selected.length} expense(s) selected · ₹${total.toFixed(2)} total${total > tallyLimit ? ' (over available income)' : ''}`;
+            tallySubmit.disabled = selected.length === 0 || total > tallyLimit + 0.01;
+        }
+
+        tallyCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateBulkTallySummary);
         });
+
+        if (tallyCheckboxes.length > 0) {
+            updateBulkTallySummary();
+        }
     </script>
 </x-app-layout>

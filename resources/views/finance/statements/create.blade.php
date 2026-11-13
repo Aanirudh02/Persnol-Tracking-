@@ -1,7 +1,7 @@
 <x-app-layout title="Take Statement">
     <div class="max-w-3xl mx-auto space-y-6">
         <!-- Top Toolbar / Back button -->
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <a href="{{ route('statements.index') }}" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-xs hover:bg-slate-50 transition flex items-center gap-1.5">
                 &larr; Back to Statements
             </a>
@@ -68,6 +68,7 @@
                         <option value="day">Today (Day)</option>
                         <option value="week">This Week</option>
                         <option value="month">This Month</option>
+                        <option value="previous_month">Previous Month</option>
                         <option value="year">This Year</option>
                         <option value="custom">Custom Date Range</option>
                     </select>
@@ -206,11 +207,11 @@
                 </div>
 
                 <!-- Submit Toolbar -->
-                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <a href="{{ route('statements.index') }}" class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                <div class="flex flex-col-reverse gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                    <a href="{{ route('statements.index') }}" class="w-full px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition sm:w-auto">
                         Cancel
                     </a>
-                    <button type="submit" style="background-color: #0f172a; color: #ffffff;" class="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer">
+                    <button type="submit" style="background-color: #0f172a; color: #ffffff;" class="w-full px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md hover:shadow-lg transition cursor-pointer sm:w-auto">
                         Generate Statement &rarr;
                     </button>
                 </div>

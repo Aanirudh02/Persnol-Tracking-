@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class IncomeController extends Controller
@@ -182,6 +183,7 @@ class IncomeController extends Controller
         $allExpenses = Expense::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('parent_id')
+            ->where('is_voluntary', false)
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->with(['incomeTallies.income'])
             ->orderByDesc('date')
@@ -234,33 +236,94 @@ class IncomeController extends Controller
             abort(403);
         }
 
-        $untallied = $income->untalliedAmount();
-        $validated = $request->validate([
-            'expense_id' => ['required', 'exists:expenses,id'],
-            'allocated_amount' => ['required', 'numeric', 'min:0.01', 'max:'.max(0.01, $untallied + 0.01)],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $isBulk = $request->has('expense_ids');
+        $validated = $isBulk
+            ? $request->validate([
+                'expense_ids' => ['required', 'array', 'min:1'],
+                'expense_ids.*' => ['required', 'integer', 'distinct', 'exists:expenses,id'],
+                'notes' => ['nullable', 'string'],
+            ])
+            : $request->validate([
+                'expense_id' => ['required', 'exists:expenses,id'],
+                'allocated_amount' => ['required', 'numeric', 'min:0.01'],
+                'notes' => ['nullable', 'string'],
+            ]);
 
-        $expense = Expense::query()->where('user_id', $request->user()->id)->with(['incomeTallies'])->findOrFail($validated['expense_id']);
+        $expenseIds = $isBulk
+            ? array_map('intval', $validated['expense_ids'])
+            : [(int) $validated['expense_id']];
 
-        if (IncomeExpenseTally::where('income_id', $income->id)->where('expense_id', $expense->id)->exists()) {
-            return back()->with('error', 'This expense is already tallied under this income stream.');
-        }
+        $result = DB::transaction(function () use ($request, $income, $expenseIds, $isBulk, $validated): array {
+            $lockedIncome = Income::query()
+                ->where('user_id', $request->user()->id)
+                ->lockForUpdate()
+                ->findOrFail($income->id);
+            $expenses = Expense::query()
+                ->where('user_id', $request->user()->id)
+                ->whereNull('parent_id')
+                ->where('is_voluntary', false)
+                ->where(fn ($query) => $query->whereNull('is_archived')->orWhere('is_archived', false))
+                ->whereIn('id', $expenseIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
 
-        $expUntallied = $expense->untalliedAmount();
-        if ((float) $validated['allocated_amount'] > $expUntallied + 0.01) {
-            return back()->with('error', 'The selected expense only has ₹'.number_format($expUntallied, 2).' available to tally.');
-        }
+            if ($expenses->count() !== count(array_unique($expenseIds))) {
+                throw ValidationException::withMessages([
+                    'expense_ids' => 'Choose only your own active, non-voluntary expenses.',
+                ]);
+            }
 
-        IncomeExpenseTally::create([
-            'user_id' => $request->user()->id,
-            'income_id' => $income->id,
-            'expense_id' => $expense->id,
-            'allocated_amount' => $validated['allocated_amount'],
-            'notes' => $validated['notes'] ?? null,
-        ]);
+            $allocations = [];
+            $totalToTally = 0.0;
+            foreach ($expenses as $expense) {
+                if (IncomeExpenseTally::query()
+                    ->where('income_id', $lockedIncome->id)
+                    ->where('expense_id', $expense->id)
+                    ->exists()) {
+                    throw ValidationException::withMessages([
+                        'expense_ids' => 'An expense is already tallied under this income stream.',
+                    ]);
+                }
 
-        return back()->with('success', 'Expense tallied against income for ₹'.number_format((float) $validated['allocated_amount'], 2).'.');
+                $availableAmount = $expense->untalliedAmount();
+                $allocatedAmount = $isBulk ? $availableAmount : (float) $validated['allocated_amount'];
+
+                if ($allocatedAmount <= 0 || $allocatedAmount > $availableAmount + 0.01) {
+                    throw ValidationException::withMessages([
+                        ($isBulk ? 'expense_ids' : 'allocated_amount') => 'A selected expense does not have enough untallied amount available.',
+                    ]);
+                }
+
+                $allocations[] = [$expense, round($allocatedAmount, 2)];
+                $totalToTally += $allocatedAmount;
+            }
+
+            if ($totalToTally > $lockedIncome->untalliedAmount() + 0.01) {
+                throw ValidationException::withMessages([
+                    ($isBulk ? 'expense_ids' : 'allocated_amount') => 'The selected amount is greater than the income amount still available to tally.',
+                ]);
+            }
+
+            foreach ($allocations as [$expense, $allocatedAmount]) {
+                IncomeExpenseTally::query()->create([
+                    'user_id' => $request->user()->id,
+                    'income_id' => $lockedIncome->id,
+                    'expense_id' => $expense->id,
+                    'allocated_amount' => $allocatedAmount,
+                    'notes' => $validated['notes'] ?? null,
+                ]);
+            }
+
+            return ['count' => count($allocations), 'amount' => round($totalToTally, 2)];
+        });
+
+        return back()->with(
+            'success',
+            $isBulk
+                ? $result['count'].' expenses tallied against income for ₹'.number_format($result['amount'], 2).'.'
+                : 'Expense tallied against income for ₹'.number_format($result['amount'], 2).'.'
+        );
     }
 
     public function untallyExpense(Request $request, Income $income, IncomeExpenseTally $tally): RedirectResponse

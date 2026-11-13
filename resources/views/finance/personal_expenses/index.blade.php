@@ -235,6 +235,9 @@
                                     </td>
                                     <td class="py-3 px-4 font-bold text-pink-600 text-sm whitespace-nowrap">
                                         ₹{{ number_format($displayAmount, 2) }}
+                                        @if(!$isGroup && (float) $exp->gst_amount > 0)
+                                            <span class="block text-[10px] font-medium text-slate-500">Includes GST ₹{{ number_format($exp->gst_amount, 2) }}</span>
+                                        @endif
                                     </td>
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap font-medium">
                                         {{ $displayMethods ?: 'Cash' }}
@@ -523,7 +526,7 @@
                     <button type="button" onclick="closePersonalModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-2xl font-bold cursor-pointer">&times;</button>
                 </div>
 
-                <form id="personal-expense-form" action="{{ route('personal-expenses.store') }}" method="POST" class="space-y-4">
+                <form id="personal-expense-form" action="{{ route('personal-expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
                     @csrf
                     <input type="hidden" name="_method" id="personal-method-input" value="POST">
 
@@ -552,9 +555,26 @@
                         </div>
                     </div>
 
+                    <div class="space-y-2 rounded-xl border border-pink-100 bg-pink-50/60 p-3 dark:border-pink-900/50 dark:bg-pink-950/20">
+                        <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <input type="checkbox" id="personal-has-gst" class="rounded border-slate-300 text-pink-600 focus:ring-pink-500">
+                            <span>Include GST</span>
+                        </label>
+                        <div id="personal-gst-field" class="hidden">
+                            <label for="personal-gst-input" class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">GST amount (₹)</label>
+                            <input type="number" step="0.01" min="0" name="gst_amount" id="personal-gst-input" value="0" disabled class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Description (e.g. Hotel with Family, Shopping, Spotify)</label>
                         <input type="text" name="description" id="personal-desc-input" placeholder="e.g. Weekend snacks or Shopping" class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white focus:ring-2 focus:ring-pink-500">
+                    </div>
+
+                    <div>
+                        <label for="personal-receipt-input" class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-300">Receipt image (optional)</label>
+                        <input type="file" name="receipt_image" id="personal-receipt-input" accept="image/*" class="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-pink-600 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white">
+                        <a id="personal-current-receipt" href="#" target="_blank" rel="noopener" class="mt-2 hidden text-xs font-semibold text-pink-700 underline dark:text-pink-300">View current receipt</a>
                     </div>
 
                     <div>
@@ -704,6 +724,12 @@
             document.getElementById('personal-expense-form').action = "{{ route('personal-expenses.store') }}";
             document.getElementById('personal-method-input').value = 'POST';
             document.getElementById('personal-amount-input').value = '';
+            document.getElementById('personal-gst-input').value = '0';
+            document.getElementById('personal-has-gst').checked = false;
+            document.getElementById('personal-gst-input').disabled = true;
+            document.getElementById('personal-gst-field').classList.add('hidden');
+            document.getElementById('personal-receipt-input').value = '';
+            document.getElementById('personal-current-receipt').classList.add('hidden');
             document.getElementById('personal-desc-input').value = '';
             setSelectValueOrAdd(document.getElementById('personal-done-by-input'), 'Me', 'Me');
             setSelectValueOrAdd(document.getElementById('personal-done-to-input'), '', '');
@@ -728,6 +754,22 @@
                 document.getElementById('personal-category-input').value = exp.category_id;
             }
             document.getElementById('personal-amount-input').value = exp.amount;
+            const personalGst = Number(exp.gst_amount || 0);
+            document.getElementById('personal-gst-input').value = personalGst.toFixed(2);
+            document.getElementById('personal-has-gst').checked = personalGst > 0;
+            document.getElementById('personal-gst-input').disabled = personalGst <= 0;
+            document.getElementById('personal-gst-field').classList.toggle('hidden', personalGst <= 0);
+            document.getElementById('personal-receipt-input').value = '';
+            const currentReceipt = document.getElementById('personal-current-receipt');
+            if (exp.receipt_image) {
+                const receiptUrl = /^https?:\/\//i.test(exp.receipt_image)
+                    ? exp.receipt_image
+                    : `${@json(asset('storage'))}/${String(exp.receipt_image).replace(/^\/+/, '')}`;
+                currentReceipt.href = receiptUrl;
+                currentReceipt.classList.remove('hidden');
+            } else {
+                currentReceipt.classList.add('hidden');
+            }
             document.getElementById('personal-date-input').value = exp.date ? exp.date.substring(0, 10) : "{{ date('Y-m-d') }}";
             document.getElementById('personal-time-input').value = exp.time ? exp.time.substring(0, 5) : "{{ date('H:i') }}";
             document.getElementById('personal-desc-input').value = exp.description || '';
@@ -756,6 +798,16 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }
+
+        document.getElementById('personal-has-gst').addEventListener('change', event => {
+            const enabled = event.target.checked;
+            const gstInput = document.getElementById('personal-gst-input');
+            document.getElementById('personal-gst-field').classList.toggle('hidden', !enabled);
+            gstInput.disabled = !enabled;
+            if (!enabled) {
+                gstInput.value = '0';
+            }
+        });
 
         let currentActivePersonalGroupId = null;
         let personalGroupFetchTimeout = null;

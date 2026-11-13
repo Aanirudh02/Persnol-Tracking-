@@ -277,11 +277,13 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
                     'friend_id' => $sandeep->id,
                     'friend_share' => 0,
                     'paid_by_friend_amount' => 50,
+                    'payment_method' => 'UPI',
                 ],
                 [
                     'friend_id' => $rahul->id,
                     'friend_share' => 0,
                     'paid_by_friend_amount' => 30,
+                    'payment_method' => 'Cash',
                 ],
             ],
         ]);
@@ -291,11 +293,13 @@ class FinanceMultiSplitAndDashboardTest extends TestCase
 
         $sandeepSplit = FriendSplit::query()->where('friend_id', $sandeep->id)->firstOrFail();
         $this->assertEquals(50.0, (float) $sandeepSplit->paid_by_friend_amount);
+        $this->assertSame('UPI', $sandeepSplit->payment_method);
         $this->assertEquals(50.0, (float) $sandeepSplit->friend_share);
         $this->assertEquals(0.0, $sandeepSplit->netAmount());
 
         $rahulSplit = FriendSplit::query()->where('friend_id', $rahul->id)->firstOrFail();
         $this->assertEquals(30.0, (float) $rahulSplit->paid_by_friend_amount);
+        $this->assertSame('Cash', $rahulSplit->payment_method);
         $this->assertEquals(30.0, (float) $rahulSplit->friend_share);
         $this->assertEquals(0.0, $rahulSplit->netAmount());
     }

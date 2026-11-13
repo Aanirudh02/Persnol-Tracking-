@@ -619,7 +619,7 @@
             <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
 
                 <!-- Expense Categories -->
-                <div>
+                <div id="expense-categories">
                     <h3 class="text-sm font-bold text-slate-700 mb-1">💸 Expense Categories</h3>
                     <p class="text-[10px] text-slate-400 mb-3">Money buckets for Finance (Food, Snacks, Petrol…). Used on parent expenses only.</p>
                     <form action="{{ route('categories.expense.store') }}" method="POST" class="flex gap-2 mb-3">

@@ -17,6 +17,7 @@ class PersonalExpense extends Model
         'expense_id',
         'personal_expense_group_id',
         'amount',
+        'gst_amount',
         'date',
         'time',
         'description',
@@ -24,6 +25,7 @@ class PersonalExpense extends Model
         'done_by',
         'done_to',
         'notes',
+        'receipt_image',
         'is_voluntary',
         'is_archived',
         'classification',
@@ -32,6 +34,7 @@ class PersonalExpense extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'gst_amount' => 'decimal:2',
         'date' => 'date',
         'is_voluntary' => 'boolean',
         'is_archived' => 'boolean',
@@ -75,6 +78,6 @@ class PersonalExpense extends Model
 
     public function totalAmount(): float
     {
-        return (float) $this->amount;
+        return (float) $this->amount + (float) ($this->gst_amount ?? 0);
     }
 }

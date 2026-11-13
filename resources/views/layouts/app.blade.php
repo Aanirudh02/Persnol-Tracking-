@@ -254,15 +254,15 @@
         </div>
 
         <!-- Finance -->
-        <a href="{{ route('finance.index') }}" class="flex flex-col items-center justify-center flex-1 py-1 text-xs {{ request()->routeIs('finance.*') || request()->routeIs('expenses.*') || request()->routeIs('income.*') ? 'text-sky-600 dark:text-sky-400 font-bold' : 'text-slate-500 dark:text-slate-400' }}">
+        <button type="button" onclick="document.getElementById('mobile-more-menu').classList.add('hidden'); document.getElementById('mobile-finance-menu').classList.toggle('hidden')" aria-haspopup="dialog" aria-controls="mobile-finance-menu" class="flex flex-col items-center justify-center flex-1 py-1 text-xs {{ request()->routeIs('finance.*') || request()->routeIs('expenses.*') || request()->routeIs('income.*') || request()->routeIs('personal-expenses.*') || request()->routeIs('statements.*') || request()->routeIs('payments.*') || request()->routeIs('friends.*') || request()->routeIs('credits.*') || request()->routeIs('savings.*') ? 'text-sky-600 dark:text-sky-400 font-bold' : 'text-slate-500 dark:text-slate-400' }}">
             <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>Finance</span>
-        </a>
+        </button>
 
         <!-- More Menu Toggle -->
         <button
             type="button"
-            onclick="document.getElementById('mobile-more-menu').classList.toggle('hidden')"
+            onclick="document.getElementById('mobile-finance-menu').classList.add('hidden'); document.getElementById('mobile-more-menu').classList.toggle('hidden')"
             class="flex flex-col items-center justify-center flex-1 py-1 text-xs text-slate-500 dark:text-slate-400 cursor-pointer"
         >
             <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
@@ -326,6 +326,52 @@
                 </a>
                 <a href="{{ route('settings.index') }}" class="p-3 rounded-2xl bg-sky-50/70 hover:bg-sky-100 border border-sky-100/80 text-xs font-medium text-slate-700 dark:text-slate-300 flex flex-col items-center gap-1.5 transition">
                     <span class="text-xl">⚙️</span> Settings
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE FINANCE MODULES DRAWER -->
+    <div id="mobile-finance-menu" role="dialog" aria-modal="true" aria-labelledby="mobile-finance-title" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="max-h-[80vh] space-y-4 overflow-y-auto rounded-t-3xl border-t border-sky-100 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
+                <h3 id="mobile-finance-title" class="font-bold text-base text-slate-900 dark:text-white">Finance Modules</h3>
+                <button type="button" onclick="document.getElementById('mobile-finance-menu').classList.add('hidden')" aria-label="Close finance modules" class="text-slate-400 text-xl font-bold">&times;</button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 text-center">
+                <a href="{{ route('finance.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">💹</span> Finance Hub
+                </a>
+                <a href="{{ route('expenses.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">💸</span> Expenses
+                </a>
+                <a href="{{ route('personal-expenses.index') }}" class="rounded-2xl border border-pink-100 bg-pink-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-pink-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">🛍️</span> Personal Expenses
+                </a>
+                <a href="{{ route('all-expenses.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">📚</span> All Expenses
+                </a>
+                <a href="{{ route('statements.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">📄</span> Statements
+                </a>
+                <a href="{{ route('income.index') }}" class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">💰</span> Income
+                </a>
+                <a href="{{ route('payments.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">🧾</span> Payments
+                </a>
+                <a href="{{ route('friends.index') }}" class="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-indigo-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">👥</span> Friends & Splits
+                </a>
+                <a href="{{ route('credits.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">🤝</span> Credits & Debts
+                </a>
+                <a href="{{ route('savings.index') }}" class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">📈</span> Savings
+                </a>
+                <a href="{{ route('finance.gpay-auditor.index') }}" class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 dark:text-slate-300">
+                    <span class="mb-1 block text-xl">📱</span> GPay Auditor
                 </a>
             </div>
         </div>

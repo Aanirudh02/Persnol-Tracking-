@@ -382,6 +382,123 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         $this->assertEquals(0.0, $income->talliedAmount());
     }
 
+    public function test_bulk_income_tally_allocates_each_expense_full_untallied_amount(): void
+    {
+        $user = $this->createAdminUser();
+        $category = ExpenseCategory::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Groceries',
+            'icon' => 'shopping-cart',
+            'color' => '#10b981',
+        ]);
+        $income = Income::query()->create([
+            'user_id' => $user->id,
+            'amount' => 120,
+            'source' => 'Salary',
+            'date' => '2026-09-10',
+            'payment_method' => 'Bank',
+        ]);
+        $previousIncome = Income::query()->create([
+            'user_id' => $user->id,
+            'amount' => 100,
+            'source' => 'Other salary',
+            'date' => '2026-09-09',
+            'payment_method' => 'Bank',
+        ]);
+        $partiallyTalliedExpense = Expense::query()->create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'amount' => 80,
+            'date' => '2026-09-05',
+            'description' => 'Partially funded expense',
+            'payment_method' => 'UPI',
+        ]);
+        $otherExpense = Expense::query()->create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'amount' => 50,
+            'date' => '2026-09-06',
+            'description' => 'Second expense',
+            'payment_method' => 'Cash',
+        ]);
+        IncomeExpenseTally::query()->create([
+            'user_id' => $user->id,
+            'income_id' => $previousIncome->id,
+            'expense_id' => $partiallyTalliedExpense->id,
+            'allocated_amount' => 20,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('income.tally', $income), [
+            'expense_ids' => [$partiallyTalliedExpense->id, $otherExpense->id],
+            'notes' => 'Funded from salary',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('income_expense_tallies', [
+            'income_id' => $income->id,
+            'expense_id' => $partiallyTalliedExpense->id,
+            'allocated_amount' => 60,
+        ]);
+        $this->assertDatabaseHas('income_expense_tallies', [
+            'income_id' => $income->id,
+            'expense_id' => $otherExpense->id,
+            'allocated_amount' => 50,
+        ]);
+        $this->assertSame(110.0, $income->fresh()->talliedAmount());
+    }
+
+    public function test_bulk_income_tally_rejects_over_budget_and_cross_user_expenses_without_writes(): void
+    {
+        $user = $this->createAdminUser();
+        $otherUser = User::factory()->create();
+        $income = Income::query()->create([
+            'user_id' => $user->id,
+            'amount' => 50,
+            'source' => 'Allowance',
+            'date' => '2026-09-10',
+            'payment_method' => 'Cash',
+        ]);
+        $ownExpense = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 30,
+            'date' => '2026-09-05',
+            'description' => 'Own expense',
+            'payment_method' => 'Cash',
+        ]);
+        $overBudgetExpense = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 25,
+            'date' => '2026-09-06',
+            'description' => 'Expense over available income',
+            'payment_method' => 'Cash',
+        ]);
+        $foreignExpense = Expense::query()->create([
+            'user_id' => $otherUser->id,
+            'amount' => 10,
+            'date' => '2026-09-07',
+            'description' => 'Another user expense',
+            'payment_method' => 'Cash',
+        ]);
+
+        $overBudgetResponse = $this->actingAs($user)->post(route('income.tally', $income), [
+            'expense_ids' => [$ownExpense->id, $overBudgetExpense->id],
+        ]);
+
+        $overBudgetResponse->assertInvalid([
+            'expense_ids' => 'The selected amount is greater than the income amount still available to tally.',
+        ]);
+        $this->assertDatabaseMissing('income_expense_tallies', ['income_id' => $income->id]);
+
+        $crossUserResponse = $this->actingAs($user)->post(route('income.tally', $income), [
+            'expense_ids' => [$ownExpense->id, $foreignExpense->id],
+        ]);
+
+        $crossUserResponse->assertInvalid([
+            'expense_ids' => 'Choose only your own active, non-voluntary expenses.',
+        ]);
+        $this->assertDatabaseMissing('income_expense_tallies', ['income_id' => $income->id]);
+    }
+
     public function test_food_store_with_dynamic_items_and_gst(): void
     {
         $user = $this->createAdminUser();

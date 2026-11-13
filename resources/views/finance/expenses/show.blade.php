@@ -37,9 +37,9 @@
             @endphp
             @if($payingFriends->isNotEmpty())
                 <p class="text-xs text-indigo-900 font-medium">
-                    Friend Contributions:
+                    Payer Contributions:
                     @foreach($payingFriends as $pf)
-                        <span class="inline-block"><strong>{{ $pf->friend?->name ?? 'Friend' }}</strong>: <strong>₹{{ number_format($pf->paid_by_friend_amount, 2) }}</strong></span>@if(! $loop->last), @endif
+                        <span class="inline-block"><strong>{{ $pf->friend?->name ?? 'Friend' }}</strong>: <strong>₹{{ number_format($pf->paid_by_friend_amount, 2) }}</strong>@if($pf->payment_method) <span class="text-slate-500">(via {{ $pf->payment_method }})</span>@endif</span>@if(! $loop->last), @endif
                     @endforeach
                 </p>
             @endif
@@ -55,6 +55,9 @@
                                     <span class="font-bold text-slate-900">{{ $s->friend?->name ?? 'Friend' }}</span>
                                     <span class="text-slate-500">· Share: ₹{{ number_format($s->friend_share, 2) }}</span>
                                     <span class="text-slate-500">· Paid: ₹{{ number_format($s->paid_by_friend_amount, 2) }}</span>
+                                    @if($s->payment_method)
+                                        <span class="text-slate-500">· Via: {{ $s->payment_method }}</span>
+                                    @endif
                                 </div>
                                 <div class="font-semibold {{ abs($s->netAmount()) < 0.01 ? 'text-emerald-700' : ($s->netAmount() > 0 ? 'text-emerald-700' : 'text-rose-700') }}">
                                     @if(abs($s->netAmount()) < 0.01)

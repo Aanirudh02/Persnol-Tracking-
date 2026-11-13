@@ -22,6 +22,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ExpenseController extends Controller
@@ -89,7 +90,11 @@ class ExpenseController extends Controller
         }
 
         $expenses = $query->orderByDesc('date')->orderByDesc('created_at')->paginate(15)->withQueryString();
-        $categories = ExpenseCategory::query()->orderBy('name')->get();
+        $categories = ExpenseCategory::query()
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $user->id))
+            ->where(fn ($query) => $query->whereNull('is_archived')->orWhere('is_archived', false))
+            ->orderBy('name')
+            ->get();
         $paymentMethods = $options->names('payment_method');
 
         // Base query for top-level expenses matching current filters
@@ -117,9 +122,7 @@ class ExpenseController extends Controller
         if ($request->filled('payment_method')) {
             $baseQuery->where('payment_method', $request->string('payment_method'));
         }
-        if ($request->boolean('voluntary_only')) {
-            $baseQuery->where('is_voluntary', true);
-        }
+        $baseQuery->where('is_voluntary', $request->boolean('voluntary_only'));
 
         // 1. Total expenses
         $totalAmount = (float) (clone $baseQuery)->sum(DB::raw('amount + gst_amount'));
@@ -230,6 +233,7 @@ class ExpenseController extends Controller
     public function create(OptionsService $options): View
     {
         $categories = ExpenseCategory::query()
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', auth()->id()))
             ->where(function ($q) {
                 $q->whereNull('is_archived')->orWhere('is_archived', false);
             })
@@ -663,6 +667,7 @@ class ExpenseController extends Controller
         $isCombination = $expense->isCombinationPayment();
         $originalBillTotal = $expense->originalBillTotal();
         $categories = ExpenseCategory::query()
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', auth()->id()))
             ->where(function ($q) {
                 $q->whereNull('is_archived')->orWhere('is_archived', false);
             })
@@ -940,7 +945,13 @@ class ExpenseController extends Controller
         $rules = [
             'amount' => ['required', 'numeric', 'min:0.01'],
             'gst_amount' => ['nullable', 'numeric', 'min:0'],
-            'category_id' => ['nullable', 'integer', 'exists:expense_categories,id'],
+            'category_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('expense_categories', 'id')->where(
+                    fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $request->user()->id)
+                ),
+            ],
             'date' => ['required', 'date'],
             'time' => ['nullable', 'date_format:H:i,H:i:s'],
             'description' => ['required', 'string', 'max:255'],
@@ -956,10 +967,12 @@ class ExpenseController extends Controller
             'split_paid_by_type' => ['nullable', 'in:me,friend,split'],
             'split_paid_by_me_amount' => ['nullable', 'numeric', 'min:0'],
             'split_paid_by_friend_amount' => ['nullable', 'numeric', 'min:0'],
+            'split_friend_payment_method' => ['nullable', 'string', 'max:50'],
             'splits' => ['nullable', 'array'],
-            'splits.*.friend_id' => ['nullable', 'integer'],
+            'splits.*.friend_id' => ['nullable', 'integer', 'distinct'],
             'splits.*.friend_share' => ['nullable', 'numeric', 'min:0'],
             'splits.*.paid_by_friend_amount' => ['nullable', 'numeric', 'min:0'],
+            'splits.*.payment_method' => ['nullable', 'string', 'max:50'],
         ];
 
         if ($isCreate) {
@@ -1127,7 +1140,9 @@ class ExpenseController extends Controller
                     'friend_id' => (int) $s['friend_id'],
                     'friend_share' => $s['friend_share'] !== null ? round((float) $s['friend_share'], 2) : null,
                     'paid_by_friend_amount' => round((float) ($s['paid_by_friend_amount'] ?? 0), 2),
+                    'payment_method' => $s['payment_method'] ?? null,
                 ])->all(),
+                'payment_method' => $multiSplits->first()['payment_method'] ?? null,
                 'notes' => $validated['notes'] ?? null,
             ];
         }
@@ -1164,6 +1179,7 @@ class ExpenseController extends Controller
             'paid_by_mode' => $mode,
             'paid_by_me_amount' => $paidByMe,
             'paid_by_friend_amount' => $paidByFriend,
+            'payment_method' => $validated['split_friend_payment_method'] ?? null,
             'multi_splits' => [
                 [
                     'friend_id' => $friendId,
@@ -1233,6 +1249,7 @@ class ExpenseController extends Controller
         $query = Expense::query()
             ->where('user_id', $user->id)
             ->whereNull('parent_id')
+            ->where('is_voluntary', false)
             ->with('category');
 
         if ($startDate && $endDate) {
@@ -1292,17 +1309,21 @@ class ExpenseController extends Controller
 
         $expenses = $expenseQuery->orderByDesc('date')->orderByDesc('created_at')->get();
 
-        $totalNormalSpend = round((float) $expenses->sum(fn ($e) => $e->totalAmount()), 2);
-        $totalVoluntarySpend = round((float) $expenses->where('is_voluntary', true)->sum(fn ($e) => $e->totalAmount()), 2);
-        $totalBaseSpend = round(max(0, $totalNormalSpend - $totalVoluntarySpend), 2);
+        $regularExpenses = $expenses->where('is_voluntary', false);
+        $voluntaryExpenses = $expenses->where('is_voluntary', true);
+        $totalNormalSpend = round((float) $regularExpenses->sum(fn ($e) => $e->totalAmount()), 2);
+        $totalVoluntarySpend = round((float) $voluntaryExpenses->sum(fn ($e) => $e->totalAmount()), 2);
+        $totalBaseSpend = $totalNormalSpend;
 
         // Group by Month (e.g. "September 2026", "June 2026")
         $monthlyGroups = $expenses->groupBy(fn ($e) => $e->date->format('F Y'))->map(function ($group, $monthName) {
-            $monthTotal = round((float) $group->sum(fn ($e) => $e->totalAmount()), 2);
-            $monthVoluntary = round((float) $group->where('is_voluntary', true)->sum(fn ($e) => $e->totalAmount()), 2);
-            $monthBase = round(max(0, $monthTotal - $monthVoluntary), 2);
+            $regularGroup = $group->where('is_voluntary', false);
+            $voluntaryGroup = $group->where('is_voluntary', true);
+            $monthTotal = round((float) $regularGroup->sum(fn ($e) => $e->totalAmount()), 2);
+            $monthVoluntary = round((float) $voluntaryGroup->sum(fn ($e) => $e->totalAmount()), 2);
+            $monthBase = $monthTotal;
 
-            $categories = $group->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')->map(function ($cGroup, $cName) use ($monthTotal) {
+            $categories = $regularGroup->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')->map(function ($cGroup, $cName) use ($monthTotal) {
                 $cTotal = round((float) $cGroup->sum(fn ($e) => $e->totalAmount()), 2);
 
                 return [
@@ -1314,7 +1335,7 @@ class ExpenseController extends Controller
                 ];
             })->sortByDesc('total')->values();
 
-            $payments = $group->groupBy(fn ($e) => $e->payment_method ?: 'Other')->map(function ($pGroup, $pMethod) {
+            $payments = $regularGroup->groupBy(fn ($e) => $e->payment_method ?: 'Other')->map(function ($pGroup, $pMethod) {
                 return [
                     'method' => $pMethod,
                     'count' => $pGroup->count(),
@@ -1327,7 +1348,7 @@ class ExpenseController extends Controller
                 'total' => $monthTotal,
                 'base' => $monthBase,
                 'voluntary' => $monthVoluntary,
-                'count' => $group->count(),
+                'count' => $regularGroup->count(),
                 'categories' => $categories,
                 'payments' => $payments,
                 'items' => $group,
@@ -1356,7 +1377,7 @@ class ExpenseController extends Controller
         $unassociatedTotal = round((float) $unassociatedFuel->sum('amount'), 2);
 
         // Overall category breakdown for the selected period
-        $overallCategoryBreakdown = $expenses->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')->map(function ($group, $name) use ($totalNormalSpend) {
+        $overallCategoryBreakdown = $regularExpenses->groupBy(fn ($e) => $e->category?->name ?? 'Uncategorized')->map(function ($group, $name) use ($totalNormalSpend) {
             $catTotal = round((float) $group->sum(fn ($e) => $e->totalAmount()), 2);
 
             return [
@@ -1369,7 +1390,7 @@ class ExpenseController extends Controller
         })->sortByDesc('total')->values();
 
         // Overall payment method breakdown for the selected period
-        $overallPaymentBreakdown = $expenses->groupBy(fn ($e) => $e->payment_method ?: 'Other')->map(function ($group, $method) use ($totalNormalSpend) {
+        $overallPaymentBreakdown = $regularExpenses->groupBy(fn ($e) => $e->payment_method ?: 'Other')->map(function ($group, $method) use ($totalNormalSpend) {
             $payTotal = round((float) $group->sum(fn ($e) => $e->totalAmount()), 2);
 
             return [

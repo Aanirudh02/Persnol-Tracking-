@@ -334,11 +334,11 @@
                                         @endif
                                         @if(!$isGroup && $exp->friendSplits->isNotEmpty())
                                             <span class="block text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
-                                                👥 Split: {{ $exp->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ' (share ₹' . number_format($s->friend_share, 2) . ($s->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($s->paid_by_friend_amount, 2) : '') . ')')->implode(', ') }}
+                                                👥 Split: {{ $exp->friendSplits->map(fn ($s) => ($s->friend?->name ?? 'Friend') . ' (share ₹' . number_format($s->friend_share, 2) . ($s->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($s->paid_by_friend_amount, 2) . ($s->payment_method ? ' via ' . $s->payment_method : '') : '') . ')')->implode(', ') }}
                                             </span>
                                         @elseif(!$isGroup && $exp->friendSplit)
                                             <span class="block text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
-                                                👥 Split with {{ $exp->friendSplit->friend?->name }} (share ₹{{ number_format($exp->friendSplit->friend_share, 2) }}{{ $exp->friendSplit->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($exp->friendSplit->paid_by_friend_amount, 2) : '' }})
+                                                👥 Split with {{ $exp->friendSplit->friend?->name }} (share ₹{{ number_format($exp->friendSplit->friend_share, 2) }}{{ $exp->friendSplit->paid_by_friend_amount > 0 ? ', paid ₹' . number_format($exp->friendSplit->paid_by_friend_amount, 2) . ($exp->friendSplit->payment_method ? ' via ' . $exp->friendSplit->payment_method : '') : '' }})
                                             </span>
                                         @endif
                                         @if(!$isGroup && $exp->notes)

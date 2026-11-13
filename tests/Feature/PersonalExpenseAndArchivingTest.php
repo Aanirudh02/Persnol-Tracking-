@@ -8,12 +8,81 @@ use App\Models\PersonalExpense;
 use App\Models\PersonalExpenseCategory;
 use App\Models\PersonalExpenseGroup;
 use App\Models\User;
+use App\Services\CloudinaryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class PersonalExpenseAndArchivingTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_personal_expense_saves_optional_gst_receipt_and_time(): void
+    {
+        $user = User::factory()->create();
+        $category = PersonalExpenseCategory::create([
+            'user_id' => $user->id,
+            'name' => 'Shopping',
+            'color' => '#ec4899',
+        ]);
+        $this->mock(CloudinaryService::class)
+            ->shouldReceive('upload')
+            ->once()
+            ->andReturn('receipts/personal-test.jpg');
+
+        $response = $this->actingAs($user)->post(route('personal-expenses.store'), [
+            'category_id' => $category->id,
+            'amount' => 100,
+            'gst_amount' => 18,
+            'date' => '2026-09-10',
+            'time' => '10:15',
+            'description' => 'Shopping with GST',
+            'payment_method' => 'UPI',
+            'receipt_image' => UploadedFile::fake()->image('receipt.jpg'),
+        ]);
+
+        $response->assertRedirect(route('personal-expenses.index'));
+        $expense = PersonalExpense::query()->where('description', 'Shopping with GST')->firstOrFail();
+        $this->assertSame(18.0, (float) $expense->gst_amount);
+        $this->assertSame(118.0, $expense->totalAmount());
+        $this->assertSame('10:15', (string) $expense->time);
+        $this->assertSame('receipts/personal-test.jpg', $expense->receipt_image);
+    }
+
+    public function test_personal_expense_totals_exclude_voluntary_spending_and_include_gst(): void
+    {
+        $user = User::factory()->create();
+        $category = PersonalExpenseCategory::create([
+            'user_id' => $user->id,
+            'name' => 'Shopping',
+            'color' => '#ec4899',
+        ]);
+        PersonalExpense::query()->create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'amount' => 100,
+            'gst_amount' => 18,
+            'date' => now()->toDateString(),
+            'description' => 'Regular personal expense',
+            'is_voluntary' => false,
+        ]);
+        PersonalExpense::query()->create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'amount' => 25,
+            'gst_amount' => 5,
+            'date' => now()->toDateString(),
+            'description' => 'Voluntary personal expense',
+            'is_voluntary' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('personal-expenses.index'));
+
+        $response->assertOk();
+        $this->assertSame(118.0, (float) $response->viewData('totalAmount'));
+        $this->assertSame(118.0, (float) $response->viewData('monthAmount'));
+        $this->assertSame(30.0, (float) $response->viewData('voluntaryAmount'));
+    }
 
     public function test_personal_expenses_can_be_grouped_renamed_detached_and_ungrouped(): void
     {

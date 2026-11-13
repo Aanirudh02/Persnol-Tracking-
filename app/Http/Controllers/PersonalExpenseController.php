@@ -9,6 +9,7 @@ use App\Models\FamilyMember;
 use App\Models\PersonalExpense;
 use App\Models\PersonalExpenseCategory;
 use App\Models\PersonalExpenseGroup;
+use App\Services\CloudinaryService;
 use App\Services\CreditDebtLinkService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
@@ -111,14 +112,19 @@ class PersonalExpenseController extends Controller
 
         // Metrics calculations (based on active expenses in filter)
         $metricQuery = (clone $query);
-        $totalAmount = (float) (clone $metricQuery)->sum('amount');
+        $totalAmount = (float) (clone $metricQuery)
+            ->where('is_voluntary', false)
+            ->sum(DB::raw('amount + gst_amount'));
         $monthStart = Carbon::today()->startOfMonth()->toDateString();
         $monthEnd = Carbon::today()->endOfMonth()->toDateString();
         $monthAmount = (float) PersonalExpense::where('user_id', $user->id)
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->whereBetween('date', [$monthStart, $monthEnd])
-            ->sum('amount');
-        $voluntaryAmount = (float) (clone $metricQuery)->where('is_voluntary', true)->sum('amount');
+            ->where('is_voluntary', false)
+            ->sum(DB::raw('amount + gst_amount'));
+        $voluntaryAmount = (float) (clone $metricQuery)
+            ->where('is_voluntary', true)
+            ->sum(DB::raw('amount + gst_amount'));
 
         // Dynamic categories & Payment methods
         $categories = PersonalExpenseCategory::query()
@@ -151,13 +157,14 @@ class PersonalExpenseController extends Controller
         ));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, CloudinaryService $cloudinary): RedirectResponse
     {
         $user = $request->user();
 
         $validated = $request->validate([
             'category_id' => 'required|exists:personal_expense_categories,id',
             'amount' => 'required|numeric|min:0.01',
+            'gst_amount' => 'nullable|numeric|min:0',
             'date' => 'required|date',
             'time' => 'nullable|string',
             'description' => 'nullable|string|max:255',
@@ -165,15 +172,21 @@ class PersonalExpenseController extends Controller
             'done_by' => 'nullable|string|max:100',
             'done_to' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'receipt_image' => 'nullable|image|max:5120',
             'classification' => 'nullable|string|in:necessary,unwanted,emergency',
             'is_voluntary' => 'nullable|boolean',
             'record_as_normal_expense' => 'nullable|boolean',
         ]);
 
+        $receiptImage = $request->hasFile('receipt_image')
+            ? $cloudinary->upload($request->file('receipt_image'), 'receipts')
+            : null;
+
         $personalExpense = PersonalExpense::create([
             'user_id' => $user->id,
             'category_id' => $validated['category_id'],
             'amount' => $validated['amount'],
+            'gst_amount' => $validated['gst_amount'] ?? 0,
             'date' => $validated['date'],
             'time' => $validated['time'] ?? now()->format('H:i'),
             'description' => $validated['description'] ?? null,
@@ -181,6 +194,7 @@ class PersonalExpenseController extends Controller
             'done_by' => ! empty($validated['done_by']) ? $validated['done_by'] : 'Me',
             'done_to' => $validated['done_to'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'receipt_image' => $receiptImage,
             'classification' => $validated['classification'] ?? 'necessary',
             'is_voluntary' => $request->boolean('is_voluntary'),
             'is_archived' => false,
@@ -193,7 +207,7 @@ class PersonalExpenseController extends Controller
         return redirect()->route('personal-expenses.index')->with('success', 'Personal expense recorded successfully!');
     }
 
-    public function update(Request $request, PersonalExpense $personalExpense, CreditDebtLinkService $creditLinkService): RedirectResponse
+    public function update(Request $request, PersonalExpense $personalExpense, CloudinaryService $cloudinary, CreditDebtLinkService $creditLinkService): RedirectResponse
     {
         abort_if($personalExpense->user_id !== auth()->id(), 403);
 
@@ -206,6 +220,7 @@ class PersonalExpenseController extends Controller
         $validated = $request->validate([
             'category_id' => 'required|exists:personal_expense_categories,id',
             'amount' => 'required|numeric|min:0.01',
+            'gst_amount' => 'nullable|numeric|min:0',
             'date' => 'required|date',
             'time' => 'nullable|string',
             'description' => 'nullable|string|max:255',
@@ -213,14 +228,20 @@ class PersonalExpenseController extends Controller
             'done_by' => 'nullable|string|max:100',
             'done_to' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'receipt_image' => 'nullable|image|max:5120',
             'classification' => 'nullable|string|in:necessary,unwanted,emergency',
             'is_voluntary' => 'nullable|boolean',
             'record_as_normal_expense' => 'nullable|boolean',
         ]);
 
+        if ($request->hasFile('receipt_image')) {
+            $validated['receipt_image'] = $cloudinary->upload($request->file('receipt_image'), 'receipts');
+        }
+
         $personalExpense->update([
             'category_id' => $validated['category_id'],
             'amount' => $validated['amount'],
+            'gst_amount' => $validated['gst_amount'] ?? 0,
             'date' => $validated['date'],
             'time' => $validated['time'] ?? $personalExpense->time ?? now()->format('H:i'),
             'description' => $validated['description'] ?? null,
@@ -228,6 +249,7 @@ class PersonalExpenseController extends Controller
             'done_by' => ! empty($validated['done_by']) ? $validated['done_by'] : 'Me',
             'done_to' => $validated['done_to'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'receipt_image' => $validated['receipt_image'] ?? $personalExpense->receipt_image,
             'classification' => $validated['classification'] ?? $personalExpense->classification ?? 'necessary',
             'is_voluntary' => $request->boolean('is_voluntary'),
         ]);
@@ -309,8 +331,8 @@ class PersonalExpenseController extends Controller
         return response()->json($expenses->map(fn ($exp) => [
             'id' => $exp->id,
             'description' => $exp->description ?: ($exp->category?->name ?? 'Personal Expense'),
-            'amount' => number_format((float) $exp->amount, 2),
-            'raw_amount' => (float) $exp->amount,
+            'amount' => number_format($exp->totalAmount(), 2),
+            'raw_amount' => $exp->totalAmount(),
             'date' => $exp->date->format('d M Y'),
             'category' => $exp->category?->name ?? 'Personal',
             'done_by' => $exp->done_by ?: 'Me',
@@ -454,6 +476,7 @@ class PersonalExpenseController extends Controller
             $personalExpense->linkedExpense->update([
                 'category_id' => $normalCategory->id,
                 'amount' => $personalExpense->amount,
+                'gst_amount' => $personalExpense->gst_amount,
                 'date' => $personalExpense->date->toDateString(),
                 'time' => $personalExpense->time ?: now()->format('H:i'),
                 'description' => $desc,
@@ -467,6 +490,7 @@ class PersonalExpenseController extends Controller
                 'daily_record_id' => $dayRecord->id,
                 'category_id' => $normalCategory->id,
                 'amount' => $personalExpense->amount,
+                'gst_amount' => $personalExpense->gst_amount,
                 'date' => $personalExpense->date->toDateString(),
                 'time' => $personalExpense->time ?: now()->format('H:i'),
                 'description' => $desc,

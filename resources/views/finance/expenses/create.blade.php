@@ -6,7 +6,7 @@
         </div>
 
         <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <form action="{{ route('expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-5 text-sm" id="expense-form">
+            <form action="{{ route('expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4 text-sm" id="expense-form">
                 @csrf
 
                 @if ($errors->any())
@@ -28,9 +28,16 @@
                         <label class="mb-1 block font-semibold text-slate-700">Amount</label>
                         <input id="expense-total" type="number" step="0.01" name="amount" required value="{{ old('amount') }}" placeholder="0.00" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-lg font-bold">
                     </div>
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">GST</label>
-                        <input id="expense-gst" type="number" step="0.01" min="0" name="gst_amount" value="{{ old('gst_amount', 0) }}" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5">
+                    @php $gstEnabled = (float) old('gst_amount', 0) > 0; @endphp
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 font-semibold text-slate-700">
+                            <input id="expense-has-gst" type="checkbox" @checked($gstEnabled) class="rounded border-slate-300 text-slate-900">
+                            <span>Include GST</span>
+                        </label>
+                        <div id="expense-gst-field" @class(['hidden' => ! $gstEnabled])>
+                            <label for="expense-gst" class="mb-1 block text-xs font-semibold text-slate-600">GST amount</label>
+                            <input id="expense-gst" type="number" step="0.01" min="0" name="gst_amount" value="{{ old('gst_amount', 0) }}" @disabled(! $gstEnabled) class="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5">
+                        </div>
                     </div>
                 </div>
 
@@ -54,9 +61,10 @@
                                 <option value="{{ $category->id }}" @selected($defaultCatId == $category->id)>{{ $category->name }}{{ $category->is_voluntary ? ' (Voluntary)' : '' }}</option>
                             @endforeach
                         </select>
+                        <a href="{{ route('settings.index') }}#expense-categories" class="mt-1 inline-block text-[11px] font-semibold text-indigo-600 hover:underline">Manage dynamic categories</a>
                     </div>
                     <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Payment Method</label>
+                        <label class="mb-1 block font-semibold text-slate-700">Your payment method</label>
                         <select name="payment_method" id="main-payment-method" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
                             @php
                                 $hasSplitOption = in_array('Split', (array) $paymentMethods);
@@ -108,12 +116,12 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
                             <h2 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                                <span class="text-base">👥</span> Friend Split / Payers (Single or Multiple Friends)
+                                <span class="text-base">👥</span> Payer Split (You and saved payers)
                             </h2>
-                            <p class="text-xs text-slate-500">Track each friend's share and who paid, or record combination payments where paid alone is enough.</p>
+                            <p class="text-xs text-slate-500">Record your payment method and each saved payer's name, amount, and method.</p>
                         </div>
                         <button type="button" id="add-friend-btn" class="self-start sm:self-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition active:scale-95">
-                            <span>+</span> Add Friend
+                            <span>+</span> Add Payer
                         </button>
                     </div>
 
@@ -134,7 +142,7 @@
                                 <input type="number" step="0.01" min="0" name="split_my_share" id="split_my_share" value="{{ old('split_my_share') }}" placeholder="0.00" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
                             </div>
                             <div>
-                                <label class="mb-1 block text-xs font-semibold text-slate-700">Paid by you (What you actually paid)</label>
+                                <label class="mb-1 block text-xs font-semibold text-slate-700">Amount paid by you</label>
                                 <input type="number" step="0.01" min="0" name="split_paid_by_me_amount" id="split_paid_by_me_amount" value="{{ old('split_paid_by_me_amount') }}" placeholder="0.00" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
                             </div>
                         </div>
@@ -196,21 +204,11 @@
                     </select>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block font-semibold text-slate-700">Classification</label>
-                        <select name="classification" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">
-                            <option value="necessary" @selected(old('classification', 'necessary') === 'necessary')>🟢 Necessary (Essential)</option>
-                            <option value="unwanted" @selected(old('classification') === 'unwanted')>🔴 Unwanted / Avoidable</option>
-                            <option value="emergency" @selected(old('classification') === 'emergency')>🟡 Emergency / Urgent</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center pt-6">
-                        <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-slate-700 select-none">
-                            <input type="checkbox" name="is_voluntary" value="1" @checked(old('is_voluntary')) class="rounded border-slate-300 text-slate-900">
-                            <span>Voluntary spend</span>
-                        </label>
-                    </div>
+                <div>
+                    <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-slate-700 select-none">
+                        <input type="checkbox" name="is_voluntary" value="1" @checked(old('is_voluntary')) class="rounded border-slate-300 text-slate-900">
+                        <span>Voluntary spend (saved separately from expense totals and statements)</span>
+                    </label>
                 </div>
 
                 <div>
@@ -235,6 +233,7 @@
     <script>
         const friendsList = @json($friends);
         const paymentMethods = @json(collect($paymentMethods)->values());
+        const payerMethods = paymentMethods.filter(method => method.toLowerCase() !== 'split');
         const totalInput = document.getElementById('expense-total');
         const gstInput = document.getElementById('expense-gst');
         const friendsContainer = document.getElementById('friends-container');
@@ -250,13 +249,6 @@
         const jumpToSplitsBtn = document.getElementById('jump-to-splits-btn');
         const friendSplitSection = document.getElementById('friend-split-section');
         const mainMethodSelect = document.getElementById('main-payment-method');
-
-        let userManuallyChangedPaymentMethod = false;
-        if (mainMethodSelect) {
-            mainMethodSelect.addEventListener('change', () => {
-                userManuallyChangedPaymentMethod = true;
-            });
-        }
 
         let friendRowCount = 0;
 
@@ -277,14 +269,16 @@
                 splitOpt.textContent = 'Split';
                 mainMethodSelect.appendChild(splitOpt);
             }
-            const activeFriends = getActiveFriendRows();
-            const myPaid = Number(myPaidInput.value) || 0;
-            const hasFriendPay = activeFriends.some(r => Number(r.querySelector('.friend-paid-input')?.value || 0) > 0);
-            if ((activeFriends.length > 0 && (hasFriendPay || activeFriends.length > 1)) || isCombinationMode()) {
-                if (!userManuallyChangedPaymentMethod) {
-                    mainMethodSelect.value = 'Split';
-                }
-            }
+        }
+
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;',
+            })[character]);
         }
 
         function onCombinationToggle() {
@@ -318,38 +312,48 @@
             });
         }
 
-        function addFriendRow(friendId = '', share = '', paid = '') {
+        function addFriendRow(friendId = '', share = '', paid = '', paymentMethod = '') {
             const index = friendRowCount++;
-            const friendOptions = ['<option value="">Select a friend</option>']
-                .concat(friendsList.map(f => `<option value="${f.id}">${f.name} (${f.role})</option>`))
+            const friendOptions = ['<option value="">Select a payer</option>']
+                .concat(friendsList.map(f => `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.role)})</option>`))
+                .join('');
+            const defaultMethod = paymentMethod || (mainMethodSelect?.value === 'Split' ? '' : mainMethodSelect?.value) || '';
+            const methodOptions = ['<option value="">Choose method</option>']
+                .concat(payerMethods.map(method => `<option value="${escapeHtml(method)}" ${method === defaultMethod ? 'selected' : ''}>${escapeHtml(method)}</option>`))
                 .join('');
 
             const comboActive = isCombinationMode();
             const card = document.createElement('div');
-            card.className = 'friend-row rounded-xl border border-indigo-200 bg-white p-3 space-y-2.5 shadow-2xs';
+            card.className = 'friend-row rounded-xl border border-indigo-200 bg-white p-2.5 space-y-2 shadow-2xs';
             card.dataset.index = index;
             card.innerHTML = `
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-indigo-900">Friend #${index + 1}</span>
+                    <span class="text-xs font-bold text-indigo-900">Payer #${index + 1}</span>
                     <button type="button" class="remove-friend-btn text-xs text-rose-600 hover:text-rose-800 font-semibold">&times; Remove</button>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Friend</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div class="col-span-2 sm:col-span-1">
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Payer name</label>
                         <select name="splits[${index}][friend_id]" class="friend-id-select w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-medium">
                             ${friendOptions}
                         </select>
                     </div>
                     <div>
                         <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                            Friend Share (₹)
+                            Share (₹)
                             <span class="share-opt-badge text-[10px] text-purple-600 font-normal ${comboActive ? '' : 'hidden'}">(Optional)</span>
                         </label>
                         <input type="number" step="0.01" min="0" name="splits[${index}][friend_share]" value="${share}" placeholder="0.00" class="friend-share-input w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Paid by friend (₹)</label>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Amount paid (₹)</label>
                         <input type="number" step="0.01" min="0" name="splits[${index}][paid_by_friend_amount]" value="${paid}" placeholder="0.00" class="friend-paid-input w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-0.5">Payer method</label>
+                        <select name="splits[${index}][payment_method]" class="payer-method-select w-full rounded-xl border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-medium">
+                            ${methodOptions}
+                        </select>
                     </div>
                 </div>
             `;
@@ -357,6 +361,7 @@
             if (friendId) {
                 card.querySelector('.friend-id-select').value = friendId;
             }
+            card.querySelector('.payer-method-select').value = defaultMethod;
 
             card.querySelector('.remove-friend-btn').addEventListener('click', () => {
                 card.remove();
@@ -426,9 +431,11 @@
             const myPaid = Number(myPaidInput.value) || 0;
             const totalShares = myShare + friendsShareSum;
             const totalPaid = myPaid + friendsPaidSum;
+            const comboMode = isCombinationMode();
+            const hasExplicitShares = (myShare > 0 || friendsShareSum > 0);
+            const displayShares = comboMode && !hasExplicitShares ? totalPaid : totalShares;
 
             // Registered expense for user alone
-            const hasExplicitShares = (myShare > 0 || friendsShareSum > 0);
             let myRegistered = bill;
             if (rows.length > 0 && friendsPaidSum > 0) {
                 myRegistered = (hasExplicitShares && myShare > 0) ? myShare : myPaid;
@@ -439,17 +446,16 @@
                 sumMyRegistered.textContent = `₹${myRegistered.toFixed(2)}`;
             }
 
-            sumShares.textContent = `₹${totalShares.toFixed(2)} of ₹${bill.toFixed(2)}`;
+            sumShares.textContent = `₹${displayShares.toFixed(2)} of ₹${bill.toFixed(2)}`;
             sumPaid.textContent = `₹${totalPaid.toFixed(2)} of ₹${bill.toFixed(2)}`;
 
-            const comboMode = isCombinationMode();
             if (comboMode && totalPaid > 0 && Math.abs(totalPaid - bill) > 0.05 && (bill === 0 || Math.abs(myPaid - bill) < 0.05)) {
                 totalInput.value = totalPaid.toFixed(2);
                 bill = getFullBillTotal();
                 sumTotalBill.textContent = bill.toFixed(2);
             }
 
-            const sharesOk = Math.abs(totalShares - bill) < 0.05;
+            const sharesOk = Math.abs(displayShares - bill) < 0.05;
             const paidOk = Math.abs(totalPaid - bill) < 0.05;
             const sharesLeftZero = (totalShares <= 0.05 && paidOk);
 
@@ -460,7 +466,7 @@
             } else if (paidOk && (sharesLeftZero || comboMode)) {
                 splitStatusBadge.textContent = '✓ Combination Paid (₹' + totalPaid.toFixed(2) + ')';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-purple-100 text-purple-800';
-                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, friend(s) paid ₹${friendsPaidSum.toFixed(2)}. Registered as ₹${myRegistered.toFixed(2)} in your expenses (no debt created).`;
+                splitPayerHint.innerHTML = `<span class="font-bold text-purple-900">🤝 Combination Payment:</span> You paid ₹${myPaid.toFixed(2)}, other payer(s) paid ₹${friendsPaidSum.toFixed(2)}. Share total is shown as paid by each person (no debt created). Registered as ₹${myRegistered.toFixed(2)} in your expenses.`;
             } else if (sharesOk && paidOk) {
                 splitStatusBadge.textContent = '✓ Split Balanced';
                 splitStatusBadge.className = 'px-2 py-0.5 rounded-md font-semibold text-[11px] bg-emerald-100 text-emerald-800';
@@ -583,6 +589,16 @@
             recalculateSplits();
             updateGroupHint();
         });
+        document.getElementById('expense-has-gst').addEventListener('change', event => {
+            const enabled = event.target.checked;
+            gstInput.disabled = !enabled;
+            document.getElementById('expense-gst-field').classList.toggle('hidden', !enabled);
+            if (!enabled) {
+                gstInput.value = '0';
+            }
+            recalculateSplits();
+            updateGroupHint();
+        });
         myShareInput.addEventListener('input', () => {
             recalculateSplits();
             updateGroupHint();
@@ -650,12 +666,12 @@
         });
         document.getElementById('add-group-line').addEventListener('click', () => addGroupLine());
 
-        // Initialize with 1 friend row if old inputs or by default
+        // Initialize payer rows from submitted values.
         @if(old('split_with_friend_id'))
             addFriendRow('{{ old('split_with_friend_id') }}', '{{ old('split_friend_share') }}', '{{ old('split_paid_by_friend_amount') }}');
         @elseif(old('splits'))
             @foreach(old('splits') as $s)
-                addFriendRow('{{ $s['friend_id'] ?? '' }}', '{{ $s['friend_share'] ?? '' }}', '{{ $s['paid_by_friend_amount'] ?? '' }}');
+                addFriendRow('{{ $s['friend_id'] ?? '' }}', '{{ $s['friend_share'] ?? '' }}', '{{ $s['paid_by_friend_amount'] ?? '' }}', @js($s['payment_method'] ?? ''));
             @endforeach
         @endif
 

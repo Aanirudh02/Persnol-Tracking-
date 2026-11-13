@@ -34,6 +34,7 @@ class StatementController extends Controller
             ->get();
 
         $normalCategories = ExpenseCategory::query()
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $user->id))
             ->withCount(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')])
             ->withSum(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')], 'amount')
             ->orderBy('name')
@@ -50,6 +51,7 @@ class StatementController extends Controller
         $recentNormalExpenses = Expense::query()
             ->where('user_id', $user->id)
             ->whereNull('parent_id')
+            ->where('is_voluntary', false)
             ->with('category')
             ->latest('date')
             ->take(100)
@@ -57,6 +59,7 @@ class StatementController extends Controller
 
         $recentPersonalExpenses = PersonalExpense::query()
             ->where('user_id', $user->id)
+            ->where('is_voluntary', false)
             ->with('category')
             ->latest('date')
             ->take(100)
@@ -82,6 +85,7 @@ class StatementController extends Controller
         $type = $request->get('type', 'normal');
 
         $normalCategories = ExpenseCategory::query()
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $user->id))
             ->withCount(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')])
             ->withSum(['expenses' => fn ($q) => $q->where('user_id', $user->id)->whereNull('parent_id')], 'amount')
             ->orderBy('name')
@@ -97,6 +101,7 @@ class StatementController extends Controller
         $recentNormalExpenses = Expense::query()
             ->where('user_id', $user->id)
             ->whereNull('parent_id')
+            ->where('is_voluntary', false)
             ->with('category')
             ->latest('date')
             ->take(100)
@@ -104,6 +109,7 @@ class StatementController extends Controller
 
         $recentPersonalExpenses = PersonalExpense::query()
             ->where('user_id', $user->id)
+            ->where('is_voluntary', false)
             ->with('category')
             ->latest('date')
             ->take(100)
@@ -125,7 +131,7 @@ class StatementController extends Controller
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'type' => 'required|in:normal,personal',
-            'period_type' => 'required|in:all,day,week,month,year,custom',
+            'period_type' => 'required|in:all,day,week,month,previous_month,year,custom',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
             'category_ids' => 'nullable|array',
@@ -142,21 +148,28 @@ class StatementController extends Controller
         $customExpenseIds = null;
 
         if (! empty($validated['custom_expense_ids'])) {
-            $customExpenseIds = array_map('intval', $validated['custom_expense_ids']);
             if ($type === 'normal') {
-                $totalAmount = (float) Expense::query()
+                $query = Expense::query()
                     ->where('user_id', $user->id)
-                    ->whereIn('id', $customExpenseIds)
-                    ->sum(DB::raw('amount + gst_amount'));
+                    ->whereIn('id', array_map('intval', $validated['custom_expense_ids']))
+                    ->whereNull('parent_id')
+                    ->where('is_voluntary', false);
+                $customExpenseIds = $query->pluck('id')->map('intval')->all();
+                $totalAmount = (float) $query->sum(DB::raw('amount + gst_amount'));
             } else {
-                $totalAmount = (float) PersonalExpense::query()
+                $query = PersonalExpense::query()
                     ->where('user_id', $user->id)
-                    ->whereIn('id', $customExpenseIds)
-                    ->sum('amount');
+                    ->whereIn('id', array_map('intval', $validated['custom_expense_ids']))
+                    ->where('is_voluntary', false);
+                $customExpenseIds = $query->pluck('id')->map('intval')->all();
+                $totalAmount = (float) $query->sum(DB::raw('amount + gst_amount'));
             }
         } else {
             if ($type === 'normal') {
-                $q = Expense::query()->where('user_id', $user->id)->whereNull('parent_id');
+                $q = Expense::query()
+                    ->where('user_id', $user->id)
+                    ->whereNull('parent_id')
+                    ->where('is_voluntary', false);
                 if ($startDate && $endDate) {
                     $q->whereBetween('date', [$startDate, $endDate]);
                 }
@@ -166,7 +179,9 @@ class StatementController extends Controller
                 $customExpenseIds = $q->pluck('id')->map('intval')->toArray();
                 $totalAmount = (float) $q->sum(DB::raw('amount + gst_amount'));
             } else {
-                $q = PersonalExpense::query()->where('user_id', $user->id);
+                $q = PersonalExpense::query()
+                    ->where('user_id', $user->id)
+                    ->where('is_voluntary', false);
                 if ($startDate && $endDate) {
                     $q->whereBetween('date', [$startDate, $endDate]);
                 }
@@ -174,7 +189,7 @@ class StatementController extends Controller
                     $q->whereIn('category_id', $validated['category_ids']);
                 }
                 $customExpenseIds = $q->pluck('id')->map('intval')->toArray();
-                $totalAmount = (float) $q->sum('amount');
+                $totalAmount = (float) $q->sum(DB::raw('amount + gst_amount'));
             }
         }
 
@@ -206,12 +221,13 @@ class StatementController extends Controller
         $items = collect();
         $user = $request->user();
 
-        if (! empty($statement->custom_expense_ids)) {
+        if (is_array($statement->custom_expense_ids)) {
             $ids = array_map('intval', $statement->custom_expense_ids);
             if ($statement->isNormal()) {
                 $items = Expense::query()
                     ->where('user_id', $user->id)
                     ->whereIn('id', $ids)
+                    ->where('is_voluntary', false)
                     ->with(['category', 'paidByFriend', 'friendSplit.friend', 'friendSplits.friend'])
                     ->orderByDesc('date')
                     ->get();
@@ -219,6 +235,7 @@ class StatementController extends Controller
                 $items = PersonalExpense::query()
                     ->where('user_id', $user->id)
                     ->whereIn('id', $ids)
+                    ->where('is_voluntary', false)
                     ->with('category')
                     ->orderByDesc('date')
                     ->get();
@@ -228,6 +245,7 @@ class StatementController extends Controller
                 $q = Expense::query()
                     ->where('user_id', $user->id)
                     ->whereNull('parent_id')
+                    ->where('is_voluntary', false)
                     ->where('created_at', '<=', $statement->created_at)
                     ->with(['category', 'paidByFriend', 'friendSplit.friend', 'friendSplits.friend']);
                 if ($statement->start_date && $statement->end_date) {
@@ -240,6 +258,7 @@ class StatementController extends Controller
             } else {
                 $q = PersonalExpense::query()
                     ->where('user_id', $user->id)
+                    ->where('is_voluntary', false)
                     ->where('created_at', '<=', $statement->created_at)
                     ->with('category');
                 if ($statement->start_date && $statement->end_date) {
@@ -254,8 +273,8 @@ class StatementController extends Controller
 
         // Category breakdown calculation
         $categoryBreakdown = $items->groupBy(fn ($item) => $item->category?->name ?? 'Uncategorized')
-            ->map(function ($group) use ($statement) {
-                $sum = $group->sum(fn ($i) => $statement->isNormal() ? $i->totalAmount() : (float) $i->amount);
+            ->map(function ($group) {
+                $sum = $group->sum(fn ($i) => $i->totalAmount());
 
                 return [
                     'count' => $group->count(),
@@ -272,7 +291,7 @@ class StatementController extends Controller
 
                     return [
                         'count' => $group->count(),
-                        'total' => round($group->sum(fn ($i) => (float) $i->amount), 2),
+                        'total' => round($group->sum(fn ($i) => $i->totalAmount()), 2),
                         'done_to' => $doneToList->isNotEmpty() ? $doneToList->implode(', ') : 'Self',
                     ];
                 });
@@ -323,6 +342,10 @@ class StatementController extends Controller
             'week' => [$today->copy()->startOfWeek()->toDateString(), $today->copy()->endOfWeek()->toDateString()],
             'month' => [$today->copy()->startOfMonth()->toDateString(), $today->copy()->endOfMonth()->toDateString()],
             'year' => [$today->copy()->startOfYear()->toDateString(), $today->copy()->endOfYear()->toDateString()],
+            'previous_month' => [
+                $today->copy()->subMonthNoOverflow()->startOfMonth()->toDateString(),
+                $today->copy()->subMonthNoOverflow()->endOfMonth()->toDateString(),
+            ],
             'custom' => [
                 $start ?: $today->copy()->startOfMonth()->toDateString(),
                 $end ?: $today->toDateString(),
