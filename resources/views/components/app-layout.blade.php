@@ -11,6 +11,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }} - {{ config('app.name', 'LifeTracker') }}</title>
+    @if($usePhotoAsLogo)
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ $authUser->profilePhotoIconUrl(192) }}">
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ $authUser->profilePhotoIconUrl(180) }}">
+    @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

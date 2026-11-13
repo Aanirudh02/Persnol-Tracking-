@@ -61,6 +61,20 @@ class User extends Authenticatable
     }
 
     /**
+     * Square, face-centred version of the profile photo for home-screen / tab icons.
+     */
+    public function profilePhotoIconUrl(int $size = 192): ?string
+    {
+        $url = $this->profilePhotoUrl();
+
+        if ($url && str_contains($url, 'res.cloudinary.com') && str_contains($url, '/image/upload/')) {
+            return str_replace('/image/upload/', "/image/upload/c_fill,g_face,w_{$size},h_{$size},f_png/", $url);
+        }
+
+        return $url;
+    }
+
+    /**
      * Whether the profile photo should replace the "LT" app logo.
      */
     public function usesProfilePhotoAsLogo(): bool
