@@ -139,8 +139,18 @@
                         <label class="mt-3 flex items-center gap-2 cursor-pointer select-none">
                             <input type="hidden" name="use_photo_as_logo" value="0">
                             <input type="checkbox" name="use_photo_as_logo" value="1" @checked(old('use_photo_as_logo', data_get($user->preferences, 'use_photo_as_logo', false))) class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Use profile photo as app logo</span>
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Use profile photo as app logo (phone home-screen icon)</span>
                         </label>
+                        <div class="mt-3">
+                            <label for="app_logo" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Separate app logo (used when the option above is off)</label>
+                            <input type="file" name="app_logo" id="app_logo" accept="image/*" class="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition" />
+                            @if(data_get($user->preferences, 'app_logo'))
+                                <div class="mt-2 flex items-center gap-2">
+                                    <img src="{{ \App\Services\CloudinaryService::url(data_get($user->preferences, 'app_logo')) }}" alt="App logo" class="w-12 h-12 rounded-xl object-cover border border-slate-200">
+                                    <span class="text-xs text-slate-500">Current app logo</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
                 <div class="pt-2">

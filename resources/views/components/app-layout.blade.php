@@ -2,7 +2,7 @@
 @php
     $authUser = auth()->user();
     $profilePhotoUrl = $authUser?->profilePhotoUrl();
-    $usePhotoAsLogo = (bool) $authUser?->usesProfilePhotoAsLogo();
+    $appIconUrl = $authUser?->appIconUrl(192);
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -11,9 +11,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }} - {{ config('app.name', 'LifeTracker') }}</title>
-    @if($usePhotoAsLogo)
-        <link rel="icon" type="image/png" sizes="192x192" href="{{ $authUser->profilePhotoIconUrl(192) }}">
-        <link rel="apple-touch-icon" sizes="180x180" href="{{ $authUser->profilePhotoIconUrl(180) }}">
+    @if($appIconUrl)
+        <link rel="icon" type="image/png" sizes="192x192" href="{{ $appIconUrl }}">
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ $authUser->appIconUrl(180) }}">
     @endif
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
@@ -22,11 +22,7 @@
 
     <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white border-r border-slate-200">
         <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-200">
-            @if($usePhotoAsLogo)
-                <img src="{{ $profilePhotoUrl }}" alt="Logo" class="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-200">
-            @else
-                <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold">LT</div>
-            @endif
+            <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold">LT</div>
             <div>
                 <span class="font-bold text-base tracking-tight text-slate-900">LifeTracker</span>
                 <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Personal OS</span>
@@ -83,11 +79,7 @@
         <header class="sticky top-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6">
             <div class="flex items-center gap-3 md:w-80">
                 <div class="md:hidden flex items-center gap-2">
-                    @if($usePhotoAsLogo)
-                        <img src="{{ $profilePhotoUrl }}" alt="Logo" class="w-9 h-9 rounded-xl object-cover ring-2 ring-slate-200">
-                    @else
-                        <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</div>
-                    @endif
+                    <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</div>
                     <span class="font-bold text-sm text-slate-900">LifeTracker</span>
                 </div>
                 <form action="{{ route('search') }}" method="GET" class="hidden md:flex items-center w-full relative">

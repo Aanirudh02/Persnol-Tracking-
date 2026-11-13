@@ -179,6 +179,7 @@ class SettingController extends Controller
             'currency' => 'required|string',
             'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'use_photo_as_logo' => 'nullable|boolean',
+            'app_logo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
         if ($request->hasFile('profile_photo')) {
@@ -187,10 +188,14 @@ class SettingController extends Controller
             unset($validated['profile_photo']);
         }
 
-        $validated['preferences'] = array_merge($user->preferences ?? [], [
+        $preferences = array_merge($user->preferences ?? [], [
             'use_photo_as_logo' => $request->boolean('use_photo_as_logo'),
         ]);
-        unset($validated['use_photo_as_logo']);
+        if ($request->hasFile('app_logo')) {
+            $preferences['app_logo'] = app(CloudinaryService::class)->upload($request->file('app_logo'), 'logos');
+        }
+        $validated['preferences'] = $preferences;
+        unset($validated['use_photo_as_logo'], $validated['app_logo']);
 
         $user->update($validated);
 

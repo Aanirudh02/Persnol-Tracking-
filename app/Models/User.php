@@ -61,11 +61,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Square, face-centred version of the profile photo for home-screen / tab icons.
+     * Home-screen / tab icon: the profile photo when "use as logo" is on, otherwise the separately uploaded logo.
      */
-    public function profilePhotoIconUrl(int $size = 192): ?string
+    public function appIconUrl(int $size = 192): ?string
     {
-        $url = $this->profilePhotoUrl();
+        $source = $this->usesProfilePhotoAsLogo()
+            ? $this->profile_photo
+            : data_get($this->preferences, 'app_logo');
+
+        $url = CloudinaryService::url($source);
 
         if ($url && str_contains($url, 'res.cloudinary.com') && str_contains($url, '/image/upload/')) {
             return str_replace('/image/upload/', "/image/upload/c_fill,g_face,w_{$size},h_{$size},f_png/", $url);
@@ -75,7 +79,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Whether the profile photo should replace the "LT" app logo.
+     * Whether the profile photo should be used as the home-screen app icon.
      */
     public function usesProfilePhotoAsLogo(): bool
     {
