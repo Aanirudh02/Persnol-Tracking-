@@ -6,17 +6,23 @@ use App\Models\ActivityCategory;
 use App\Models\ExpenseCategory;
 use App\Models\FoodCategory;
 use App\Models\PersonalExpenseCategory;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
     /**
      * Store a new expense category
      */
-    public function storeExpense(Request $request)
+    public function storeExpense(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:80',
+            'name' => [
+                'required', 'string', 'max:80',
+                Rule::unique('expense_categories', 'name')
+                    ->where(fn ($query) => $query->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $request->user()->id))),
+            ],
             'color' => 'nullable|string|max:20',
             'icon' => 'nullable|string|max:20',
         ]);
@@ -31,14 +37,51 @@ class CategoryController extends Controller
         return back()->with('success', "Category '{$validated['name']}' added!");
     }
 
-    public function destroyExpense(Request $request, ExpenseCategory $category)
+    public function updateExpense(Request $request, ExpenseCategory $category): RedirectResponse
     {
-        if ($category->user_id !== $request->user()->id) {
-            abort(403);
+        $this->authorizeExpenseCategory($request, $category);
+
+        $validated = $request->validate([
+            'name' => [
+                'required', 'string', 'max:80',
+                Rule::unique('expense_categories', 'name')
+                    ->ignore($category->id)
+                    ->where(fn ($query) => $query->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $request->user()->id))),
+            ],
+            'color' => ['nullable', 'string', 'max:20'],
+            'icon' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        $category->update([
+            'name' => $validated['name'],
+            'color' => $validated['color'] ?? $category->color,
+            'icon' => $validated['icon'] ?? $category->icon,
+        ]);
+
+        return back()->with('success', "Category '{$category->name}' updated!");
+    }
+
+    public function destroyExpense(Request $request, ExpenseCategory $category): RedirectResponse
+    {
+        $this->authorizeExpenseCategory($request, $category);
+
+        if ($category->expenses()->withTrashed()->exists()) {
+            return back()->with('error', "Category '{$category->name}' has expenses and cannot be deleted. Archive it instead.");
         }
+
         $category->delete();
 
         return back()->with('success', 'Category deleted.');
+    }
+
+    /**
+     * Own categories can be managed by their owner; shared (system) categories only by an Admin.
+     */
+    private function authorizeExpenseCategory(Request $request, ExpenseCategory $category): void
+    {
+        $ownsCategory = $category->user_id !== null && (int) $category->user_id === (int) $request->user()->id;
+
+        abort_unless($ownsCategory || ($category->user_id === null && $request->user()->isAdmin()), 403);
     }
 
     /**
@@ -126,7 +169,7 @@ class CategoryController extends Controller
 
     public function updatePersonal(Request $request, PersonalExpenseCategory $category)
     {
-        if ($category->user_id && $category->user_id !== $request->user()->id) {
+        if ($category->user_id && (int) $category->user_id !== (int) $request->user()->id) {
             abort(403);
         }
 
@@ -145,11 +188,16 @@ class CategoryController extends Controller
         return back()->with('success', "Personal expense category '{$category->name}' updated!");
     }
 
-    public function destroyPersonal(Request $request, PersonalExpenseCategory $category)
+    public function destroyPersonal(Request $request, PersonalExpenseCategory $category): RedirectResponse
     {
-        if ($category->user_id && $category->user_id !== $request->user()->id) {
+        if ($category->user_id && (int) $category->user_id !== (int) $request->user()->id) {
             abort(403);
         }
+
+        if ($category->personalExpenses()->withTrashed()->exists()) {
+            return back()->with('error', "Category '{$category->name}' has personal expenses and cannot be deleted.");
+        }
+
         $category->delete();
 
         return back()->with('success', 'Personal expense category deleted.');

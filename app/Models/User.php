@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CloudinaryService;
 use App\Services\OptionsService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -49,6 +50,22 @@ class User extends Authenticatable
             'preferences' => 'array',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Public URL of the uploaded profile photo, if any.
+     */
+    public function profilePhotoUrl(): ?string
+    {
+        return CloudinaryService::url($this->profile_photo);
+    }
+
+    /**
+     * Whether the profile photo should replace the "LT" app logo.
+     */
+    public function usesProfilePhotoAsLogo(): bool
+    {
+        return filled($this->profile_photo) && (bool) data_get($this->preferences, 'use_photo_as_logo', false);
     }
 
     public function roles(): BelongsToMany

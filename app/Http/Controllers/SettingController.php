@@ -131,10 +131,10 @@ class SettingController extends Controller
 
         $expenseCategories = ExpenseCategory::where(function ($q) use ($user) {
             $q->whereNull('user_id')->orWhere('user_id', $user->id);
-        })->orderBy('name')->get();
+        })->withCount(['expenses' => fn ($q) => $q->withTrashed()])->orderBy('name')->get();
         $personalExpenseCategories = PersonalExpenseCategory::where(function ($q) use ($user) {
             $q->whereNull('user_id')->orWhere('user_id', $user->id);
-        })->orderBy('name')->get();
+        })->withCount(['personalExpenses' => fn ($q) => $q->withTrashed()])->orderBy('name')->get();
         $incomeCategories = IncomeCategory::where(function ($q) use ($user) {
             $q->whereNull('user_id')->orWhere('user_id', $user->id);
         })->orderBy('name')->get();
@@ -178,11 +178,19 @@ class SettingController extends Controller
             'timezone' => 'required|string',
             'currency' => 'required|string',
             'profile_photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'use_photo_as_logo' => 'nullable|boolean',
         ]);
 
         if ($request->hasFile('profile_photo')) {
             $validated['profile_photo'] = app(CloudinaryService::class)->upload($request->file('profile_photo'), 'profiles');
+        } else {
+            unset($validated['profile_photo']);
         }
+
+        $validated['preferences'] = array_merge($user->preferences ?? [], [
+            'use_photo_as_logo' => $request->boolean('use_photo_as_logo'),
+        ]);
+        unset($validated['use_photo_as_logo']);
 
         $user->update($validated);
 

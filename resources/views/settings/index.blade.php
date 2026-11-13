@@ -85,7 +85,7 @@
         </div>
 
         <!-- Profile Section -->
-        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div id="profile" class="scroll-mt-20 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
                 <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -129,11 +129,18 @@
                         <label for="profile_photo" class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">Profile Photo</label>
                         <input type="file" name="profile_photo" id="profile_photo" accept="image/*" class="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-950/50 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/50 transition" />
                         @if($user->profile_photo)
-                            <div class="mt-2 flex items-center gap-2">
-                                <img src="{{ \App\Services\CloudinaryService::url($user->profile_photo) }}" alt="Profile Photo" class="w-10 h-10 rounded-full object-cover border border-indigo-200">
-                                <span class="text-[11px] text-slate-500">Current profile photo</span>
+                            <div class="mt-3 flex items-center gap-3">
+                                <button type="button" onclick="window.openImageModal(@js($user->profilePhotoUrl()), @js($user->name), 'Profile photo')" title="View full photo" class="shrink-0 rounded-full ring-4 ring-indigo-50 transition hover:scale-105 cursor-pointer">
+                                    <img src="{{ $user->profilePhotoUrl() }}" alt="Profile Photo" class="w-20 h-20 rounded-full object-cover border border-indigo-200">
+                                </button>
+                                <span class="text-xs text-slate-500">Current profile photo — tap to view</span>
                             </div>
                         @endif
+                        <label class="mt-3 flex items-center gap-2 cursor-pointer select-none">
+                            <input type="hidden" name="use_photo_as_logo" value="0">
+                            <input type="checkbox" name="use_photo_as_logo" value="1" @checked(old('use_photo_as_logo', data_get($user->preferences, 'use_photo_as_logo', false))) class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Use profile photo as app logo</span>
+                        </label>
                     </div>
                 </div>
                 <div class="pt-2">
@@ -310,6 +317,97 @@
             </form>
         </div>
 
+        <!-- Expense Categories Management -->
+        <div id="expense-categories" class="scroll-mt-20 bg-white dark:bg-slate-900 rounded-2xl border border-indigo-100 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>💸</span> Dynamic Expense Categories
+                </h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Money buckets for normal expenses (Food, Snacks, Petrol...). Categories that already have expenses cannot be deleted, archive them instead.</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <form action="{{ route('categories.expense.store') }}" method="POST" class="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+                    @csrf
+                    <input type="text" name="name" required maxlength="80" placeholder="Category name (e.g. Groceries, Rent)..." class="flex-1 min-w-0 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white">
+                    <input type="color" name="color" value="#6366f1" title="Category Color" class="h-10 w-12 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1 cursor-pointer">
+                    <button type="submit" class="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition whitespace-nowrap cursor-pointer">
+                        + Add Category
+                    </button>
+                </form>
+
+                <div class="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    @forelse($expenseCategories as $eCat)
+                        @php
+                            $canManageExpenseCategory = $eCat->user_id ? (int) $eCat->user_id === (int) $user->id : $user->isAdmin();
+                        @endphp
+                        <div class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-3.5 py-2.5 text-xs {{ $eCat->is_archived ? 'opacity-60' : '' }}">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $eCat->color ?? '#6366f1' }}"></span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 truncate">{{ $eCat->name }}</span>
+                                <span class="shrink-0 text-[10px] text-slate-400">{{ $eCat->expenses_count }} used</span>
+                            </div>
+                            @if($canManageExpenseCategory)
+                                <div class="flex items-center gap-2.5 flex-shrink-0">
+                                    <button type="button" onclick="openEditExpenseCatModal({{ $eCat->id }}, @js($eCat->name), @js($eCat->color ?? '#6366f1'))" class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">Edit</button>
+                                    @if($eCat->expenses_count > 0)
+                                        <span class="text-[11px] font-bold text-slate-300 cursor-not-allowed" title="Has expenses, cannot delete">Delete</span>
+                                    @else
+                                        <form action="{{ route('categories.expense.destroy', $eCat) }}" method="POST" onsubmit="return confirm('Delete this expense category?');" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-[11px] font-bold text-rose-500 hover:underline cursor-pointer">Delete</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            @else
+                                <span class="text-[10px] font-semibold text-slate-400">Shared</span>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-xs text-slate-400 italic">No expense categories yet.</p>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Expense Category Modal -->
+        <div id="edit-expense-cat-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target === this) closeEditExpenseCatModal()">
+            <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white">Edit Expense Category</h3>
+                    <button type="button" onclick="closeEditExpenseCatModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold cursor-pointer">&times;</button>
+                </div>
+                <form id="edit-expense-cat-form" action="" method="POST" class="space-y-4">
+                    @csrf
+                    @method('PUT')
+                    <div>
+                        <label for="edit-expense-cat-name" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Category Name</label>
+                        <input type="text" name="name" id="edit-expense-cat-name" required maxlength="80" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label for="edit-expense-cat-color" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Color Theme</label>
+                        <input type="color" name="color" id="edit-expense-cat-color" class="h-10 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1 cursor-pointer">
+                    </div>
+                    <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <button type="button" onclick="closeEditExpenseCatModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer">Cancel</button>
+                        <button type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition cursor-pointer">Update Category</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            function openEditExpenseCatModal(id, name, color) {
+                document.getElementById('edit-expense-cat-form').action = @js(url('/categories/expense')) + '/' + id;
+                document.getElementById('edit-expense-cat-name').value = name;
+                document.getElementById('edit-expense-cat-color').value = color || '#6366f1';
+                document.getElementById('edit-expense-cat-modal').classList.remove('hidden');
+            }
+            function closeEditExpenseCatModal() {
+                document.getElementById('edit-expense-cat-modal').classList.add('hidden');
+            }
+        </script>
+
         <!-- Personal Expense Categories Management -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-pink-100 dark:border-slate-800 shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -336,16 +434,21 @@
                             <div class="flex items-center gap-2 min-w-0">
                                 <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: {{ $pCat->color ?? '#ec4899' }}"></span>
                                 <span class="font-bold text-slate-800 dark:text-slate-200 truncate">{{ $pCat->name }}</span>
+                                <span class="shrink-0 text-[10px] text-slate-400">{{ $pCat->personal_expenses_count }} used</span>
                             </div>
                             <div class="flex items-center gap-2.5 flex-shrink-0">
                                 <button type="button" onclick="openEditPersonalCatModal({{ $pCat->id }}, @js($pCat->name), @js($pCat->color ?? '#ec4899'))" class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
                                     Edit
                                 </button>
-                                <form action="{{ route('categories.personal.destroy', $pCat) }}" method="POST" onsubmit="return confirm('Delete this personal category?');" class="inline">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-[11px] font-bold text-rose-500 hover:underline cursor-pointer">Delete</button>
-                                </form>
+                                @if($pCat->personal_expenses_count > 0)
+                                    <span class="text-[11px] font-bold text-slate-300 cursor-not-allowed" title="Has expenses, cannot delete">Delete</span>
+                                @else
+                                    <form action="{{ route('categories.personal.destroy', $pCat) }}" method="POST" onsubmit="return confirm('Delete this personal category?');" class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-[11px] font-bold text-rose-500 hover:underline cursor-pointer">Delete</button>
+                                    </form>
+                                @endif
                             </div>
                         </div>
                     @endforeach
@@ -616,31 +719,7 @@
                 </h2>
                 <p class="text-xs text-slate-400 mt-0.5">Expense categories = money buckets (Food, Snacks, Petrol). Food/Snack categories = meal type on each item (Dinner, Tea/Coffee). Sub-items inherit the parent expense category — do not re-pick it.</p>
             </div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                <!-- Expense Categories -->
-                <div id="expense-categories">
-                    <h3 class="text-sm font-bold text-slate-700 mb-1">💸 Expense Categories</h3>
-                    <p class="text-[10px] text-slate-400 mb-3">Money buckets for Finance (Food, Snacks, Petrol…). Used on parent expenses only.</p>
-                    <form action="{{ route('categories.expense.store') }}" method="POST" class="flex gap-2 mb-3">
-                        @csrf
-                        <input type="text" name="name" required placeholder="New category..." class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:ring-2 focus:ring-indigo-400">
-                        <button type="submit" class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition">+ Add</button>
-                    </form>
-                    <div class="space-y-1.5">
-                        @forelse($expenseCategories as $cat)
-                            <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-                                <span class="text-xs font-medium text-slate-700">{{ $cat->icon }} {{ $cat->name }}</span>
-                                <form action="{{ route('categories.expense.destroy', $cat) }}" method="POST" onsubmit="return confirm('Delete this category?')">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-rose-400 hover:text-rose-600 text-xs">✕</button>
-                                </form>
-                            </div>
-                        @empty
-                            <p class="text-xs text-slate-400 italic">No custom expense categories yet.</p>
-                        @endforelse
-                    </div>
-                </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 <!-- Food Categories -->
                 <div>

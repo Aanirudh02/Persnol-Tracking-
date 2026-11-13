@@ -1,4 +1,9 @@
 @props(['title' => 'Dashboard'])
+@php
+    $authUser = auth()->user();
+    $profilePhotoUrl = $authUser?->profilePhotoUrl();
+    $usePhotoAsLogo = (bool) $authUser?->usesProfilePhotoAsLogo();
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -13,7 +18,11 @@
 
     <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white border-r border-slate-200">
         <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-200">
-            <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold">LT</div>
+            @if($usePhotoAsLogo)
+                <img src="{{ $profilePhotoUrl }}" alt="Logo" class="w-10 h-10 rounded-xl object-cover ring-2 ring-slate-200">
+            @else
+                <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold">LT</div>
+            @endif
             <div>
                 <span class="font-bold text-base tracking-tight text-slate-900">LifeTracker</span>
                 <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Personal OS</span>
@@ -70,7 +79,11 @@
         <header class="sticky top-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6">
             <div class="flex items-center gap-3 md:w-80">
                 <div class="md:hidden flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</div>
+                    @if($usePhotoAsLogo)
+                        <img src="{{ $profilePhotoUrl }}" alt="Logo" class="w-9 h-9 rounded-xl object-cover ring-2 ring-slate-200">
+                    @else
+                        <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</div>
+                    @endif
                     <span class="font-bold text-sm text-slate-900">LifeTracker</span>
                 </div>
                 <form action="{{ route('search') }}" method="GET" class="hidden md:flex items-center w-full relative">
@@ -86,12 +99,18 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </a>
                 <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-                    <div class="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-xs">
-                        {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
-                    </div>
+                    @if($profilePhotoUrl)
+                        <button type="button" data-profile-photo onclick="window.openImageModal(@js($profilePhotoUrl), @js($authUser->name), 'Profile photo')" title="View profile photo" class="shrink-0 rounded-full ring-2 ring-white shadow-md outline outline-1 outline-slate-200 transition hover:scale-105 cursor-pointer">
+                            <img src="{{ $profilePhotoUrl }}" alt="{{ $authUser->name }}" class="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover">
+                        </button>
+                    @else
+                        <a href="{{ route('settings.index') }}#profile" title="Add a profile photo" class="w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white shadow-md">
+                            {{ strtoupper(substr($authUser->name ?? 'U', 0, 1)) }}
+                        </a>
+                    @endif
                     <div class="hidden sm:block text-left">
-                        <span class="block text-sm font-semibold text-slate-800 leading-tight">{{ auth()->user()->name }}</span>
-                        <span class="block text-xs text-slate-400 capitalize">{{ auth()->user()->roles->first()?->name ?? 'User' }}</span>
+                        <span class="block text-sm font-semibold text-slate-800 leading-tight">{{ $authUser->name }}</span>
+                        <span class="block text-xs text-slate-400 capitalize">{{ $authUser->roles->first()?->name ?? 'User' }}</span>
                     </div>
                     <form action="{{ route('logout') }}" method="POST" class="inline">
                         @csrf
@@ -168,43 +187,101 @@
         <div class="relative -top-5 flex-1 flex justify-center">
             <button type="button" onclick="window.openQuickAdd()" class="w-13 h-13 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center text-2xl font-bold active:scale-95 transition-transform cursor-pointer" title="Quick Add">+</button>
         </div>
-        <a href="{{ route('finance.index') }}" class="flex flex-col items-center justify-center flex-1 py-1 text-sm {{ request()->routeIs('finance.*') || request()->routeIs('expenses.*') || request()->routeIs('income.*') ? 'text-slate-900 font-bold' : 'text-slate-500' }}">
+        @php
+            $financeActive = request()->routeIs('finance.*', 'expenses.*', 'expense-groups.*', 'personal-expenses.*', 'all-expenses.*', 'income.*', 'statements.*', 'classification.*', 'payments.*', 'savings.*', 'daily-balances.*', 'friends.*', 'credits.*', 'family-members.*');
+        @endphp
+        <button type="button" onclick="window.toggleMobileDrawer('mobile-finance-menu')" aria-haspopup="dialog" aria-controls="mobile-finance-menu" class="flex flex-col items-center justify-center flex-1 py-1 text-sm cursor-pointer {{ $financeActive ? 'text-slate-900 font-bold' : 'text-slate-500' }}">
             <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>Finance</span>
-        </a>
-        <button type="button" onclick="document.getElementById('mobile-more-menu').classList.toggle('hidden')" class="flex flex-col items-center justify-center flex-1 py-1 text-sm text-slate-500 cursor-pointer">
+        </button>
+        <button type="button" onclick="window.toggleMobileDrawer('mobile-more-menu')" aria-haspopup="dialog" aria-controls="mobile-more-menu" class="flex flex-col items-center justify-center flex-1 py-1 text-sm text-slate-500 cursor-pointer">
             <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
             <span>More</span>
         </button>
     </nav>
 
-    <div id="mobile-more-menu" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end" onclick="if(event.target === this) this.classList.add('hidden')">
-        <div class="bg-white rounded-t-3xl p-6 space-y-4 max-h-[80vh] overflow-y-auto border-t border-slate-200 shadow-2xl">
+    @php
+        $financeDrawerSections = [
+            'Overview' => [
+                ['finance.index', [], 'Finance Hub', 'bg-slate-900 text-white', 'M3 3v18h18M7 15l4-4 3 3 5-6'],
+                ['all-expenses.index', [], 'All Expenses', 'bg-sky-100 text-sky-700', 'M4 6h16M4 12h16M4 18h10'],
+            ],
+            'Spending' => [
+                ['expenses.index', [], 'Expenses', 'bg-rose-100 text-rose-700', 'M12 19V5m0 14l-6-6m6 6l6-6'],
+                ['personal-expenses.index', [], 'Personal Expenses', 'bg-pink-100 text-pink-700', 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'],
+                ['classification.index', [], 'Classifications', 'bg-violet-100 text-violet-700', 'M7 7h.01M7 3h5l8 8-9 9-8-8V7a4 4 0 014-4z'],
+            ],
+            'Income & Savings' => [
+                ['income.index', [], 'Income', 'bg-emerald-100 text-emerald-700', 'M12 5v14m0-14l-6 6m6-6l6 6'],
+                ['savings.index', [], 'Savings & Funds', 'bg-teal-100 text-teal-700', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                ['daily-balances.index', [], 'Daily Cash Register', 'bg-amber-100 text-amber-700', 'M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm2 8h4'],
+            ],
+            'Statements & Checks' => [
+                ['statements.index', [], 'Statements', 'bg-indigo-100 text-indigo-700', 'M9 12h6m-6 4h6M7 4h7l5 5v11a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z'],
+                ['statements.create', [], 'Take Statement', 'bg-indigo-100 text-indigo-700', 'M12 11v6m-3-3h6M7 4h7l5 5v11a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z'],
+                ['payments.index', [], 'Payments', 'bg-sky-100 text-sky-700', 'M9 12l2 2 4-4M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
+                ['finance.gpay-auditor.index', [], 'GPay Auditor', 'bg-emerald-100 text-emerald-700', 'M8 3h8a1 1 0 011 1v16a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1zm3 15h2'],
+            ],
+            'People' => [
+                ['friends.index', [], 'Friends & Splits', 'bg-blue-100 text-blue-700', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
+                ['credits.index', ['type' => 'credit'], 'Credits (I owe)', 'bg-orange-100 text-orange-700', 'M17 8l4 4m0 0l-4 4m4-4H3'],
+                ['credits.index', ['type' => 'debt'], 'Debts (owed to me)', 'bg-lime-100 text-lime-700', 'M7 16l-4-4m0 0l4-4m-4 4h18'],
+                ['family-members.index', [], 'Family Members', 'bg-fuchsia-100 text-fuchsia-700', 'M3 12l9-9 9 9M5 10v10h14V10'],
+            ],
+        ];
+        $moreDrawerItems = [
+            ['food.index', [], 'Food'],
+            ['food.index', ['is_snack' => 1], 'Snacks'],
+            ['sleep.index', [], 'Sleep'],
+            ['activities.index', [], 'Activities'],
+            ['scooter.index', [], 'Trips'],
+            ['scooter.plan', [], 'Plan Trip'],
+            ['vehicles.index', [], 'Vehicles'],
+            ['petrol.index', [], 'Petrol'],
+            ['odometer.index', [], 'Odometer'],
+            ['mistakes.index', [], 'Mistakes'],
+            ['notes.index', [], 'Notes'],
+            ['analytics.index', [], 'Analytics'],
+            ['reports.index', [], 'Reports'],
+            ['settings.index', [], 'Settings'],
+        ];
+    @endphp
+
+    <div id="mobile-more-menu" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="bg-white rounded-t-3xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4 max-h-[80vh] overflow-y-auto border-t border-slate-200 shadow-2xl">
             <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                <h3 class="font-bold text-base text-slate-900">All Modules</h3>
-                <button onclick="document.getElementById('mobile-more-menu').classList.add('hidden')" class="text-slate-400 text-xl font-bold">&times;</button>
+                <h3 id="mobile-more-title" class="font-bold text-base text-slate-900">All Modules</h3>
+                <button type="button" onclick="document.getElementById('mobile-more-menu').classList.add('hidden')" aria-label="Close modules" class="text-slate-400 text-xl font-bold">&times;</button>
             </div>
             <div class="grid grid-cols-3 gap-3 text-center">
-                @foreach([
-                    ['family-members.index', 'Family Members', []],
-                    ['personal-expenses.index', 'Personal Expenses', []],
-                    ['all-expenses.index', 'All Expenses', []],
-                    ['statements.index', 'Statements', []],
-                    ['food.index', 'Food', []],
-                    ['food.index', 'Snacks', ['is_snack' => 1]],
-                    ['sleep.index', 'Sleep', []],
-                    ['scooter.index', 'Trips', []],
-                    ['scooter.plan', 'Plan Trip', []],
-                    ['vehicles.index', 'Vehicles', []],
-                    ['petrol.index', 'Petrol', []],
-                    ['odometer.index', 'Odometer', []],
-                    ['credits.index', 'Credits', ['type' => 'credit']],
-                    ['credits.index', 'Debts', ['type' => 'debt']],
-                    ['settings.index', 'Settings', []],
-                ] as [$route, $label, $params])
+                @foreach($moreDrawerItems as [$route, $params, $label])
                     <a href="{{ route($route, $params) }}" class="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-sm font-medium text-slate-700 transition">{{ $label }}</a>
                 @endforeach
             </div>
+        </div>
+    </div>
+
+    <div id="mobile-finance-menu" role="dialog" aria-modal="true" aria-labelledby="mobile-finance-title" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="bg-white rounded-t-3xl p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6 space-y-5 max-h-[85vh] overflow-y-auto border-t border-slate-200 shadow-2xl">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 id="mobile-finance-title" class="font-bold text-base text-slate-900">Finance</h3>
+                <button type="button" onclick="document.getElementById('mobile-finance-menu').classList.add('hidden')" aria-label="Close finance modules" class="text-slate-400 text-xl font-bold">&times;</button>
+            </div>
+            @foreach($financeDrawerSections as $sectionTitle => $sectionItems)
+                <section>
+                    <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ $sectionTitle }}</p>
+                    <div class="grid grid-cols-3 gap-2.5">
+                        @foreach($sectionItems as [$route, $params, $label, $chipClasses, $iconPath])
+                            <a href="{{ route($route, $params) }}" class="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-3 text-center text-xs font-semibold leading-tight text-slate-700 transition hover:bg-slate-100 active:scale-95">
+                                <span class="flex h-9 w-9 items-center justify-center rounded-xl {{ $chipClasses }}">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $iconPath }}"/></svg>
+                                </span>
+                                {{ $label }}
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endforeach
         </div>
     </div>
 
@@ -278,6 +355,18 @@
             }
         };
 
+        window.toggleMobileDrawer = function(id) {
+            ['mobile-more-menu', 'mobile-finance-menu'].forEach(function(drawerId) {
+                const drawer = document.getElementById(drawerId);
+                if (!drawer) return;
+                if (drawerId === id) {
+                    drawer.classList.toggle('hidden');
+                } else {
+                    drawer.classList.add('hidden');
+                }
+            });
+        };
+
         window.openPhotoModal = window.openImageModal;
         window.closePhotoModal = window.closeImageModal;
 
@@ -295,6 +384,9 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 window.closeImageModal();
+                ['mobile-more-menu', 'mobile-finance-menu'].forEach(function(drawerId) {
+                    document.getElementById(drawerId)?.classList.add('hidden');
+                });
             }
         });
     </script>

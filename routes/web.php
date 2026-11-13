@@ -160,6 +160,7 @@ Route::middleware('auth')->group(function () {
 
     // Categories (user-defined)
     Route::post('/categories/expense', [CategoryController::class, 'storeExpense'])->name('categories.expense.store');
+    Route::put('/categories/expense/{category}', [CategoryController::class, 'updateExpense'])->name('categories.expense.update');
     Route::delete('/categories/expense/{category}', [CategoryController::class, 'destroyExpense'])->name('categories.expense.destroy');
     Route::post('/categories/personal', [CategoryController::class, 'storePersonal'])->name('categories.personal.store');
     Route::put('/categories/personal/{category}', [CategoryController::class, 'updatePersonal'])->name('categories.personal.update');

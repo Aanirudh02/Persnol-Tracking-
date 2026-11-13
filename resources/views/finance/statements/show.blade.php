@@ -136,6 +136,8 @@
                                 <th class="py-3 px-4">Category</th>
                                 <th class="py-3 px-4">Method</th>
                                 <th class="py-3 px-4 text-right">Amount</th>
+                                <th class="py-3 px-4 text-right" title="Running statement total before this transaction">Before</th>
+                                <th class="py-3 px-4 text-right" title="Running statement total after this transaction">After</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -228,10 +230,12 @@
                                     <td class="py-3 px-4 text-right font-bold text-slate-900 whitespace-nowrap">
                                         ₹{{ number_format($itemAmount, 2) }}
                                     </td>
+                                    <td class="py-3 px-4 text-right font-mono text-slate-500 whitespace-nowrap">₹{{ number_format($runningBalances[$item->id]['before'] ?? 0, 2) }}</td>
+                                    <td class="py-3 px-4 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">₹{{ number_format($runningBalances[$item->id]['after'] ?? 0, 2) }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center py-8 text-slate-400">No items found matching this statement criteria.</td>
+                                    <td colspan="8" class="text-center py-8 text-slate-400">No items found matching this statement criteria.</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -241,6 +245,7 @@
                                 <td class="py-3 px-4 text-right text-base font-black {{ $statement->isPersonal() ? 'text-pink-600' : 'text-slate-900' }}">
                                     ₹{{ number_format($statement->total_amount, 2) }}
                                 </td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>
