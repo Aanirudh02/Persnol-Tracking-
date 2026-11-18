@@ -271,15 +271,6 @@ class StatementController extends Controller
             }
         }
 
-        // Running statement total before/after each transaction, in chronological order
-        $runningBalances = [];
-        $runningTotal = 0.0;
-        foreach ($items->sortBy([fn ($a, $b) => strcmp((string) ($a->date ?? $a->created_at), (string) ($b->date ?? $b->created_at)), ['id', 'asc']]) as $item) {
-            $before = $runningTotal;
-            $runningTotal = round($runningTotal + $item->totalAmount(), 2);
-            $runningBalances[$item->id] = ['before' => $before, 'after' => $runningTotal];
-        }
-
         // Category breakdown calculation
         $categoryBreakdown = $items->groupBy(fn ($item) => $item->category?->name ?? 'Uncategorized')
             ->map(function ($group) {
@@ -308,7 +299,7 @@ class StatementController extends Controller
 
         $allowStatementDeletion = (bool) Setting::getVal('allow_statement_deletion', true);
 
-        return view('finance.statements.show', compact('statement', 'items', 'categoryBreakdown', 'allowStatementDeletion', 'doneByBreakdown', 'runningBalances'));
+        return view('finance.statements.show', compact('statement', 'items', 'categoryBreakdown', 'allowStatementDeletion', 'doneByBreakdown'));
     }
 
     public function update(Request $request, ExpenseStatement $statement): RedirectResponse
