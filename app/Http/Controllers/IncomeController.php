@@ -178,14 +178,20 @@ class IncomeController extends Controller
             abort(403);
         }
 
-        $income->load(['category', 'tallies.expense.category']);
+        $income->load([
+            'category',
+            'tallies.expense.category',
+            'tallies.expense.friendSplit.friend',
+            'tallies.expense.friendSplits.friend',
+        ]);
 
         $allExpenses = Expense::query()
             ->where('user_id', $request->user()->id)
             ->whereNull('parent_id')
             ->where('is_voluntary', false)
+            ->where('payment_method', $income->payment_method)
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
-            ->with(['incomeTallies.income'])
+            ->with(['category', 'expenseGroup', 'incomeTallies.income', 'friendSplit.friend', 'friendSplits.friend'])
             ->orderByDesc('date')
             ->take(60)
             ->get();
@@ -207,7 +213,7 @@ class IncomeController extends Controller
                 $otherSource = $otherTallies->first()?->income?->source ?? 'another income';
                 $exp->tally_badge = 'Fully tallied under '.$otherSource.' (₹'.number_format($totalTallied, 2).')';
             } elseif ($totalTallied > 0) {
-                $exp->is_selectable = true;
+                $exp->is_selectable = false;
                 $exp->tally_badge = 'Partially tallied (₹'.number_format($totalTallied, 2).' / ₹'.number_format($exp->totalAmount(), 2).')';
             } else {
                 $exp->is_selectable = true;
@@ -218,13 +224,13 @@ class IncomeController extends Controller
         $talliedTotal = $income->talliedAmount();
         $untalliedTotal = $income->untalliedAmount();
 
-        $availableList = $allExpenses->where('is_selectable', true)->values();
-        $talliedList = $allExpenses->where('is_selectable', false)->values();
+        $expenseOptions = $allExpenses
+            ->reject(fn (Expense $expense): bool => $expense->incomeTallies->contains('income_id', $income->id))
+            ->values();
 
         return view('finance.income.show', [
             'income' => $income,
-            'availableExpenses' => $availableList,
-            'talliedExpenses' => $talliedList,
+            'expenses' => $expenseOptions,
             'talliedTotal' => $talliedTotal,
             'untalliedTotal' => $untalliedTotal,
         ]);
@@ -262,27 +268,26 @@ class IncomeController extends Controller
                 ->where('user_id', $request->user()->id)
                 ->whereNull('parent_id')
                 ->where('is_voluntary', false)
+                ->where('payment_method', $lockedIncome->payment_method)
                 ->where(fn ($query) => $query->whereNull('is_archived')->orWhere('is_archived', false))
                 ->whereIn('id', $expenseIds)
+                ->with('incomeTallies')
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
 
             if ($expenses->count() !== count(array_unique($expenseIds))) {
                 throw ValidationException::withMessages([
-                    'expense_ids' => 'Choose only your own active, non-voluntary expenses.',
+                    ($isBulk ? 'expense_ids' : 'expense_id') => 'Choose only your own active, non-voluntary expenses that match this income’s payment method.',
                 ]);
             }
 
             $allocations = [];
             $totalToTally = 0.0;
             foreach ($expenses as $expense) {
-                if (IncomeExpenseTally::query()
-                    ->where('income_id', $lockedIncome->id)
-                    ->where('expense_id', $expense->id)
-                    ->exists()) {
+                if ($expense->incomeTallies->isNotEmpty()) {
                     throw ValidationException::withMessages([
-                        'expense_ids' => 'An expense is already tallied under this income stream.',
+                        ($isBulk ? 'expense_ids' : 'expense_id') => 'An expense that already has an income tally cannot be selected again.',
                     ]);
                 }
 

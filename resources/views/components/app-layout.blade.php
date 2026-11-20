@@ -35,11 +35,11 @@
 
             <div class="pt-2 pb-1"><p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Finance</p></div>
             <x-nav-link href="{{ route('finance.index') }}" :active="request()->routeIs('finance.index')" icon="credit-card">Finance Hub</x-nav-link>
+            <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">Income</x-nav-link>
             <x-nav-link href="{{ route('expenses.index') }}" :active="request()->routeIs('expenses.*')" icon="trending-down">Expenses</x-nav-link>
             <x-nav-link href="{{ route('personal-expenses.index') }}" :active="request()->routeIs('personal-expenses.*')" icon="user">Personal Expenses</x-nav-link>
             <x-nav-link href="{{ route('all-expenses.index') }}" :active="request()->routeIs('all-expenses.*')" icon="layers">All Expenses</x-nav-link>
             <x-nav-link href="{{ route('statements.index') }}" :active="request()->routeIs('statements.*')" icon="file-text">Statements</x-nav-link>
-            <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">Money Received</x-nav-link>
             <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">Payments</x-nav-link>
             <x-nav-link href="{{ route('savings.index') }}" :active="request()->routeIs('savings.*')" icon="trending-up">Savings & Funds</x-nav-link>
             <x-nav-link href="{{ route('daily-balances.index') }}" :active="request()->routeIs('daily-balances.*')" icon="layers">Daily Cash Register</x-nav-link>
