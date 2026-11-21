@@ -24,145 +24,188 @@
         $creditType = request('type', 'credit');
         $desktopNavGroups = [
             'Money' => [
+                'icon' => 'credit-card',
                 'active' => request()->routeIs('income.*', 'expenses.*', 'expense-groups.*', 'personal-expenses.*', 'personal-expense-groups.*', 'all-expenses.*', 'bulk-entry.*', 'classification.*'),
                 'sections' => [
                     'Income & expenses' => [
-                        ['income.index', [], 'Income', request()->routeIs('income.*')],
-                        ['expenses.index', [], 'Expenses', request()->routeIs('expenses.*', 'expense-groups.*')],
-                        ['personal-expenses.index', [], 'Personal Expenses', request()->routeIs('personal-expenses.*', 'personal-expense-groups.*')],
+                        ['income.index', [], 'Income', request()->routeIs('income.*'), 'trending-up'],
+                        ['expenses.index', [], 'Expenses', request()->routeIs('expenses.*', 'expense-groups.*'), 'trending-down'],
+                        ['personal-expenses.index', [], 'Personal Expenses', request()->routeIs('personal-expenses.*', 'personal-expense-groups.*'), 'user'],
                     ],
                     'Tools' => [
-                        ['bulk-entry.create', [], 'Bulk add', request()->routeIs('bulk-entry.*')],
-                        ['all-expenses.index', [], 'All expenses', request()->routeIs('all-expenses.*')],
-                        ['classification.index', [], 'Classifications', request()->routeIs('classification.*')],
+                        ['bulk-entry.create', [], 'Bulk add', request()->routeIs('bulk-entry.*'), 'plus'],
+                        ['all-expenses.index', [], 'All expenses', request()->routeIs('all-expenses.*'), 'layers'],
+                        ['classification.index', [], 'Classifications', request()->routeIs('classification.*'), 'tag'],
                     ],
                 ],
             ],
             'Ledger' => [
+                'icon' => 'layers',
                 'active' => request()->routeIs('finance.index', 'daily-balances.*', 'statements.*', 'savings.*', 'finance.gpay-auditor.*'),
                 'sections' => [
                     'Balances' => [
-                        ['finance.index', [], 'Finance Hub', request()->routeIs('finance.index')],
-                        ['daily-balances.index', [], 'Daily Cash Register', request()->routeIs('daily-balances.*')],
-                        ['savings.index', [], 'Savings & Funds', request()->routeIs('savings.*')],
+                        ['finance.index', [], 'Finance Hub', request()->routeIs('finance.index'), 'credit-card'],
+                        ['daily-balances.index', [], 'Daily Cash Register', request()->routeIs('daily-balances.*'), 'layers'],
+                        ['savings.index', [], 'Savings & Funds', request()->routeIs('savings.*'), 'trending-up'],
                     ],
                     'Statements & checks' => [
-                        ['statements.index', [], 'Statements', request()->routeIs('statements.index', 'statements.show')],
-                        ['statements.create', [], 'Take statement', request()->routeIs('statements.create')],
-                        ['finance.gpay-auditor.index', [], 'GPay Auditor', request()->routeIs('finance.gpay-auditor.*')],
+                        ['statements.index', [], 'Statements', request()->routeIs('statements.index', 'statements.show'), 'file-text'],
+                        ['statements.create', [], 'Take statement', request()->routeIs('statements.create'), 'file-plus'],
+                        ['finance.gpay-auditor.index', [], 'GPay Auditor', request()->routeIs('finance.gpay-auditor.*'), 'smartphone'],
                     ],
                 ],
             ],
             'People' => [
+                'icon' => 'users',
                 'active' => request()->routeIs('friends.*', 'friend-splits.*', 'credits.*', 'family-members.*'),
                 'sections' => [
                     'People' => [
-                        ['friends.index', [], 'Friends & Splits', request()->routeIs('friends.*', 'friend-splits.*')],
-                        ['credits.index', ['type' => 'credit'], 'Credits (I owe)', request()->routeIs('credits.*') && $creditType === 'credit'],
-                        ['credits.index', ['type' => 'debt'], 'Debts (owed to me)', request()->routeIs('credits.*') && $creditType === 'debt'],
-                        ['family-members.index', [], 'Family Members', request()->routeIs('family-members.*')],
+                        ['friends.index', [], 'Friends & Splits', request()->routeIs('friends.*', 'friend-splits.*'), 'users'],
+                        ['credits.index', ['type' => 'credit'], 'Credits (I owe)', request()->routeIs('credits.*') && $creditType === 'credit', 'users'],
+                        ['credits.index', ['type' => 'debt'], 'Debts (owed to me)', request()->routeIs('credits.*') && $creditType === 'debt', 'users'],
+                        ['family-members.index', [], 'Family Members', request()->routeIs('family-members.*'), 'users'],
                     ],
                 ],
             ],
             'Life' => [
+                'icon' => 'activity',
                 'active' => request()->routeIs('food.*', 'sleep.*', 'activities.*', 'scooter.*', 'vehicles.*', 'petrol.*', 'odometer.*', 'mistakes.*', 'lessons.*', 'notes.*'),
                 'sections' => [
                     'Daily life' => [
-                        ['food.index', [], 'Food', request()->routeIs('food.*') && ! request()->boolean('is_snack')],
-                        ['food.index', ['is_snack' => 1], 'Snacks', request()->routeIs('food.*') && request()->boolean('is_snack')],
-                        ['sleep.index', [], 'Sleep & Wake', request()->routeIs('sleep.*')],
-                        ['activities.index', [], 'Activities', request()->routeIs('activities.*')],
-                        ['mistakes.index', [], 'Mistakes & Lessons', request()->routeIs('mistakes.*', 'lessons.*')],
-                        ['notes.index', [], 'Notes', request()->routeIs('notes.*')],
+                        ['food.index', [], 'Food', request()->routeIs('food.*') && ! request()->boolean('is_snack'), 'coffee'],
+                        ['food.index', ['is_snack' => 1], 'Snacks', request()->routeIs('food.*') && request()->boolean('is_snack'), 'coffee'],
+                        ['sleep.index', [], 'Sleep & Wake', request()->routeIs('sleep.*'), 'activity'],
+                        ['activities.index', [], 'Activities', request()->routeIs('activities.*'), 'activity'],
+                        ['mistakes.index', [], 'Mistakes & Lessons', request()->routeIs('mistakes.*', 'lessons.*'), 'alert-triangle'],
+                        ['notes.index', [], 'Notes', request()->routeIs('notes.*'), 'file-text'],
                     ],
                     'Travel' => [
-                        ['scooter.index', [], 'Scooter Trips', request()->routeIs('scooter.index', 'scooter.start', 'scooter.end', 'scooter.edit')],
-                        ['scooter.plan', [], 'Trip Planner', request()->routeIs('scooter.plan*')],
-                        ['vehicles.index', [], 'Vehicles', request()->routeIs('vehicles.*')],
-                        ['petrol.index', [], 'Petrol / Fuel', request()->routeIs('petrol.*')],
-                        ['odometer.index', [], 'Odometer & Mileage', request()->routeIs('odometer.*')],
+                        ['scooter.index', [], 'Scooter Trips', request()->routeIs('scooter.index', 'scooter.start', 'scooter.end', 'scooter.edit'), 'navigation'],
+                        ['scooter.plan', [], 'Trip Planner', request()->routeIs('scooter.plan*'), 'navigation'],
+                        ['vehicles.index', [], 'Vehicles', request()->routeIs('vehicles.*'), 'navigation'],
+                        ['petrol.index', [], 'Petrol / Fuel', request()->routeIs('petrol.*'), 'fuel'],
+                        ['odometer.index', [], 'Odometer & Mileage', request()->routeIs('odometer.*'), 'navigation'],
                     ],
                 ],
             ],
             'Insights' => [
+                'icon' => 'pie-chart',
                 'active' => request()->routeIs('analytics.*', 'reports.*', 'settings.*'),
                 'sections' => [
                     'Insights' => [
-                        ['analytics.index', [], 'Analytics', request()->routeIs('analytics.*')],
-                        ['reports.index', [], 'Reports & Export', request()->routeIs('reports.*')],
-                        ['settings.index', [], 'Settings', request()->routeIs('settings.*')],
+                        ['analytics.index', [], 'Analytics', request()->routeIs('analytics.*'), 'pie-chart'],
+                        ['reports.index', [], 'Reports & Export', request()->routeIs('reports.*'), 'bar-chart-2'],
+                        ['settings.index', [], 'Settings', request()->routeIs('settings.*'), 'settings'],
                     ],
                 ],
             ],
         ];
-        $topLinkClass = fn (bool $active): string => 'inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold transition '
-            .($active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900');
     @endphp
 
-    <div class="app-main min-h-screen min-w-0">
-        <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
-            <div class="h-16 flex items-center justify-between gap-3 px-4 sm:px-6">
-                <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-2">
-                    <span class="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</span>
-                    <span class="hidden lg:block font-bold text-sm text-slate-900 leading-tight">LifeTracker<span class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Personal OS</span></span>
-                    <span class="md:hidden font-bold text-sm text-slate-900">LifeTracker</span>
-                </a>
+    <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white border-r border-slate-200">
+        <a href="{{ route('dashboard') }}" class="h-16 shrink-0 flex items-center px-6 gap-3 border-b border-slate-200">
+            <span class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold">LT</span>
+            <span>
+                <span class="block font-bold text-base tracking-tight text-slate-900">LifeTracker</span>
+                <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Personal OS</span>
+            </span>
+        </a>
 
-                {{-- Desktop / web navigation bar --}}
-                <nav aria-label="Main" class="hidden md:flex min-w-0 flex-1 items-center gap-0.5">
-                    <a href="{{ route('dashboard') }}" class="{{ $topLinkClass(request()->routeIs('dashboard')) }}" @if(request()->routeIs('dashboard')) aria-current="page" @endif>Dashboard</a>
-                    <a href="{{ route('calendar') }}" class="{{ $topLinkClass(request()->routeIs('calendar', 'timeline')) }}" @if(request()->routeIs('calendar', 'timeline')) aria-current="page" @endif>Calendar</a>
-                    @foreach($desktopNavGroups as $groupLabel => $group)
-                        <div class="relative" data-nav-menu>
-                            <button type="button" data-nav-toggle aria-expanded="false" aria-haspopup="true" class="{{ $topLinkClass($group['active']) }} cursor-pointer">
-                                {{ $groupLabel }}
-                                <svg class="h-3.5 w-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            <div data-nav-panel class="hidden absolute left-0 top-full mt-2 w-max min-w-[220px] max-w-[min(520px,90vw)] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                                <div class="grid gap-2 {{ count($group['sections']) > 1 ? 'grid-cols-2' : 'grid-cols-1' }}">
-                                    @foreach($group['sections'] as $sectionLabel => $links)
-                                        <div>
-                                            <p class="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $sectionLabel }}</p>
-                                            @foreach($links as [$linkRoute, $linkParams, $linkLabel, $linkActive])
-                                                <a href="{{ route($linkRoute, $linkParams) }}" @if($linkActive) aria-current="page" @endif class="block whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition {{ $linkActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">{{ $linkLabel }}</a>
-                                            @endforeach
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                </nav>
+        <nav aria-label="Main" data-sidebar-nav class="flex-1 flex flex-col overflow-y-auto px-4 py-4 space-y-1">
+            <x-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')" icon="home">Dashboard</x-nav-link>
+            <x-nav-link href="{{ route('calendar') }}" :active="request()->routeIs('calendar', 'timeline')" icon="calendar">Calendar & Timeline</x-nav-link>
 
-                <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
-                    <a href="{{ route('search') }}" title="Search" class="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    </a>
-                    <button type="button" onclick="window.openQuickAdd()" class="hidden md:inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 cursor-pointer transition active:scale-95">
-                        <span class="text-base leading-none font-bold">+</span>
-                        <span class="hidden xl:inline">Quick Record</span>
-                    </button>
-                    <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-                        @if($profilePhotoUrl)
-                            <button type="button" data-profile-photo onclick="window.openImageModal(@js($profilePhotoUrl), @js($authUser->name), 'Profile photo')" title="View profile photo" class="shrink-0 rounded-full ring-2 ring-white shadow-md outline outline-1 outline-slate-200 transition hover:scale-105 cursor-pointer">
-                                <img src="{{ $profilePhotoUrl }}" alt="{{ $authUser->name }}" class="w-9 h-9 rounded-full object-cover">
-                            </button>
-                        @else
-                            <a href="{{ route('settings.index') }}#profile" title="Add a profile photo" class="w-9 h-9 shrink-0 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white shadow-md">
-                                {{ strtoupper(substr($authUser->name ?? 'U', 0, 1)) }}
-                            </a>
-                        @endif
-                        <div class="hidden 2xl:block text-left">
-                            <span class="block text-sm font-semibold text-slate-800 leading-tight">{{ $authUser->name }}</span>
-                            <span class="block text-xs text-slate-400 capitalize">{{ $authUser->roles->first()?->name ?? 'User' }}</span>
-                        </div>
-                        <form action="{{ route('logout') }}" method="POST" class="inline">
-                            @csrf
-                            <button type="submit" title="Sign Out" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                            </button>
-                        </form>
+            @foreach($desktopNavGroups as $groupLabel => $group)
+                <details data-nav-group="{{ $groupLabel }}" @if($group['active']) data-nav-group-active @endif open class="group/nav pt-2">
+                    <summary class="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden {{ $group['active'] ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600' }}">
+                        <span class="flex h-4 w-4 items-center justify-center [&>svg]:h-4 [&>svg]:w-4"><x-nav-icon :name="$group['icon']" /></span>
+                        <span class="flex-1">{{ $groupLabel }}</span>
+                        <svg class="h-3.5 w-3.5 transition-transform group-open/nav:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    </summary>
+                    <div class="mt-1 space-y-1">
+                        @foreach($group['sections'] as $sectionLabel => $links)
+                            @if(count($group['sections']) > 1)
+                                <p class="px-3.5 pt-1.5 pb-0.5 text-[11px] font-semibold text-slate-400">{{ $sectionLabel }}</p>
+                            @endif
+                            @foreach($links as [$linkRoute, $linkParams, $linkLabel, $linkActive, $linkIcon])
+                                <x-nav-link href="{{ route($linkRoute, $linkParams) }}" :active="$linkActive" :icon="$linkIcon" :aria-current="$linkActive ? 'page' : null">{{ $linkLabel }}</x-nav-link>
+                            @endforeach
+                        @endforeach
                     </div>
+                </details>
+            @endforeach
+        </nav>
+
+        <div class="p-4 border-t border-slate-200">
+            <button type="button" onclick="window.openQuickAdd()" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition active:scale-95">
+                <span class="text-lg leading-none font-bold">+</span>
+                <span>Quick Record</span>
+            </button>
+        </div>
+    </aside>
+
+    <script>
+        (function () {
+            let collapsedGroups = [];
+            try {
+                collapsedGroups = JSON.parse(localStorage.getItem('sidebarCollapsedGroups') || '[]');
+            } catch (error) {
+                collapsedGroups = [];
+            }
+            document.querySelectorAll('[data-nav-group]').forEach(function (groupEl) {
+                if (collapsedGroups.includes(groupEl.dataset.navGroup) && !groupEl.hasAttribute('data-nav-group-active')) {
+                    groupEl.removeAttribute('open');
+                }
+                groupEl.addEventListener('toggle', function () {
+                    const closed = Array.from(document.querySelectorAll('[data-nav-group]:not([open])')).map((el) => el.dataset.navGroup);
+                    try {
+                        localStorage.setItem('sidebarCollapsedGroups', JSON.stringify(closed));
+                    } catch (error) {}
+                });
+            });
+            document.querySelector('[data-sidebar-nav] [aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+        })();
+    </script>
+
+    <div class="app-main md:pl-64 min-h-screen min-w-0">
+        <header class="sticky top-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between gap-3 px-4 sm:px-6">
+            <div class="flex min-w-0 items-center gap-3 md:w-80">
+                <a href="{{ route('dashboard') }}" class="md:hidden flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</span>
+                    <span class="font-bold text-sm text-slate-900">LifeTracker</span>
+                </a>
+                <form action="{{ route('search') }}" method="GET" class="hidden md:flex items-center w-full relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </span>
+                    <input type="text" name="q" value="{{ request('q') }}" placeholder="Search expenses, friends, notes, trips..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 transition" />
+                </form>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+                <a href="{{ route('search') }}" title="Search" class="md:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </a>
+                <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
+                    @if($profilePhotoUrl)
+                        <button type="button" data-profile-photo onclick="window.openImageModal(@js($profilePhotoUrl), @js($authUser->name), 'Profile photo')" title="View profile photo" class="shrink-0 rounded-full ring-2 ring-white shadow-md outline outline-1 outline-slate-200 transition hover:scale-105 cursor-pointer">
+                            <img src="{{ $profilePhotoUrl }}" alt="{{ $authUser->name }}" class="w-10 h-10 rounded-full object-cover">
+                        </button>
+                    @else
+                        <a href="{{ route('settings.index') }}#profile" title="Add a profile photo" class="w-10 h-10 shrink-0 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white shadow-md">
+                            {{ strtoupper(substr($authUser->name ?? 'U', 0, 1)) }}
+                        </a>
+                    @endif
+                    <div class="hidden sm:block text-left">
+                        <span class="block text-sm font-semibold text-slate-800 leading-tight">{{ $authUser->name }}</span>
+                        <span class="block text-xs text-slate-400 capitalize">{{ $authUser->roles->first()?->name ?? 'User' }}</span>
+                    </div>
+                    <form action="{{ route('logout') }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" title="Sign Out" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                        </button>
+                    </form>
                 </div>
             </div>
         </header>
@@ -397,40 +440,6 @@
                 document.body.classList.remove('overflow-hidden');
             }
         };
-
-        (function () {
-            const menus = document.querySelectorAll('[data-nav-menu]');
-            const closeAll = (except) => menus.forEach((menu) => {
-                if (menu === except) return;
-                menu.querySelector('[data-nav-panel]').classList.add('hidden');
-                menu.querySelector('[data-nav-toggle]').setAttribute('aria-expanded', 'false');
-            });
-            menus.forEach((menu) => {
-                const toggle = menu.querySelector('[data-nav-toggle]');
-                const panel = menu.querySelector('[data-nav-panel]');
-                toggle.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    closeAll(menu);
-                    const opening = panel.classList.contains('hidden');
-                    panel.classList.toggle('hidden', !opening);
-                    toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
-                    if (opening) {
-                        panel.style.left = '';
-                        panel.style.right = '';
-                        if (panel.getBoundingClientRect().right > window.innerWidth - 8) {
-                            panel.style.left = 'auto';
-                            panel.style.right = '0';
-                        }
-                    }
-                });
-            });
-            document.addEventListener('click', (event) => {
-                if (!event.target.closest('[data-nav-menu]')) closeAll(null);
-            });
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') closeAll(null);
-            });
-        })();
 
         window.toggleMobileDrawer = function(id) {
             ['mobile-more-menu', 'mobile-finance-menu'].forEach(function(drawerId) {
