@@ -296,28 +296,103 @@ class CreditDebtController extends Controller
             'paid_on' => ['required', 'date'],
             'payment_method' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
+            'register_as_expense' => ['nullable', 'boolean'],
         ]);
 
         if ((float) $validated['amount'] - $creditDebt->remaining() > 0.01) {
             return back()->withInput()->withErrors(['amount' => 'Payment amount cannot exceed the remaining balance.']);
         }
 
-        CreditDebtPayment::create([
-            'credit_debt_id' => $creditDebt->id,
-            'amount' => $validated['amount'],
-            'paid_on' => $validated['paid_on'],
-            'payment_method' => $validated['payment_method'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
-
-        if (filled($validated['payment_method'] ?? null)) {
-            $creditDebt->payment_method = $validated['payment_method'];
+        $registerAsExpense = $creditDebt->type === 'credit' && $request->boolean('register_as_expense');
+        if ($registerAsExpense && ($error = $this->alreadyExpensedError($creditDebt, (float) $validated['amount']))) {
+            return back()->withInput()->with('error', $error);
         }
 
-        $this->refreshCreditDebtAmounts($creditDebt);
+        DB::transaction(function () use ($request, $creditDebt, $validated, $registerAsExpense): void {
+            $payment = CreditDebtPayment::create([
+                'credit_debt_id' => $creditDebt->id,
+                'amount' => $validated['amount'],
+                'paid_on' => $validated['paid_on'],
+                'payment_method' => $validated['payment_method'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            if ($registerAsExpense) {
+                $this->fileCreditPaymentAsExpense($request, $creditDebt, $payment);
+            }
+
+            if (filled($validated['payment_method'] ?? null)) {
+                $creditDebt->payment_method = $validated['payment_method'];
+            }
+
+            $this->refreshCreditDebtAmounts($creditDebt);
+        });
+
         $linkService->syncCreditDebtToFriend($creditDebt->fresh());
 
-        return back()->with('success', 'Payment recorded. Remaining ₹'.number_format($creditDebt->fresh()->remaining(), 2));
+        $message = 'Payment recorded'.($registerAsExpense ? ' and registered as a linked expense' : '').'. Remaining ₹'.number_format($creditDebt->fresh()->remaining(), 2);
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Register an already-recorded credit due payment as its own expense, linked to the credit.
+     */
+    public function registerPaymentAsExpense(Request $request, CreditDebt $creditDebt, CreditDebtPayment $payment): RedirectResponse
+    {
+        if ($creditDebt->user_id !== $request->user()->id || $payment->credit_debt_id !== $creditDebt->id || $creditDebt->type !== 'credit') {
+            abort(403);
+        }
+
+        if ($payment->expense_id || $payment->personal_expense_id) {
+            return back()->with('info', 'This payment is already registered as an expense.');
+        }
+
+        if ($error = $this->alreadyExpensedError($creditDebt, (float) $payment->amount)) {
+            return back()->with('error', $error);
+        }
+
+        $expense = DB::transaction(fn (): Expense => $this->fileCreditPaymentAsExpense($request, $creditDebt, $payment));
+
+        return back()->with('success', 'Payment of ₹'.number_format((float) $payment->amount, 2).' registered as Expense #'.$expense->id.' (linked to Credit #'.$creditDebt->id.').');
+    }
+
+    /**
+     * One credit due payment becomes one separate expense, linked to the credit and to the payment row.
+     */
+    private function fileCreditPaymentAsExpense(Request $request, CreditDebt $creditDebt, CreditDebtPayment $payment): Expense
+    {
+        $category = ExpenseCategory::firstOrCreate(
+            ['name' => 'Debt Repayment', 'user_id' => null],
+            ['icon' => 'hand-coins', 'color' => '#6366f1', 'is_archived' => false, 'is_voluntary' => false]
+        );
+
+        $paidOn = $payment->paid_on->toDateString();
+        $dailyRecord = DailyRecord::forUserOnDate($request->user()->id, $paidOn);
+
+        $friendName = $creditDebt->friend?->name ?? 'Friend';
+        $expense = Expense::create([
+            'user_id' => $request->user()->id,
+            'credit_debt_id' => $creditDebt->id,
+            'daily_record_id' => $dailyRecord->id,
+            'category_id' => $category->id,
+            'amount' => $payment->amount,
+            'gst_amount' => 0,
+            'date' => $paidOn,
+            'time' => Carbon::now()->format('H:i'),
+            'description' => 'Credit due payment to '.$friendName.($creditDebt->description ? ' ('.$creditDebt->description.')' : ''),
+            'payment_method' => $payment->payment_method ?: ($creditDebt->payment_method ?: 'Cash'),
+            'paid_by' => 'Me',
+            'paid_by_type' => 'me',
+            'notes' => trim(($payment->notes ?? '')."\nLinked to Credit #".$creditDebt->id.' · payment #'.$payment->id),
+            'is_voluntary' => false,
+        ]);
+
+        $payment->update(['expense_id' => $expense->id]);
+        $creditDebt->linked_expense_id = $expense->id;
+        $creditDebt->save();
+
+        return $expense;
     }
 
     public function updatePayment(Request $request, CreditDebt $creditDebt, CreditDebtPayment $payment, FinanceLinkService $linkService): RedirectResponse

@@ -1,5 +1,7 @@
 <x-app-layout title="Personal Expenses">
     <div class="space-y-6">
+        <x-money-tabs active="personal" />
+
         <!-- Page Header -->
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -222,6 +224,9 @@
                                         <span class="font-semibold text-slate-900 dark:text-white block">
                                             {{ $isGroup ? $exp->personalExpenseGroup->name : ($exp->description ?: ($exp->category?->name ?? 'Personal Expense')) }}
                                         </span>
+                                        @if(!$isGroup && $exp->is_closed)
+                                            <span class="mt-0.5 inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-white">🔒 Closed{{ $exp->closed_reason === 'debt_closed' ? ' (debt closed)' : '' }}</span>
+                                        @endif
                                         @if($isGroup)
                                             <span class="text-[11px] text-slate-400 block mt-0.5">{{ $groupExpenses->count() }} grouped transactions · {{ $displayMethods }}</span>
                                         @elseif($exp->notes)
@@ -303,6 +308,10 @@
                                                 Delete
                                             </button>
                                         @else
+                                            <form action="{{ route($exp->is_closed ? 'personal-expenses.reopen' : 'personal-expenses.close', $exp) }}" method="POST" class="inline">
+                                                @csrf
+                                                <button type="submit" class="text-xs font-semibold mr-2 cursor-pointer {{ $exp->is_closed ? 'text-amber-600 hover:underline' : 'text-slate-700 dark:text-slate-300 hover:underline' }}">{{ $exp->is_closed ? 'Reopen' : 'Close' }}</button>
+                                            </form>
                                             <button type="button" onclick="openEditPersonalModal({{ json_encode($exp) }})" class="text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition mr-2 cursor-pointer">
                                                 Edit
                                             </button>

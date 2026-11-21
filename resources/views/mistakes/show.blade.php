@@ -79,6 +79,22 @@
                 </div>
             @endif
 
+            <!-- Lessons registered separately for this mistake -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-bold text-sky-700 uppercase tracking-wider">Lessons ({{ $mistake->lessons->count() }})</h2>
+                    <a href="{{ route('lessons.create', ['mistake_id' => $mistake->id]) }}" class="text-xs font-semibold text-sky-700 hover:underline">+ Register a lesson</a>
+                </div>
+                @forelse($mistake->lessons as $lesson)
+                    <a href="{{ route('lessons.edit', $lesson) }}" class="block p-3 rounded-2xl bg-sky-50/60 border border-sky-100 text-sm text-sky-950 hover:bg-sky-50">
+                        <span class="block font-semibold">{{ $lesson->title }}</span>
+                        <span class="block text-xs text-slate-600 whitespace-pre-line">{{ $lesson->lesson }}</span>
+                    </a>
+                @empty
+                    <p class="text-xs text-slate-400">No separate lessons yet.</p>
+                @endforelse
+            </div>
+
             <!-- Prevention Strategy -->
             @if($mistake->prevention_strategy)
                 <div class="space-y-2">

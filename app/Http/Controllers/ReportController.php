@@ -6,7 +6,6 @@ use App\Models\Expense;
 use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\Mistake;
-use App\Models\Payment;
 use App\Models\PersonalExpense;
 use App\Models\ScooterTrip;
 use Carbon\Carbon;
@@ -49,11 +48,6 @@ class ReportController extends Controller
             ->orderBy('date')
             ->get();
 
-        $payments = Payment::where('user_id', $user->id)
-            ->whereBetween('date', [$startDate, $endDate])
-            ->orderBy('date')
-            ->get();
-
         $trips = ScooterTrip::where('user_id', $user->id)
             ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('date')
@@ -81,7 +75,6 @@ class ReportController extends Controller
             'endDate',
             'expenses',
             'incomes',
-            'payments',
             'trips',
             'fuelEntries',
             'mistakes',

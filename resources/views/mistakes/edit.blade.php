@@ -58,7 +58,7 @@
 
                 <div>
                     <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Lesson Learned *</label>
-                    <textarea name="lesson_learned" required rows="2" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">{{ old('lesson_learned', $mistake->lesson_learned) }}</textarea>
+                    <textarea name="lesson_learned" rows="2" class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">{{ old('lesson_learned', $mistake->lesson_learned) }}</textarea>
                 </div>
 
                 <div>

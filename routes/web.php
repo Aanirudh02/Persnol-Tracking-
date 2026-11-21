@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AllExpensesController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BulkEntryController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CreditDebtController;
 use App\Http\Controllers\DailyBalanceController;
@@ -19,12 +20,12 @@ use App\Http\Controllers\FriendSplitController;
 use App\Http\Controllers\GeoController;
 use App\Http\Controllers\GPayAuditorController;
 use App\Http\Controllers\IncomeController;
+use App\Http\Controllers\LessonController;
 use App\Http\Controllers\MediaUploadController;
 use App\Http\Controllers\MistakeController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\OdometerController;
 use App\Http\Controllers\OptionController;
-use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PersonalExpenseController;
 use App\Http\Controllers\PetrolController;
 use App\Http\Controllers\ReportController;
@@ -73,6 +74,10 @@ Route::middleware('auth')->group(function () {
         // All Expenses overview
         Route::get('/all-expenses', [AllExpensesController::class, 'index'])->name('all-expenses.index');
 
+        // Bulk add expenses, personal expenses and income
+        Route::get('/bulk-entry', [BulkEntryController::class, 'create'])->name('bulk-entry.create');
+        Route::post('/bulk-entry', [BulkEntryController::class, 'store'])->name('bulk-entry.store');
+
         // Personal Expenses
         Route::get('/personal-expense-groups/unassigned-expenses', [PersonalExpenseController::class, 'unassignedExpenses'])->name('personal-expense-groups.unassigned');
         Route::post('/personal-expense-groups/{personalExpenseGroup}/expenses/attach', [PersonalExpenseController::class, 'attachExpenses'])->name('personal-expense-groups.expenses.attach');
@@ -83,6 +88,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/personal-expense-groups/{personalExpenseGroup}/expenses/{personalExpense}', [PersonalExpenseController::class, 'detachFromGroup'])->name('personal-expense-groups.expenses.detach');
         Route::post('/personal-expenses/{personalExpense}/archive', [PersonalExpenseController::class, 'archive'])->name('personal-expenses.archive');
         Route::post('/personal-expenses/{personalExpense}/restore', [PersonalExpenseController::class, 'restore'])->name('personal-expenses.restore');
+        Route::post('/personal-expenses/{personalExpense}/close', [PersonalExpenseController::class, 'close'])->name('personal-expenses.close');
+        Route::post('/personal-expenses/{personalExpense}/reopen', [PersonalExpenseController::class, 'reopen'])->name('personal-expenses.reopen');
         Route::resource('personal-expenses', PersonalExpenseController::class)->names('personal-expenses');
 
         // Statements Module
@@ -107,6 +114,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/expenses/{expense}/restore', [ExpenseController::class, 'restore'])->name('expenses.restore')->withTrashed();
         Route::put('/expense-groups/{expenseGroup}/expenses/{expense}/payment-method', [ExpenseController::class, 'updateGroupPaymentMethod'])->name('expense-groups.expenses.payment-method');
         Route::post('/expenses/{expense}/link-food', [ExpenseController::class, 'linkFood'])->name('expenses.link-food');
+        Route::post('/expenses/{expense}/close', [ExpenseController::class, 'close'])->name('expenses.close');
+        Route::post('/expenses/{expense}/reopen', [ExpenseController::class, 'reopen'])->name('expenses.reopen');
 
         // Savings Module
         Route::resource('savings', SavingsController::class)->names('savings');
@@ -115,6 +124,7 @@ Route::middleware('auth')->group(function () {
         // Daily Balances & Cash Register
         Route::get('/daily-balances', [DailyBalanceController::class, 'index'])->name('daily-balances.index');
         Route::get('/daily-balances/today', [DailyBalanceController::class, 'today'])->name('daily-balances.today');
+        Route::get('/daily-balances/statement', [DailyBalanceController::class, 'statement'])->name('daily-balances.statement');
         Route::post('/daily-balances', [DailyBalanceController::class, 'update'])->name('daily-balances.update');
         Route::post('/daily-balances/categories', [DailyBalanceController::class, 'updateCategories'])->name('daily-balances.categories');
         Route::post('/daily-balances/reconcile', [DailyBalanceController::class, 'reconcile'])->name('daily-balances.reconcile');
@@ -124,9 +134,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/income/{income}/tally', [IncomeController::class, 'tallyExpense'])->name('income.tally');
         Route::delete('/income/{income}/tally/{tally}', [IncomeController::class, 'untallyExpense'])->name('income.untally');
 
-        // Payments & Reconciliation
-        Route::resource('payments', PaymentController::class)->names('payments');
-        Route::post('/payments/{payment}/reconcile', [PaymentController::class, 'reconcile'])->name('payments.reconcile')->middleware('permission:payments.reconcile');
+        // GPay statement auditor
         Route::get('/reconcile/gpay-auditor', [GPayAuditorController::class, 'index'])->name('finance.gpay-auditor.index');
         Route::post('/reconcile/gpay-auditor', [GPayAuditorController::class, 'audit'])->name('finance.gpay-auditor.audit');
         Route::post('/reconcile/gpay-auditor/action', [GPayAuditorController::class, 'quickAction'])->name('finance.gpay-auditor.action');
@@ -147,6 +155,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/credits/{creditDebt}/payments', [CreditDebtController::class, 'addPayment'])->name('credits.payments');
         Route::put('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'updatePayment'])->name('credits.payments.update');
         Route::delete('/credits/{creditDebt}/payments/{payment}', [CreditDebtController::class, 'deletePayment'])->name('credits.payments.destroy');
+        Route::post('/credits/{creditDebt}/payments/{payment}/register-expense', [CreditDebtController::class, 'registerPaymentAsExpense'])->name('credits.payments.register-expense');
         Route::post('/credits/{creditDebt}/record-as-expense', [CreditDebtController::class, 'recordAsExpense'])->name('credits.record-as-expense');
         Route::post('/credits/{creditDebt}/record-as-personal-expense', [CreditDebtController::class, 'recordAsPersonalExpense'])->name('credits.record-as-personal-expense');
         Route::post('/credits/{creditDebt}/record-as-income', [CreditDebtController::class, 'recordAsIncome'])->name('credits.record-as-income');
@@ -224,6 +233,7 @@ Route::middleware('auth')->group(function () {
 
     // Mistakes & Lessons
     Route::resource('mistakes', MistakeController::class)->names('mistakes');
+    Route::resource('lessons', LessonController::class)->except(['show'])->names('lessons');
 
     // Notes
     Route::get('/notes', [NoteController::class, 'index'])->name('notes.index');

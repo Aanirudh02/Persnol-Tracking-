@@ -771,8 +771,8 @@
                         <a href="{{ route('friends.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
                             <span>👥</span> Friend Debts
                         </a>
-                        <a href="{{ route('payments.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
-                            <span>✅</span> Reconcile
+                        <a href="{{ route('daily-balances.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
+                            <span>🧾</span> Cash Register
                         </a>
                         <a href="{{ route('petrol.index') }}" class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 flex items-center gap-2">
                             <span>⛽</span> Petrol Log

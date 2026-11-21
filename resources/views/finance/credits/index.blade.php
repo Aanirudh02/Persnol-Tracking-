@@ -183,6 +183,9 @@
                             @if($item->linked_expense_id && $item->linkedExpense)
                                 <span class="font-semibold text-emerald-700 inline-flex items-center gap-1">
                                     <span>✅</span> Recorded as Normal Expense
+                                    @if($item->linkedExpense->is_closed)
+                                        <span class="ml-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-white">🔒 Expense closed</span>
+                                    @endif
                                 </span>
                             @else
                                 <button type="button" onclick="document.getElementById('record-expense-{{ $item->id }}').classList.toggle('hidden'); document.getElementById('record-personal-expense-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-debt-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('close-credit-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('record-income-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-discount-{{ $item->id }}')?.classList.add('hidden'); document.getElementById('settle-nopay-{{ $item->id }}')?.classList.add('hidden');" class="font-semibold text-emerald-700 hover:underline flex items-center gap-1">
@@ -496,9 +499,12 @@
                                                     <span class="text-slate-400">·</span>
                                                     <span class="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{{ $payment->payment_method ?? 'Payment' }}</span>
                                                 </div>
-                                                @if($payment->notes)
-                                                    <span class="text-slate-400 italic text-[11px] truncate max-w-[200px]">{{ $payment->notes }}</span>
-                                                @endif
+                                                <div class="flex items-center gap-2">
+                                                    @if($payment->notes)
+                                                        <span class="text-slate-400 italic text-[11px] truncate max-w-[200px]">{{ $payment->notes }}</span>
+                                                    @endif
+                                                    @include('finance.credits._payment_expense_link', ['item' => $item, 'payment' => $payment])
+                                                </div>
                                             </div>
                                         @endforeach
                                     </div>
@@ -520,11 +526,14 @@
                                             <button class="rounded-lg bg-slate-900 px-3 py-2 font-semibold text-white">Update</button>
                                             <button form="delete-payment-{{ $payment->id }}" type="submit" class="hidden"></button>
                                         </form>
-                                        <form id="delete-payment-{{ $payment->id }}" action="{{ route('credits.payments.destroy', [$item, $payment]) }}" method="POST" class="-mt-1 text-right">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-xs font-semibold text-rose-600 hover:underline">Delete payment</button>
-                                        </form>
+                                        <div class="-mt-1 flex items-center justify-end gap-3">
+                                            @include('finance.credits._payment_expense_link', ['item' => $item, 'payment' => $payment])
+                                            <form id="delete-payment-{{ $payment->id }}" action="{{ route('credits.payments.destroy', [$item, $payment]) }}" method="POST">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-xs font-semibold text-rose-600 hover:underline">Delete payment</button>
+                                            </form>
+                                        </div>
                                     @endforeach
 
                                     <!-- Record Additional Payment -->
@@ -540,6 +549,12 @@
                                                 @endforeach
                                             </select>
                                             <button class="rounded-xl bg-slate-900 px-2 py-2 font-semibold text-white">Record payment</button>
+                                            @if($item->type === 'credit')
+                                                <label class="sm:col-span-4 inline-flex items-center gap-2 text-[11px] font-semibold text-slate-600 cursor-pointer select-none">
+                                                    <input type="checkbox" name="register_as_expense" value="1" @checked($item->unexpensedAmount() > 0) class="rounded border-slate-300">
+                                                    <span>Also register this due payment as a separate expense (linked to this credit)</span>
+                                                </label>
+                                            @endif
                                         </form>
                                     </div>
                                 </div>

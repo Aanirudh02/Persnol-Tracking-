@@ -83,13 +83,13 @@ class DailyBalanceController extends Controller
         if ($todayData) {
             $tomorrowCategories = [];
             foreach ($activeCategories as $cat) {
-                $tomorrowCategories[$cat] = $todayData['categories'][$cat]['closing'] ?? 0.0;
+                $tomorrowCategories[$cat] = $todayData['categories'][$cat]['carry_forward'] ?? $todayData['categories'][$cat]['closing'] ?? 0.0;
             }
             $tomorrowPreview = [
                 'date' => $today->copy()->addDay(),
                 'date_str' => $tomorrowDateStr,
                 'categories' => $tomorrowCategories,
-                'total' => $todayData['total']['closing'] ?? 0.0,
+                'total' => $todayData['total']['carry_forward'] ?? $todayData['total']['closing'] ?? 0.0,
             ];
         }
 
@@ -104,6 +104,7 @@ class DailyBalanceController extends Controller
             ->where('user_id', $user->id)
             ->where('date', $selectedDateStr)
             ->whereNull('parent_id')
+            ->where('is_unlogged', false)
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend'))
             ->orderBy('time', 'desc')
@@ -171,6 +172,7 @@ class DailyBalanceController extends Controller
             ->where('user_id', $user->id)
             ->where('date', $todayStr)
             ->whereNull('parent_id')
+            ->where('is_unlogged', false)
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend')) // friend paid the whole bill: nothing left your wallet
             ->with(['category', 'friendSplits.friend'])
@@ -275,6 +277,85 @@ class DailyBalanceController extends Controller
             'todayExpenses',
             'savedToday'
         ));
+    }
+
+    /**
+     * Printable Daily Cash Register statement for a date range. Rendered on demand
+     * (browser "Save as PDF") and never stored.
+     */
+    public function statement(Request $request): View
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'from' => ['required', 'date'],
+            'to' => ['required', 'date', 'after_or_equal:from'],
+            'types' => ['nullable', 'array'],
+            'types.*' => ['string', 'max:50'],
+        ]);
+
+        $from = Carbon::parse($validated['from'])->startOfDay();
+        $to = Carbon::parse($validated['to'])->startOfDay();
+        if ($to->gt(Carbon::today())) {
+            $to = Carbon::today();
+        }
+        if ($from->diffInDays($to) > 366) {
+            $from = $to->copy()->subDays(366);
+        }
+
+        $range = $this->registerService->computeRange($user, $from, $to);
+        $types = array_values(array_intersect($validated['types'] ?? $range['categories'], $range['categories']));
+        if ($types === []) {
+            $types = $range['categories'];
+        }
+
+        $incomes = Income::query()
+            ->where('user_id', $user->id)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->with(['category', 'tallies.expense'])
+            ->orderBy('date')
+            ->orderBy('time')
+            ->get();
+
+        $expenses = Expense::query()
+            ->where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('is_unlogged', false)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend'))
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->with(['category', 'incomeTallies.income'])
+            ->orderBy('date')
+            ->orderBy('time')
+            ->get();
+
+        $adjustments = collect($range['days'])
+            ->flatMap(fn (array $day): array => collect($day['categories'])
+                ->filter(fn (array $cat, string $name): bool => in_array($name, $types, true) && ((float) $cat['adjustment'] !== 0.0 || filled($cat['adjustment_note'])))
+                ->map(fn (array $cat, string $name): array => [
+                    'date' => $day['date'],
+                    'type' => $name,
+                    'amount' => (float) $cat['adjustment'],
+                    'note' => $cat['adjustment_note'],
+                ])
+                ->values()
+                ->all())
+            ->values();
+
+        $dayNotes = collect($range['days'])->filter(fn (array $day): bool => filled($day['notes']))->map(fn (array $day): array => [
+            'date' => $day['date'],
+            'note' => $day['notes'],
+        ])->values();
+
+        return view('finance.daily_balances.statement', [
+            'from' => $from,
+            'to' => $to,
+            'days' => $range['days'],
+            'types' => $types,
+            'incomes' => $incomes,
+            'expenses' => $expenses,
+            'adjustments' => $adjustments,
+            'dayNotes' => $dayNotes,
+        ]);
     }
 
     public function update(Request $request): RedirectResponse

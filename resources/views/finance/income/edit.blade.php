@@ -143,6 +143,14 @@
                     </div>
                 </div>
 
+                <label class="flex items-start gap-2.5 rounded-xl border border-violet-200 bg-violet-50/60 p-3 cursor-pointer select-none dark:border-violet-900 dark:bg-violet-950/20">
+                    <input type="checkbox" name="keep_separate" value="1" @checked(old('keep_separate', $income->keep_separate)) class="mt-0.5 rounded border-slate-300 text-violet-600">
+                    <span>
+                        <span class="block text-xs font-bold text-slate-900 dark:text-white">Keep separate in the Daily Cash Register</span>
+                        <span class="block text-[10px] text-slate-500">Shown on its own day, but not carried to the next day's opening balance.</span>
+                    </span>
+                </label>
+
                 <div class="pt-2 flex items-center justify-end gap-3">
                     <a href="{{ route('income.index') }}" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Cancel</a>
                     <button type="submit" class="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-semibold shadow-sm transition active:scale-95">Save Changes</button>

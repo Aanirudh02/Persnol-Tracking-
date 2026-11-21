@@ -11,7 +11,6 @@
                 <a href="{{ route('income.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Income</a>
                 <a href="{{ route('savings.index') }}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 font-bold text-emerald-800 hover:bg-emerald-100">🏦 Savings & Funds</a>
                 <a href="{{ route('daily-balances.index') }}" class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 font-bold text-amber-800 hover:bg-amber-100">🧾 Daily Cash Register</a>
-                <a href="{{ route('payments.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Payments</a>
                 <a href="{{ route('finance.gpay-auditor.index') }}" class="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 font-bold text-emerald-800 hover:bg-emerald-100">📱 GPay Auditor</a>
                 <a href="{{ route('friends.index') }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">Friends & Splits</a>
                 <a href="{{ route('classification.index') }}" class="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 font-bold text-violet-700 hover:bg-violet-100">🏷️ Classifications</a>
@@ -75,10 +74,6 @@
                         <span class="text-lg">🏦</span>
                     </div>
                     <div class="mt-2 text-2xl font-bold {{ $currentBalance >= 0 ? 'text-slate-900' : 'text-rose-600' }}">₹{{ number_format($currentBalance, 2) }}</div>
-                    <div class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
-                        <span>Pending to Pay:</span>
-                        <span class="font-semibold text-amber-600">₹{{ number_format($stats['pending_payments'] ?? 0, 2) }}</span>
-                    </div>
                 </div>
             @endif
         </div>
@@ -224,23 +219,6 @@
                 </div>
             </div>
 
-            <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="mb-3 flex items-center justify-between">
-                    <h2 class="text-sm font-bold text-slate-900">Pending Payments</h2>
-                    <a href="{{ route('payments.index') }}" class="text-xs font-semibold text-indigo-600 hover:underline">Open</a>
-                </div>
-                <div class="space-y-2">
-                    @forelse($pendingPayments as $payment)
-                        <div class="rounded-2xl bg-slate-50 px-3 py-3 text-xs">
-                            <div class="font-semibold text-slate-900">{{ $payment->purpose }}</div>
-                            <div class="text-slate-500">{{ $payment->paid_to }} · {{ $payment->payment_method }}</div>
-                            <div class="mt-1 font-bold text-amber-700">₹{{ number_format($payment->amount, 2) }}</div>
-                        </div>
-                    @empty
-                        <p class="text-sm text-slate-400">No pending payments.</p>
-                    @endforelse
-                </div>
-            </div>
         </div>
     </div>
 </x-app-layout>

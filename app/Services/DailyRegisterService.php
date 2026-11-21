@@ -113,11 +113,16 @@ class DailyRegisterService
             ->get();
 
         $incomesByDateAndMethod = [];
+        $separateIncomesByDateAndMethod = [];
         $incomeDetailsByDateAndMethod = [];
         foreach ($monthIncomes as $inc) {
             $d = Carbon::parse($inc->date)->toDateString();
             $method = $inc->payment_method ?: 'Cash';
             $incomesByDateAndMethod[$d][$method] = ($incomesByDateAndMethod[$d][$method] ?? 0.0) + (float) $inc->amount;
+            // "Keep separate" income shows on its own day but is not carried into the next day's opening
+            if ($inc->keep_separate) {
+                $separateIncomesByDateAndMethod[$d][$method] = ($separateIncomesByDateAndMethod[$d][$method] ?? 0.0) + (float) $inc->amount;
+            }
             $incomeDetailsByDateAndMethod[$d][$method][] = [
                 'id' => $inc->id,
                 'source' => $inc->source ?: 'Income',
@@ -125,6 +130,7 @@ class DailyRegisterService
                 'category' => $inc->category?->name ?? 'General',
                 'time' => $inc->time ? substr($inc->time, 0, 5) : null,
                 'notes' => $inc->notes,
+                'keep_separate' => (bool) $inc->keep_separate,
             ];
         }
 
@@ -133,6 +139,7 @@ class DailyRegisterService
             ->whereNull('parent_id')
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend')) // friend paid the whole bill: nothing left your wallet
+            ->where('is_unlogged', false) // forgotten long ago: kept in its own list, never moves past balances
             ->whereDate('date', '>=', $startOfMonth->toDateString())
             ->whereDate('date', '<=', $maxHistoryDate->toDateString())
             ->with('category')
@@ -156,6 +163,7 @@ class DailyRegisterService
                     'category' => $exp->category?->name ?? 'General',
                     'time' => $exp->time ? substr($exp->time, 0, 5) : null,
                     'notes' => $exp->notes,
+                    'is_closed' => (bool) $exp->is_closed,
                 ];
             }
         }
@@ -180,11 +188,14 @@ class DailyRegisterService
             $totalOutflow = 0.0;
             $totalAdjustment = 0.0;
             $totalClosing = 0.0;
+            $totalSeparateInflow = 0.0;
+            $totalCarryForward = 0.0;
             $dayAllIncomes = [];
             $dayAllExpenses = [];
 
             foreach ($activeCategories as $cat) {
                 $inflow = (float) ($incomesByDateAndMethod[$dStr][$cat] ?? 0.0);
+                $separateInflow = (float) ($separateIncomesByDateAndMethod[$dStr][$cat] ?? 0.0);
                 $outflow = (float) ($expensesByDateAndMethod[$dStr][$cat] ?? 0.0);
 
                 $catIncomes = $incomeDetailsByDateAndMethod[$dStr][$cat] ?? [];
@@ -216,6 +227,7 @@ class DailyRegisterService
                 $closing = ($dStr === $todayStr || ($inflow > 0 || $outflow > 0) || ! $isManualClosing)
                     ? ($opening + $inflow - $outflow + $adjustment)
                     : (float) $catSaved['closing'];
+                $carryForward = $closing - $separateInflow;
 
                 $dayCategories[$cat] = [
                     'name' => $cat,
@@ -225,6 +237,8 @@ class DailyRegisterService
                     'adjustment' => round($adjustment, 2),
                     'adjustment_note' => $catSaved['adjustment_note'] ?? null,
                     'closing' => round($closing, 2),
+                    'separate_inflow' => round($separateInflow, 2),
+                    'carry_forward' => round($carryForward, 2),
                     'net_flow' => round($inflow - $outflow, 2),
                     'income_items' => $catIncomes,
                     'expense_items' => $catExpenses,
@@ -237,8 +251,10 @@ class DailyRegisterService
                 $totalOutflow += $outflow;
                 $totalAdjustment += $adjustment;
                 $totalClosing += $closing;
+                $totalSeparateInflow += $separateInflow;
+                $totalCarryForward += $carryForward;
 
-                $runningCategoryBalances[$cat] = $closing;
+                $runningCategoryBalances[$cat] = $carryForward;
             }
 
             // Fallback for legacy records
@@ -246,6 +262,7 @@ class DailyRegisterService
                 $totalOpening = (float) $saved->opening_balance;
                 $totalAdjustment = (float) $saved->manual_adjustment;
                 $totalClosing = (float) $saved->closing_balance;
+                $totalCarryForward = $totalClosing - $totalSeparateInflow;
             }
 
             $dayEntry = [
@@ -260,6 +277,8 @@ class DailyRegisterService
                     'outflow' => round($totalOutflow, 2),
                     'adjustment' => round($totalAdjustment, 2),
                     'closing' => round($totalClosing, 2),
+                    'separate_inflow' => round($totalSeparateInflow, 2),
+                    'carry_forward' => round($totalCarryForward, 2),
                     'net_flow' => round($totalInflow - $totalOutflow, 2),
                     'income_items' => $dayAllIncomes,
                     'expense_items' => $dayAllExpenses,
@@ -292,6 +311,41 @@ class DailyRegisterService
     }
 
     /**
+     * Daily register days between two dates (inclusive), computed month by month.
+     *
+     * @return array{days: array<string, array<string, mixed>>, categories: array<string>}
+     */
+    public function computeRange(User $user, Carbon $from, Carbon $to): array
+    {
+        $categories = $this->getActiveCategories($user->id);
+        $fromStr = $from->toDateString();
+        $toStr = $to->toDateString();
+        $days = [];
+
+        $monthStart = $from->copy()->startOfMonth();
+        while ($monthStart->lte($to)) {
+            $monthEnd = $monthStart->copy()->endOfMonth();
+            $calc = $this->computeDailyRegisterForMonth(
+                $user,
+                $monthStart->copy(),
+                $monthEnd->lt($to) ? $monthEnd : $to->copy(),
+                $categories,
+                $from->copy()
+            );
+
+            foreach ($calc['days'] as $dateStr => $day) {
+                if ($dateStr >= $fromStr && $dateStr <= $toStr) {
+                    $days[$dateStr] = $day;
+                }
+            }
+
+            $monthStart = $monthStart->copy()->addMonthNoOverflow()->startOfMonth();
+        }
+
+        return ['days' => $days, 'categories' => $categories];
+    }
+
+    /**
      * Get the daily cash register figures for a specific date.
      *
      * @return array<string, mixed>
@@ -315,6 +369,8 @@ class DailyRegisterService
                 'outflow' => 0.0,
                 'adjustment' => 0.0,
                 'closing' => 0.0,
+                'separate_inflow' => 0.0,
+                'carry_forward' => 0.0,
                 'net_flow' => 0.0,
                 'income_items' => [],
                 'expense_items' => [],

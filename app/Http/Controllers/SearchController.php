@@ -10,7 +10,6 @@ use App\Models\FuelEntry;
 use App\Models\Income;
 use App\Models\Mistake;
 use App\Models\Note;
-use App\Models\Payment;
 use App\Models\ScooterTrip;
 use Illuminate\Http\Request;
 
@@ -32,10 +31,6 @@ class SearchController extends Controller
 
             'income' => Income::where('user_id', $user->id)
                 ->where(fn ($query) => $query->where('source', 'like', "%{$q}%")->orWhere('description', 'like', "%{$q}%")->orWhere('notes', 'like', "%{$q}%"))
-                ->take(10)->get(),
-
-            'payments' => Payment::where('user_id', $user->id)
-                ->where(fn ($query) => $query->where('paid_to', 'like', "%{$q}%")->orWhere('purpose', 'like', "%{$q}%")->orWhere('notes', 'like', "%{$q}%"))
                 ->take(10)->get(),
 
             'friend_transactions' => FriendTransaction::where('user_id', $user->id)

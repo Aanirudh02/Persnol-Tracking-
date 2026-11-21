@@ -32,6 +32,18 @@ class DailyRecord extends Model
         'sleep_prompt_dismissed' => 'boolean',
     ];
 
+    /**
+     * The user's record for a day, created when missing. Matches on the calendar date so a
+     * stored "Y-m-d 00:00:00" value is found instead of inserting a duplicate.
+     */
+    public static function forUserOnDate(int $userId, Carbon|string $date): self
+    {
+        $day = Carbon::parse($date)->toDateString();
+
+        return self::query()->where('user_id', $userId)->whereDate('record_date', $day)->first()
+            ?? self::create(['user_id' => $userId, 'record_date' => $day]);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

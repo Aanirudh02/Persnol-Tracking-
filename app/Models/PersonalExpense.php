@@ -30,6 +30,9 @@ class PersonalExpense extends Model
         'is_archived',
         'classification',
         'credit_debt_id',
+        'is_closed',
+        'closed_at',
+        'closed_reason',
     ];
 
     protected $casts = [
@@ -38,6 +41,8 @@ class PersonalExpense extends Model
         'date' => 'date',
         'is_voluntary' => 'boolean',
         'is_archived' => 'boolean',
+        'is_closed' => 'boolean',
+        'closed_at' => 'datetime',
     ];
 
     /**
@@ -74,6 +79,63 @@ class PersonalExpense extends Model
     public function linkedExpense(): BelongsTo
     {
         return $this->belongsTo(Expense::class, 'expense_id');
+    }
+
+    /**
+     * Mark this personal expense as settled and closed.
+     *
+     * @param  string  $reason  'manual' or 'debt_closed' (closed automatically with its debt)
+     */
+    public function markClosed(string $reason = 'manual'): void
+    {
+        $this->update(['is_closed' => true, 'closed_at' => now(), 'closed_reason' => $reason]);
+    }
+
+    public function reopen(): void
+    {
+        $this->update(['is_closed' => false, 'closed_at' => null, 'closed_reason' => null]);
+    }
+
+    /**
+     * Record (or refresh) this personal expense in main expenses so the Daily Cash Register sees it.
+     */
+    public function syncLinkedNormalExpense(): Expense
+    {
+        $categoryName = $this->category?->name ?? 'Personal';
+        $normalCategory = ExpenseCategory::firstOrCreate(
+            ['name' => $categoryName, 'user_id' => null],
+            ['icon' => 'user', 'color' => '#3b82f6', 'is_archived' => false]
+        );
+
+        $values = [
+            'category_id' => $normalCategory->id,
+            'amount' => $this->amount,
+            'gst_amount' => $this->gst_amount,
+            'date' => $this->date->toDateString(),
+            'time' => $this->time ?: now()->format('H:i'),
+            'description' => '[Personal] '.($this->description ?: $categoryName),
+            'payment_method' => $this->payment_method ?: 'Cash',
+            'notes' => $this->notes,
+            'is_voluntary' => $this->is_voluntary,
+        ];
+
+        if ($this->linkedExpense) {
+            $this->linkedExpense->update($values);
+
+            return $this->linkedExpense;
+        }
+
+        $dayRecord = DailyRecord::forUserOnDate($this->user_id, $this->date);
+
+        $expense = Expense::create([
+            ...$values,
+            'user_id' => $this->user_id,
+            'daily_record_id' => $dayRecord->id,
+        ]);
+
+        $this->update(['expense_id' => $expense->id]);
+
+        return $expense;
     }
 
     public function totalAmount(): float

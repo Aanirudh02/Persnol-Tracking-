@@ -51,7 +51,7 @@ class MistakeController extends Controller
             'what_happened' => 'required|string',
             'why_happened' => 'required|string',
             'what_should_have_done' => 'required|string',
-            'lesson_learned' => 'required|string',
+            'lesson_learned' => 'nullable|string',
             'prevention_plan' => 'required|string',
             'severity' => 'required|in:Low,Medium,High,Critical',
             'status' => 'required|in:Open,Working On It,Resolved,Learned',
@@ -74,7 +74,7 @@ class MistakeController extends Controller
             'what_happened' => $validated['what_happened'],
             'why_happened' => $validated['why_happened'],
             'what_should_have_done' => $validated['what_should_have_done'],
-            'lesson_learned' => $validated['lesson_learned'],
+            'lesson_learned' => $validated['lesson_learned'] ?? null,
             'prevention_plan' => $validated['prevention_plan'],
             'severity' => $validated['severity'],
             'status' => $validated['status'],
@@ -97,6 +97,8 @@ class MistakeController extends Controller
         if ($mistake->user_id !== auth()->id()) {
             abort(403);
         }
+
+        $mistake->load(['lessons' => fn ($query) => $query->orderByDesc('date')]);
 
         return view('mistakes.show', compact('mistake'));
     }
@@ -125,7 +127,7 @@ class MistakeController extends Controller
             'what_happened' => 'required|string',
             'why_happened' => 'required|string',
             'what_should_have_done' => 'required|string',
-            'lesson_learned' => 'required|string',
+            'lesson_learned' => 'nullable|string',
             'prevention_plan' => 'required|string',
             'severity' => 'required|in:Low,Medium,High,Critical',
             'status' => 'required|in:Open,Working On It,Resolved,Learned',

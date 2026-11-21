@@ -1,5 +1,7 @@
 <x-app-layout title="Mistakes & Lessons">
     <div class="space-y-6">
+        @include('mistakes._tabs')
+
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
@@ -8,9 +10,14 @@
                 </h1>
                 <p class="text-xs text-slate-500">Record mistakes, analyze root causes, design prevention plans, and identify repeated patterns.</p>
             </div>
-            <a href="{{ route('mistakes.create') }}" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-md shadow-rose-600/20 self-start transition">
-                + Record Mistake & Lesson
-            </a>
+            <div class="flex flex-wrap gap-2 self-start">
+                <a href="{{ route('lessons.create') }}" class="px-4 py-2 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 font-semibold text-xs transition">
+                    + Register Lesson
+                </a>
+                <a href="{{ route('mistakes.create') }}" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-md shadow-rose-600/20 transition">
+                    + Record Mistake
+                </a>
+            </div>
         </div>
 
         <!-- Metric Cards -->

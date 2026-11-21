@@ -6,7 +6,6 @@ use App\Models\CreditDebt;
 use App\Models\Expense;
 use App\Models\Friend;
 use App\Models\Income;
-use App\Models\Payment;
 use App\Models\Setting;
 use App\Services\FinanceService;
 use App\Services\FriendBalanceService;
@@ -40,13 +39,6 @@ class FinanceDashboardController extends Controller
             ->with('category')
             ->orderByDesc('date')
             ->orderByDesc('created_at')
-            ->take(5)
-            ->get();
-
-        $pendingPayments = Payment::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'Pending')
-            ->orderBy('date')
             ->take(5)
             ->get();
 
@@ -94,7 +86,6 @@ class FinanceDashboardController extends Controller
             'weeklyStats',
             'recentExpenses',
             'recentIncomes',
-            'pendingPayments',
             'friendBalances',
             'totalOwedToMe',
             'totalIOwe',

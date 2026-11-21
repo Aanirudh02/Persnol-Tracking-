@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Models\Expense;
 use App\Models\Friend;
 use App\Models\Income;
-use App\Models\Payment;
-use App\Models\PaymentReconciliation;
 use App\Models\Setting;
 use App\Models\Settlement;
 use Carbon\Carbon;
@@ -51,38 +49,6 @@ class FinanceService
         return Carbon::parse($record->created_at)->addDays($windowDays)->isFuture();
     }
 
-    public function reconcilePayment(Payment $payment, array $data): PaymentReconciliation
-    {
-        return DB::transaction(function () use ($payment, $data) {
-            $oldStatus = $payment->status;
-
-            $reconciliation = PaymentReconciliation::create([
-                'payment_id' => $payment->id,
-                'user_id' => auth()->id(),
-                'reconciled_date' => $data['reconciled_date'] ?? Carbon::today()->toDateString(),
-                'reconciled_amount' => $data['reconciled_amount'] ?? $payment->amount,
-                'reconciled_by' => auth()->user()->name,
-                'notes' => $data['notes'] ?? null,
-            ]);
-
-            $payment->update([
-                'status' => 'Reconciled',
-                'is_locked' => true,
-            ]);
-
-            AuditService::log(
-                module: 'payment',
-                recordId: $payment->id,
-                action: 'reconciled',
-                oldValues: ['status' => $oldStatus],
-                newValues: ['status' => 'Reconciled', 'reconciled_amount' => $reconciliation->reconciled_amount],
-                reason: $data['notes'] ?? 'Payment reconciled successfully'
-            );
-
-            return $reconciliation;
-        });
-    }
-
     public function settleWithFriend(
         Friend $friend,
         float $amount,
@@ -114,7 +80,7 @@ class FinanceService
     }
 
     /**
-     * @return array{total_income: float, total_expenses: float, voluntary_spend: float, net_savings: float, pending_payments: float, start: string, end: string}
+     * @return array{total_income: float, total_expenses: float, voluntary_spend: float, net_savings: float, start: string, end: string}
      */
     public function getWeeklyStats(int $userId, ?string $date = null): array
     {
@@ -141,24 +107,18 @@ class FinanceService
             ->where('is_voluntary', true)
             ->sum(DB::raw('amount + gst_amount'));
 
-        $pendingPayments = (float) Payment::query()
-            ->where('user_id', $userId)
-            ->where('status', 'Pending')
-            ->sum('amount');
-
         return [
             'total_income' => $totalIncome,
             'total_expenses' => $totalExpenses,
             'voluntary_spend' => $voluntarySpend,
             'net_savings' => $totalIncome - $totalExpenses,
-            'pending_payments' => $pendingPayments,
             'start' => $start->toDateString(),
             'end' => $end->toDateString(),
         ];
     }
 
     /**
-     * @return array{total_income: float, total_expenses: float, voluntary_spend: float, net_savings: float, pending_payments: float}
+     * @return array{total_income: float, total_expenses: float, voluntary_spend: float, net_savings: float}
      */
     public function getMonthlyStats(int $userId, ?int $year = null, ?int $month = null): array
     {
@@ -187,17 +147,11 @@ class FinanceService
             ->where('is_voluntary', true)
             ->sum(DB::raw('amount + gst_amount'));
 
-        $pendingPayments = (float) Payment::query()
-            ->where('user_id', $userId)
-            ->where('status', 'Pending')
-            ->sum('amount');
-
         return [
             'total_income' => $totalIncome,
             'total_expenses' => $totalExpenses,
             'voluntary_spend' => $voluntarySpend,
             'net_savings' => $totalIncome - $totalExpenses,
-            'pending_payments' => $pendingPayments,
         ];
     }
 

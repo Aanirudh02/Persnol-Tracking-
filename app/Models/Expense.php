@@ -40,6 +40,10 @@ class Expense extends Model
         'is_archived',
         'classification',
         'credit_debt_id',
+        'is_closed',
+        'closed_at',
+        'closed_reason',
+        'is_unlogged',
     ];
 
     protected $casts = [
@@ -49,6 +53,9 @@ class Expense extends Model
         'is_locked' => 'boolean',
         'is_voluntary' => 'boolean',
         'is_archived' => 'boolean',
+        'is_closed' => 'boolean',
+        'is_unlogged' => 'boolean',
+        'closed_at' => 'datetime',
         'split_my_share' => 'decimal:2',
         'split_friend_share' => 'decimal:2',
     ];
@@ -117,6 +124,21 @@ class Expense extends Model
     public function creditDebtPayments(): HasMany
     {
         return $this->hasMany(CreditDebtPayment::class);
+    }
+
+    /**
+     * Mark this expense as settled and closed.
+     *
+     * @param  string  $reason  'manual' or 'debt_closed' (closed automatically with its debt)
+     */
+    public function markClosed(string $reason = 'manual'): void
+    {
+        $this->update(['is_closed' => true, 'closed_at' => now(), 'closed_reason' => $reason]);
+    }
+
+    public function reopen(): void
+    {
+        $this->update(['is_closed' => false, 'closed_at' => null, 'closed_reason' => null]);
     }
 
     public function incomeTallies(): HasMany

@@ -65,8 +65,8 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Lesson Learned *</label>
-                        <textarea name="lesson_learned" required rows="2" placeholder="Key philosophy / lesson taken away..." class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">{{ old('lesson_learned') }}</textarea>
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Lesson Learned <span class="font-normal text-slate-400">(optional — you can also register lessons separately)</span></label>
+                        <textarea name="lesson_learned" rows="2" placeholder="Key philosophy / lesson taken away..." class="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">{{ old('lesson_learned') }}</textarea>
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">How Will I Avoid It Next Time? (Prevention) *</label>

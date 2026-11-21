@@ -292,10 +292,6 @@ class FinanceFriendsOverhaulTest extends TestCase
             'paid_by_type' => 'me',
         ]);
 
-        $this->actingAs($user)->get(route('payments.create'))
-            ->assertOk()
-            ->assertSee('WalletX');
-
         $this->actingAs($user)->get(route('finance.index'))
             ->assertOk()
             ->assertSee('Expense By Payment Type')

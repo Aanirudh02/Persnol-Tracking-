@@ -71,9 +71,6 @@
             <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">
                 Money Received
             </x-nav-link>
-            <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">
-                Payments & Reconcile
-            </x-nav-link>
             <x-nav-link href="{{ route('finance.gpay-auditor.index') }}" :active="request()->routeIs('finance.gpay-auditor.*')" icon="smartphone">
                 GPay Auditor
             </x-nav-link>
@@ -357,9 +354,6 @@
                 </a>
                 <a href="{{ route('income.index') }}" class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-emerald-100 dark:text-slate-300">
                     <span class="mb-1 block text-xl">💰</span> Income
-                </a>
-                <a href="{{ route('payments.index') }}" class="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-sky-100 dark:text-slate-300">
-                    <span class="mb-1 block text-xl">🧾</span> Payments
                 </a>
                 <a href="{{ route('friends.index') }}" class="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-3 text-xs font-medium text-slate-700 transition hover:bg-indigo-100 dark:text-slate-300">
                     <span class="mb-1 block text-xl">👥</span> Friends & Splits

@@ -33,11 +33,6 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'expenses.delete', 'display_name' => 'Delete Expenses', 'module' => 'Expenses'],
 
             // Payments
-            ['name' => 'payments.view', 'display_name' => 'View Payments', 'module' => 'Payments'],
-            ['name' => 'payments.create', 'display_name' => 'Create Payments', 'module' => 'Payments'],
-            ['name' => 'payments.edit', 'display_name' => 'Edit Payments', 'module' => 'Payments'],
-            ['name' => 'payments.delete', 'display_name' => 'Delete Payments', 'module' => 'Payments'],
-            ['name' => 'payments.reconcile', 'display_name' => 'Reconcile Payments', 'module' => 'Payments'],
 
             // Activities
             ['name' => 'activities.view', 'display_name' => 'View Activities', 'module' => 'Activities'],

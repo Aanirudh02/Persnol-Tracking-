@@ -46,6 +46,13 @@ class CreditDebt extends Model
         'fully_paid_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (CreditDebt $creditDebt): void {
+            $creditDebt->syncLinkedRecordClosure();
+        });
+    }
+
     public function linkedExpense(): BelongsTo
     {
         return $this->belongsTo(Expense::class, 'linked_expense_id');
@@ -121,6 +128,37 @@ class CreditDebt extends Model
     public function unexpensedAmount(): float
     {
         return round(max(0, (float) $this->amount - (float) $this->settled_discount_amount - $this->expensedAmount()), 2);
+    }
+
+    /**
+     * True once nothing is left to collect / pay (fully paid, closed or settled).
+     */
+    public function isClosed(): bool
+    {
+        return $this->is_settled_discounted
+            || $this->status === 'fully_paid'
+            || ((float) $this->amount > 0 && $this->remaining() <= 0.009);
+    }
+
+    /**
+     * A closed debt (money lent) closes the expense(s) it was filed as; reopening the
+     * debt reopens only the records that were closed automatically with it.
+     */
+    public function syncLinkedRecordClosure(): void
+    {
+        if ($this->type !== 'debt' || ! $this->exists) {
+            return;
+        }
+
+        if ($this->isClosed()) {
+            $this->linkedExpenses()->where('is_closed', false)->get()->each->markClosed('debt_closed');
+            $this->linkedPersonalExpenses()->where('is_closed', false)->get()->each->markClosed('debt_closed');
+
+            return;
+        }
+
+        $this->linkedExpenses()->where('closed_reason', 'debt_closed')->get()->each->reopen();
+        $this->linkedPersonalExpenses()->where('closed_reason', 'debt_closed')->get()->each->reopen();
     }
 
     public function foodEntry(): BelongsTo

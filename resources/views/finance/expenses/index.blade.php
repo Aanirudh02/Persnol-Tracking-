@@ -1,5 +1,7 @@
 <x-app-layout title="Expenses">
     <div class="space-y-6">
+        <x-money-tabs active="expenses" />
+
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -197,6 +199,16 @@
                     <span>📁 Archived / Historical</span>
                     <span class="px-2 py-0.5 rounded-full text-[10px] {{ ($status ?? 'active') === 'archived' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' }}">{{ $archivedCount }}</span>
                 </a>
+                <a href="{{ route('expenses.index', request()->boolean('unlogged_only') ? request()->except(['page', 'unlogged_only']) : array_merge(request()->except('page'), ['unlogged_only' => 1])) }}"
+                   class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 {{ request()->boolean('unlogged_only') ? 'bg-violet-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700' }}">
+                    <span>🕰️ Unlogged</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] {{ request()->boolean('unlogged_only') ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' }}">{{ $unloggedCount }} · ₹{{ number_format($unloggedTotal, 0) }}</span>
+                </a>
+                <select onchange="window.location.href = this.value" aria-label="Open or closed expenses" class="text-xs font-bold py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                    <option value="{{ route('expenses.index', request()->except(['page', 'closure'])) }}" @selected(! request('closure'))>Open & closed</option>
+                    <option value="{{ route('expenses.index', array_merge(request()->except('page'), ['closure' => 'open'])) }}" @selected(request('closure') === 'open')>Open only</option>
+                    <option value="{{ route('expenses.index', array_merge(request()->except('page'), ['closure' => 'closed'])) }}" @selected(request('closure') === 'closed')>Closed only ({{ $closedCount }})</option>
+                </select>
             </div>
             @if(($status ?? 'active') === 'archived')
                 <div class="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-900">
@@ -209,6 +221,12 @@
         <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-sky-100 dark:border-slate-800 shadow-sm">
             <form action="{{ route('expenses.index') }}" method="GET" class="space-y-3 text-xs">
                 <input type="hidden" name="status" value="{{ $status ?? 'active' }}">
+                @if(request()->boolean('unlogged_only'))
+                    <input type="hidden" name="unlogged_only" value="1">
+                @endif
+                @if(request('closure'))
+                    <input type="hidden" name="closure" value="{{ request('closure') }}">
+                @endif
                 <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
                         <label class="block text-slate-400 mb-1">Category</label>
@@ -324,6 +342,12 @@
                                     </td>
                                     <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">
                                         <a href="{{ route('expenses.show', $displayExpense) }}" class="font-semibold text-slate-900 dark:text-white hover:underline">{{ $isGroup ? $exp->expenseGroup->name : $exp->description }}</a>
+                                        @if(!$isGroup && $exp->is_closed)
+                                            <span class="ml-1 inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-white" title="{{ $exp->closed_reason === 'debt_closed' ? 'Closed automatically because its debt was closed' : 'Settled & closed' }}{{ $exp->closed_at ? ' on '.$exp->closed_at->format('d M Y') : '' }}">🔒 Closed{{ $exp->closed_reason === 'debt_closed' ? ' (debt closed)' : '' }}</span>
+                                        @endif
+                                        @if(!$isGroup && $exp->is_unlogged)
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">🕰️ Unlogged</span>
+                                        @endif
                                         @if(!$isGroup && $exp->parent)
                                             <span class="block text-[10px] font-normal text-slate-400">Sub-expense under: {{ $exp->parent->description }}</span>
                                         @endif
@@ -397,11 +421,19 @@
                                                 Delete
                                             </button>
                                         @elseif($isEditable)
+                                            <form action="{{ route($exp->is_closed ? 'expenses.reopen' : 'expenses.close', $exp) }}" method="POST" class="inline">
+                                                @csrf
+                                                <button type="submit" class="mr-2 font-semibold cursor-pointer {{ $exp->is_closed ? 'text-amber-600 hover:underline' : 'text-slate-700 dark:text-slate-300 hover:underline' }}">{{ $exp->is_closed ? 'Reopen' : 'Close' }}</button>
+                                            </form>
                                             <a href="{{ route('expenses.edit', $exp) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-semibold mr-2">Edit</a>
                                             <button type="button" onclick="openExpenseDeleteModal({{ $exp->id }}, @js($exp->description), {{ $exp->totalAmount() }}, @js($displayDate->format('d M Y')), false)" class="text-rose-600 hover:underline font-semibold cursor-pointer">
                                                 Delete
                                             </button>
                                         @else
+                                            <form action="{{ route($exp->is_closed ? 'expenses.reopen' : 'expenses.close', $exp) }}" method="POST" class="inline">
+                                                @csrf
+                                                <button type="submit" class="mr-2 font-semibold cursor-pointer {{ $exp->is_closed ? 'text-amber-600 hover:underline' : 'text-slate-700 dark:text-slate-300 hover:underline' }}">{{ $exp->is_closed ? 'Reopen' : 'Close' }}</button>
+                                            </form>
                                             <span class="text-slate-400 text-[11px] font-medium" title="Edit window expired">🔒 Locked</span>
                                         @endif
                                     </td>

@@ -1,5 +1,7 @@
 <x-app-layout title="Money Received (Income)">
     <div class="space-y-6">
+        <x-money-tabs active="income" />
+
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Money Received</h1>
@@ -42,7 +44,12 @@
                             @foreach($incomes as $inc)
                                 <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
                                     <td class="py-3 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ $inc->date->format('d M Y') }}</td>
-                                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">{{ $inc->source }}</td>
+                                    <td class="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                                        {{ $inc->source }}
+                                        @if($inc->keep_separate)
+                                            <span class="ml-1 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700" title="Shown in the Daily Cash Register on its day, not carried to the next day">Separate</span>
+                                        @endif
+                                    </td>
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->description ?? '--' }}</td>
                                     <td class="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400 text-sm whitespace-nowrap">₹{{ number_format($inc->amount, 2) }}</td>
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->payment_method }}</td>

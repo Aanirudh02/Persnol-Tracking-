@@ -20,100 +20,149 @@
 </head>
 <body class="app-body min-h-screen bg-canvas text-slate-900 antialiased font-sans overflow-x-hidden selection:bg-slate-900 selection:text-white">
 
-    <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 bg-white border-r border-slate-200">
-        <div class="h-16 flex items-center px-6 gap-3 border-b border-slate-200">
-            <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold">LT</div>
-            <div>
-                <span class="font-bold text-base tracking-tight text-slate-900">LifeTracker</span>
-                <span class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Personal OS</span>
-            </div>
-        </div>
+    @php
+        $creditType = request('type', 'credit');
+        $desktopNavGroups = [
+            'Money' => [
+                'active' => request()->routeIs('income.*', 'expenses.*', 'expense-groups.*', 'personal-expenses.*', 'personal-expense-groups.*', 'all-expenses.*', 'bulk-entry.*', 'classification.*'),
+                'sections' => [
+                    'Income & expenses' => [
+                        ['income.index', [], 'Income', request()->routeIs('income.*')],
+                        ['expenses.index', [], 'Expenses', request()->routeIs('expenses.*', 'expense-groups.*')],
+                        ['personal-expenses.index', [], 'Personal Expenses', request()->routeIs('personal-expenses.*', 'personal-expense-groups.*')],
+                    ],
+                    'Tools' => [
+                        ['bulk-entry.create', [], 'Bulk add', request()->routeIs('bulk-entry.*')],
+                        ['all-expenses.index', [], 'All expenses', request()->routeIs('all-expenses.*')],
+                        ['classification.index', [], 'Classifications', request()->routeIs('classification.*')],
+                    ],
+                ],
+            ],
+            'Ledger' => [
+                'active' => request()->routeIs('finance.index', 'daily-balances.*', 'statements.*', 'savings.*', 'finance.gpay-auditor.*'),
+                'sections' => [
+                    'Balances' => [
+                        ['finance.index', [], 'Finance Hub', request()->routeIs('finance.index')],
+                        ['daily-balances.index', [], 'Daily Cash Register', request()->routeIs('daily-balances.*')],
+                        ['savings.index', [], 'Savings & Funds', request()->routeIs('savings.*')],
+                    ],
+                    'Statements & checks' => [
+                        ['statements.index', [], 'Statements', request()->routeIs('statements.index', 'statements.show')],
+                        ['statements.create', [], 'Take statement', request()->routeIs('statements.create')],
+                        ['finance.gpay-auditor.index', [], 'GPay Auditor', request()->routeIs('finance.gpay-auditor.*')],
+                    ],
+                ],
+            ],
+            'People' => [
+                'active' => request()->routeIs('friends.*', 'friend-splits.*', 'credits.*', 'family-members.*'),
+                'sections' => [
+                    'People' => [
+                        ['friends.index', [], 'Friends & Splits', request()->routeIs('friends.*', 'friend-splits.*')],
+                        ['credits.index', ['type' => 'credit'], 'Credits (I owe)', request()->routeIs('credits.*') && $creditType === 'credit'],
+                        ['credits.index', ['type' => 'debt'], 'Debts (owed to me)', request()->routeIs('credits.*') && $creditType === 'debt'],
+                        ['family-members.index', [], 'Family Members', request()->routeIs('family-members.*')],
+                    ],
+                ],
+            ],
+            'Life' => [
+                'active' => request()->routeIs('food.*', 'sleep.*', 'activities.*', 'scooter.*', 'vehicles.*', 'petrol.*', 'odometer.*', 'mistakes.*', 'lessons.*', 'notes.*'),
+                'sections' => [
+                    'Daily life' => [
+                        ['food.index', [], 'Food', request()->routeIs('food.*') && ! request()->boolean('is_snack')],
+                        ['food.index', ['is_snack' => 1], 'Snacks', request()->routeIs('food.*') && request()->boolean('is_snack')],
+                        ['sleep.index', [], 'Sleep & Wake', request()->routeIs('sleep.*')],
+                        ['activities.index', [], 'Activities', request()->routeIs('activities.*')],
+                        ['mistakes.index', [], 'Mistakes & Lessons', request()->routeIs('mistakes.*', 'lessons.*')],
+                        ['notes.index', [], 'Notes', request()->routeIs('notes.*')],
+                    ],
+                    'Travel' => [
+                        ['scooter.index', [], 'Scooter Trips', request()->routeIs('scooter.index', 'scooter.start', 'scooter.end', 'scooter.edit')],
+                        ['scooter.plan', [], 'Trip Planner', request()->routeIs('scooter.plan*')],
+                        ['vehicles.index', [], 'Vehicles', request()->routeIs('vehicles.*')],
+                        ['petrol.index', [], 'Petrol / Fuel', request()->routeIs('petrol.*')],
+                        ['odometer.index', [], 'Odometer & Mileage', request()->routeIs('odometer.*')],
+                    ],
+                ],
+            ],
+            'Insights' => [
+                'active' => request()->routeIs('analytics.*', 'reports.*', 'settings.*'),
+                'sections' => [
+                    'Insights' => [
+                        ['analytics.index', [], 'Analytics', request()->routeIs('analytics.*')],
+                        ['reports.index', [], 'Reports & Export', request()->routeIs('reports.*')],
+                        ['settings.index', [], 'Settings', request()->routeIs('settings.*')],
+                    ],
+                ],
+            ],
+        ];
+        $topLinkClass = fn (bool $active): string => 'inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold transition '
+            .($active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900');
+    @endphp
 
-        <div class="flex-1 flex flex-col overflow-y-auto px-4 py-4 space-y-1">
-            <x-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')" icon="home">Dashboard</x-nav-link>
-            <x-nav-link href="{{ route('calendar') }}" :active="request()->routeIs('calendar') || request()->routeIs('timeline')" icon="calendar">Calendar & Timeline</x-nav-link>
-
-            <div class="pt-2 pb-1"><p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Finance</p></div>
-            <x-nav-link href="{{ route('finance.index') }}" :active="request()->routeIs('finance.index')" icon="credit-card">Finance Hub</x-nav-link>
-            <x-nav-link href="{{ route('income.index') }}" :active="request()->routeIs('income.*')" icon="trending-up">Income</x-nav-link>
-            <x-nav-link href="{{ route('expenses.index') }}" :active="request()->routeIs('expenses.*')" icon="trending-down">Expenses</x-nav-link>
-            <x-nav-link href="{{ route('personal-expenses.index') }}" :active="request()->routeIs('personal-expenses.*')" icon="user">Personal Expenses</x-nav-link>
-            <x-nav-link href="{{ route('all-expenses.index') }}" :active="request()->routeIs('all-expenses.*')" icon="layers">All Expenses</x-nav-link>
-            <x-nav-link href="{{ route('statements.index') }}" :active="request()->routeIs('statements.*')" icon="file-text">Statements</x-nav-link>
-            <x-nav-link href="{{ route('payments.index') }}" :active="request()->routeIs('payments.*')" icon="check-square">Payments</x-nav-link>
-            <x-nav-link href="{{ route('savings.index') }}" :active="request()->routeIs('savings.*')" icon="trending-up">Savings & Funds</x-nav-link>
-            <x-nav-link href="{{ route('daily-balances.index') }}" :active="request()->routeIs('daily-balances.*')" icon="layers">Daily Cash Register</x-nav-link>
-            <x-nav-link href="{{ route('friends.index') }}" :active="request()->routeIs('friends.*')" icon="users">Friends & Splits</x-nav-link>
-            <x-nav-link href="{{ route('family-members.index') }}" :active="request()->routeIs('family-members.*')" icon="users">Family Members</x-nav-link>
-            <x-nav-link href="{{ route('credits.index', ['type' => 'credit']) }}" :active="request()->routeIs('credits.*') && request('type', 'credit') === 'credit'" icon="users">Credits (I owe)</x-nav-link>
-            <x-nav-link href="{{ route('credits.index', ['type' => 'debt']) }}" :active="request()->routeIs('credits.*') && request('type') === 'debt'" icon="users">Debts (owe me)</x-nav-link>
-
-            <div class="pt-2 pb-1"><p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Life & Habits</p></div>
-            <x-nav-link href="{{ route('food.index') }}" :active="request()->routeIs('food.*') && !request()->boolean('is_snack')" icon="coffee">Food</x-nav-link>
-            <x-nav-link href="{{ route('food.index', ['is_snack' => 1]) }}" :active="request()->routeIs('food.*') && request()->boolean('is_snack')" icon="coffee">Snacks</x-nav-link>
-            <x-nav-link href="{{ route('sleep.index') }}" :active="request()->routeIs('sleep.*')" icon="activity">Sleep & Wake</x-nav-link>
-            <x-nav-link href="{{ route('activities.index') }}" :active="request()->routeIs('activities.*')" icon="activity">Activities</x-nav-link>
-            <x-nav-link href="{{ route('scooter.index') }}" :active="request()->routeIs('scooter.index') || request()->routeIs('scooter.start') || request()->routeIs('scooter.end')" icon="navigation">Scooter Trips</x-nav-link>
-            <x-nav-link href="{{ route('scooter.plan') }}" :active="request()->routeIs('scooter.plan*')" icon="navigation">Trip Planner</x-nav-link>
-            <x-nav-link href="{{ route('vehicles.index') }}" :active="request()->routeIs('vehicles.*')" icon="navigation">Vehicles</x-nav-link>
-            <x-nav-link href="{{ route('petrol.index') }}" :active="request()->routeIs('petrol.*')" icon="fuel">Petrol / Fuel</x-nav-link>
-            <x-nav-link href="{{ route('odometer.index') }}" :active="request()->routeIs('odometer.*')" icon="navigation">Odometer & Mileage</x-nav-link>
-            <x-nav-link href="{{ route('mistakes.index') }}" :active="request()->routeIs('mistakes.*')" icon="alert-triangle">Mistakes</x-nav-link>
-            <x-nav-link href="{{ route('notes.index') }}" :active="request()->routeIs('notes.*')" icon="file-text">Notes</x-nav-link>
-
-            <div class="pt-2 pb-1"><p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Insights</p></div>
-            <x-nav-link href="{{ route('analytics.index') }}" :active="request()->routeIs('analytics.*')" icon="pie-chart">Analytics</x-nav-link>
-            <x-nav-link href="{{ route('reports.index') }}" :active="request()->routeIs('reports.*')" icon="bar-chart-2">Reports</x-nav-link>
-            <x-nav-link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')" icon="settings">Settings</x-nav-link>
-        </div>
-
-        <div class="p-4 border-t border-slate-200">
-            <button type="button" onclick="window.openQuickAdd()" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition active:scale-95">
-                <span class="text-lg leading-none font-bold">+</span>
-                <span>Quick Record</span>
-            </button>
-        </div>
-    </aside>
-
-    <div class="app-main md:pl-64 min-h-screen min-w-0">
-        <header class="sticky top-0 z-20 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 sm:px-6">
-            <div class="flex items-center gap-3 md:w-80">
-                <div class="md:hidden flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</div>
-                    <span class="font-bold text-sm text-slate-900">LifeTracker</span>
-                </div>
-                <form action="{{ route('search') }}" method="GET" class="hidden md:flex items-center w-full relative">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    </span>
-                    <input type="text" name="q" value="{{ request('q') }}" placeholder="Search expenses, friends, notes, trips..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 transition" />
-                </form>
-            </div>
-
-            <div class="flex items-center gap-2 sm:gap-3">
-                <a href="{{ route('search') }}" class="md:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    <div class="app-main min-h-screen min-w-0">
+        <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+            <div class="h-16 flex items-center justify-between gap-3 px-4 sm:px-6">
+                <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-2">
+                    <span class="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-xs">LT</span>
+                    <span class="hidden lg:block font-bold text-sm text-slate-900 leading-tight">LifeTracker<span class="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Personal OS</span></span>
+                    <span class="md:hidden font-bold text-sm text-slate-900">LifeTracker</span>
                 </a>
-                <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-                    @if($profilePhotoUrl)
-                        <button type="button" data-profile-photo onclick="window.openImageModal(@js($profilePhotoUrl), @js($authUser->name), 'Profile photo')" title="View profile photo" class="shrink-0 rounded-full ring-2 ring-white shadow-md outline outline-1 outline-slate-200 transition hover:scale-105 cursor-pointer">
-                            <img src="{{ $profilePhotoUrl }}" alt="{{ $authUser->name }}" class="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover">
-                        </button>
-                    @else
-                        <a href="{{ route('settings.index') }}#profile" title="Add a profile photo" class="w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white shadow-md">
-                            {{ strtoupper(substr($authUser->name ?? 'U', 0, 1)) }}
-                        </a>
-                    @endif
-                    <div class="hidden sm:block text-left">
-                        <span class="block text-sm font-semibold text-slate-800 leading-tight">{{ $authUser->name }}</span>
-                        <span class="block text-xs text-slate-400 capitalize">{{ $authUser->roles->first()?->name ?? 'User' }}</span>
+
+                {{-- Desktop / web navigation bar --}}
+                <nav aria-label="Main" class="hidden md:flex min-w-0 flex-1 items-center gap-0.5">
+                    <a href="{{ route('dashboard') }}" class="{{ $topLinkClass(request()->routeIs('dashboard')) }}" @if(request()->routeIs('dashboard')) aria-current="page" @endif>Dashboard</a>
+                    <a href="{{ route('calendar') }}" class="{{ $topLinkClass(request()->routeIs('calendar', 'timeline')) }}" @if(request()->routeIs('calendar', 'timeline')) aria-current="page" @endif>Calendar</a>
+                    @foreach($desktopNavGroups as $groupLabel => $group)
+                        <div class="relative" data-nav-menu>
+                            <button type="button" data-nav-toggle aria-expanded="false" aria-haspopup="true" class="{{ $topLinkClass($group['active']) }} cursor-pointer">
+                                {{ $groupLabel }}
+                                <svg class="h-3.5 w-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div data-nav-panel class="hidden absolute left-0 top-full mt-2 w-max min-w-[220px] max-w-[min(520px,90vw)] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                                <div class="grid gap-2 {{ count($group['sections']) > 1 ? 'grid-cols-2' : 'grid-cols-1' }}">
+                                    @foreach($group['sections'] as $sectionLabel => $links)
+                                        <div>
+                                            <p class="px-3 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $sectionLabel }}</p>
+                                            @foreach($links as [$linkRoute, $linkParams, $linkLabel, $linkActive])
+                                                <a href="{{ route($linkRoute, $linkParams) }}" @if($linkActive) aria-current="page" @endif class="block whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition {{ $linkActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">{{ $linkLabel }}</a>
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </nav>
+
+                <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                    <a href="{{ route('search') }}" title="Search" class="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </a>
+                    <button type="button" onclick="window.openQuickAdd()" class="hidden md:inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 cursor-pointer transition active:scale-95">
+                        <span class="text-base leading-none font-bold">+</span>
+                        <span class="hidden xl:inline">Quick Record</span>
+                    </button>
+                    <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
+                        @if($profilePhotoUrl)
+                            <button type="button" data-profile-photo onclick="window.openImageModal(@js($profilePhotoUrl), @js($authUser->name), 'Profile photo')" title="View profile photo" class="shrink-0 rounded-full ring-2 ring-white shadow-md outline outline-1 outline-slate-200 transition hover:scale-105 cursor-pointer">
+                                <img src="{{ $profilePhotoUrl }}" alt="{{ $authUser->name }}" class="w-9 h-9 rounded-full object-cover">
+                            </button>
+                        @else
+                            <a href="{{ route('settings.index') }}#profile" title="Add a profile photo" class="w-9 h-9 shrink-0 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm ring-2 ring-white shadow-md">
+                                {{ strtoupper(substr($authUser->name ?? 'U', 0, 1)) }}
+                            </a>
+                        @endif
+                        <div class="hidden 2xl:block text-left">
+                            <span class="block text-sm font-semibold text-slate-800 leading-tight">{{ $authUser->name }}</span>
+                            <span class="block text-xs text-slate-400 capitalize">{{ $authUser->roles->first()?->name ?? 'User' }}</span>
+                        </div>
+                        <form action="{{ route('logout') }}" method="POST" class="inline">
+                            @csrf
+                            <button type="submit" title="Sign Out" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                            </button>
+                        </form>
                     </div>
-                    <form action="{{ route('logout') }}" method="POST" class="inline">
-                        @csrf
-                        <button type="submit" title="Sign Out" class="p-2 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                        </button>
-                    </form>
                 </div>
             </div>
         </header>
@@ -184,7 +233,7 @@
             <button type="button" onclick="window.openQuickAdd()" class="w-13 h-13 rounded-full bg-slate-900 text-white shadow-xl flex items-center justify-center text-2xl font-bold active:scale-95 transition-transform cursor-pointer" title="Quick Add">+</button>
         </div>
         @php
-            $financeActive = request()->routeIs('finance.*', 'expenses.*', 'expense-groups.*', 'personal-expenses.*', 'all-expenses.*', 'income.*', 'statements.*', 'classification.*', 'payments.*', 'savings.*', 'daily-balances.*', 'friends.*', 'credits.*', 'family-members.*');
+            $financeActive = request()->routeIs('finance.*', 'expenses.*', 'expense-groups.*', 'personal-expenses.*', 'all-expenses.*', 'bulk-entry.*', 'income.*', 'statements.*', 'classification.*', 'savings.*', 'daily-balances.*', 'friends.*', 'credits.*', 'family-members.*');
         @endphp
         <button type="button" onclick="window.toggleMobileDrawer('mobile-finance-menu')" aria-haspopup="dialog" aria-controls="mobile-finance-menu" class="flex flex-col items-center justify-center flex-1 py-1 text-sm cursor-pointer {{ $financeActive ? 'text-slate-900 font-bold' : 'text-slate-500' }}">
             <svg class="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -198,24 +247,22 @@
 
     @php
         $financeDrawerSections = [
-            'Overview' => [
-                ['finance.index', [], 'Finance Hub', 'bg-slate-900 text-white', 'M3 3v18h18M7 15l4-4 3 3 5-6'],
-                ['all-expenses.index', [], 'All Expenses', 'bg-sky-100 text-sky-700', 'M4 6h16M4 12h16M4 18h10'],
-            ],
-            'Spending' => [
+            'Income & Expenses' => [
+                ['income.index', [], 'Income', 'bg-emerald-100 text-emerald-700', 'M12 5v14m0-14l-6 6m6-6l6 6'],
                 ['expenses.index', [], 'Expenses', 'bg-rose-100 text-rose-700', 'M12 19V5m0 14l-6-6m6 6l6-6'],
                 ['personal-expenses.index', [], 'Personal Expenses', 'bg-pink-100 text-pink-700', 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'],
+                ['bulk-entry.create', [], 'Bulk Add', 'bg-slate-900 text-white', 'M12 4v16m8-8H4'],
+                ['all-expenses.index', [], 'All Expenses', 'bg-sky-100 text-sky-700', 'M4 6h16M4 12h16M4 18h10'],
                 ['classification.index', [], 'Classifications', 'bg-violet-100 text-violet-700', 'M7 7h.01M7 3h5l8 8-9 9-8-8V7a4 4 0 014-4z'],
             ],
-            'Income & Savings' => [
-                ['income.index', [], 'Income', 'bg-emerald-100 text-emerald-700', 'M12 5v14m0-14l-6 6m6-6l6 6'],
-                ['savings.index', [], 'Savings & Funds', 'bg-teal-100 text-teal-700', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+            'Ledger' => [
+                ['finance.index', [], 'Finance Hub', 'bg-slate-900 text-white', 'M3 3v18h18M7 15l4-4 3 3 5-6'],
                 ['daily-balances.index', [], 'Daily Cash Register', 'bg-amber-100 text-amber-700', 'M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2zm2 8h4'],
+                ['savings.index', [], 'Savings & Funds', 'bg-teal-100 text-teal-700', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
             ],
             'Statements & Checks' => [
                 ['statements.index', [], 'Statements', 'bg-indigo-100 text-indigo-700', 'M9 12h6m-6 4h6M7 4h7l5 5v11a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z'],
                 ['statements.create', [], 'Take Statement', 'bg-indigo-100 text-indigo-700', 'M12 11v6m-3-3h6M7 4h7l5 5v11a1 1 0 01-1 1H7a1 1 0 01-1-1V5a1 1 0 011-1z'],
-                ['payments.index', [], 'Payments', 'bg-sky-100 text-sky-700', 'M9 12l2 2 4-4M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z'],
                 ['finance.gpay-auditor.index', [], 'GPay Auditor', 'bg-emerald-100 text-emerald-700', 'M8 3h8a1 1 0 011 1v16a1 1 0 01-1 1H8a1 1 0 01-1-1V4a1 1 0 011-1zm3 15h2'],
             ],
             'People' => [
@@ -235,7 +282,7 @@
             ['vehicles.index', [], 'Vehicles'],
             ['petrol.index', [], 'Petrol'],
             ['odometer.index', [], 'Odometer'],
-            ['mistakes.index', [], 'Mistakes'],
+            ['mistakes.index', [], 'Mistakes & Lessons'],
             ['notes.index', [], 'Notes'],
             ['analytics.index', [], 'Analytics'],
             ['reports.index', [], 'Reports'],
@@ -350,6 +397,40 @@
                 document.body.classList.remove('overflow-hidden');
             }
         };
+
+        (function () {
+            const menus = document.querySelectorAll('[data-nav-menu]');
+            const closeAll = (except) => menus.forEach((menu) => {
+                if (menu === except) return;
+                menu.querySelector('[data-nav-panel]').classList.add('hidden');
+                menu.querySelector('[data-nav-toggle]').setAttribute('aria-expanded', 'false');
+            });
+            menus.forEach((menu) => {
+                const toggle = menu.querySelector('[data-nav-toggle]');
+                const panel = menu.querySelector('[data-nav-panel]');
+                toggle.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    closeAll(menu);
+                    const opening = panel.classList.contains('hidden');
+                    panel.classList.toggle('hidden', !opening);
+                    toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+                    if (opening) {
+                        panel.style.left = '';
+                        panel.style.right = '';
+                        if (panel.getBoundingClientRect().right > window.innerWidth - 8) {
+                            panel.style.left = 'auto';
+                            panel.style.right = '0';
+                        }
+                    }
+                });
+            });
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('[data-nav-menu]')) closeAll(null);
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') closeAll(null);
+            });
+        })();
 
         window.toggleMobileDrawer = function(id) {
             ['mobile-more-menu', 'mobile-finance-menu'].forEach(function(drawerId) {

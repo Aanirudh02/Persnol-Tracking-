@@ -5,6 +5,21 @@
             <h1 class="text-2xl font-bold text-slate-900 mt-2">{{ $expense->description }}</h1>
             <p class="text-sm text-slate-500">₹{{ number_format($expense->totalAmount(), 2) }} · {{ $expense->category?->name ?? 'Uncategorized' }} · {{ $expense->date->format('d M Y') }}</p>
             @if($expense->is_voluntary)<span class="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-pink-50 text-pink-700">Voluntary</span>@endif
+            @if($expense->is_unlogged)<span class="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-violet-100 text-violet-700">🕰️ Unlogged</span>@endif
+
+            @unless($expense->trashed())
+                <div class="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border px-3.5 py-3 text-xs {{ $expense->is_closed ? 'border-slate-300 bg-slate-100 text-slate-800' : 'border-slate-200 bg-white text-slate-600' }}">
+                    @if($expense->is_closed)
+                        <span class="font-bold">🔒 Settled & closed{{ $expense->closed_at ? ' on '.$expense->closed_at->format('d M Y') : '' }}{{ $expense->closed_reason === 'debt_closed' ? ' — its debt was closed' : '' }}</span>
+                    @else
+                        <span class="font-medium">Open expense</span>
+                    @endif
+                    <form action="{{ route($expense->is_closed ? 'expenses.reopen' : 'expenses.close', $expense) }}" method="POST" class="ml-auto">
+                        @csrf
+                        <button type="submit" class="rounded-xl px-3 py-1.5 font-bold text-white cursor-pointer {{ $expense->is_closed ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-900 hover:bg-slate-800' }}">{{ $expense->is_closed ? 'Reopen' : 'Mark settled & closed' }}</button>
+                    </form>
+                </div>
+            @endunless
 
             @if($expense->trashed())
                 <div class="mt-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs">

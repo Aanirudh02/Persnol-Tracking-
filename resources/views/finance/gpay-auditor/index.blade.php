@@ -4,7 +4,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('payments.index') }}" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition">&larr; Back to Payments</a>
+                    <a href="{{ route('finance.index') }}" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 transition">&larr; Back to Finance Hub</a>
                     <span class="text-slate-300">/</span>
                     <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">GPay Auditor</span>
                 </div>

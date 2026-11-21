@@ -26,12 +26,14 @@ class Income extends Model
         'notes',
         'is_locked',
         'credit_debt_id',
+        'keep_separate',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'date' => 'date',
         'is_locked' => 'boolean',
+        'keep_separate' => 'boolean',
     ];
 
     /**

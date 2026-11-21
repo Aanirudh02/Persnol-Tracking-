@@ -66,6 +66,7 @@ class IncomeController extends Controller
             'time' => 'nullable',
             'payment_method' => 'required|string',
             'tally_mode' => 'nullable|in:tally_current,tally_future,separate',
+            'keep_separate' => 'nullable|boolean',
             'description' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
         ]);
@@ -85,6 +86,7 @@ class IncomeController extends Controller
             'time' => $validated['time'] ?? Carbon::now()->format('H:i'),
             'payment_method' => $validated['payment_method'],
             'tally_mode' => $validated['tally_mode'] ?? 'separate',
+            'keep_separate' => $request->boolean('keep_separate'),
             'description' => $validated['description'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);
@@ -130,6 +132,7 @@ class IncomeController extends Controller
             'time' => 'nullable',
             'payment_method' => 'required|string',
             'tally_mode' => 'nullable|in:tally_current,tally_future,separate',
+            'keep_separate' => 'nullable|boolean',
             'description' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'reason' => 'nullable|string|max:255',
@@ -149,6 +152,7 @@ class IncomeController extends Controller
             'time' => $validated['time'] ?? $income->time,
             'payment_method' => $validated['payment_method'],
             'tally_mode' => $validated['tally_mode'] ?? 'separate',
+            'keep_separate' => $request->boolean('keep_separate'),
             'description' => $validated['description'] ?? null,
             'notes' => $validated['notes'] ?? null,
         ]);

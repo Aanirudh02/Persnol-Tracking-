@@ -17,6 +17,7 @@ use App\Services\FinanceLinkService;
 use App\Services\FinanceService;
 use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,7 @@ class ExpenseController extends Controller
         if ($request->boolean('voluntary_only')) {
             $query->where('is_voluntary', true);
         }
+        $this->applyClosureFilters($query, $request);
 
         $expenses = $query->orderByDesc('date')->orderByDesc('created_at')->paginate(15)->withQueryString();
         $categories = ExpenseCategory::query()
@@ -123,6 +125,11 @@ class ExpenseController extends Controller
             $baseQuery->where('payment_method', $request->string('payment_method'));
         }
         $baseQuery->where('is_voluntary', $request->boolean('voluntary_only'));
+        $this->applyClosureFilters($baseQuery, $request);
+
+        $unloggedCount = Expense::where('user_id', $user->id)->whereNull('parent_id')->where('is_unlogged', true)->count();
+        $closedCount = Expense::where('user_id', $user->id)->whereNull('parent_id')->where('is_closed', true)->count();
+        $unloggedTotal = (float) Expense::where('user_id', $user->id)->whereNull('parent_id')->where('is_unlogged', true)->where('is_voluntary', false)->sum(DB::raw('amount + gst_amount'));
 
         // 1. Total expenses
         $totalAmount = (float) (clone $baseQuery)->sum(DB::raw('amount + gst_amount'));
@@ -226,8 +233,50 @@ class ExpenseController extends Controller
             'period',
             'fromDate',
             'toDate',
-            'customMonth'
+            'customMonth',
+            'unloggedCount',
+            'closedCount',
+            'unloggedTotal'
         ));
+    }
+
+    /**
+     * Narrow an expense query to the "Unlogged" or "Open / Closed" views.
+     *
+     * @param  Builder<Expense>  $query
+     */
+    private function applyClosureFilters($query, Request $request): void
+    {
+        if ($request->boolean('unlogged_only')) {
+            $query->where('is_unlogged', true);
+        }
+
+        match ($request->get('closure')) {
+            'open' => $query->where('is_closed', false),
+            'closed' => $query->where('is_closed', true),
+            default => null,
+        };
+    }
+
+    /**
+     * Mark an expense as settled and closed.
+     */
+    public function close(Request $request, Expense $expense): RedirectResponse
+    {
+        abort_if($expense->user_id !== $request->user()->id, 403);
+
+        $expense->markClosed();
+
+        return back()->with('success', 'Expense marked as settled & closed.');
+    }
+
+    public function reopen(Request $request, Expense $expense): RedirectResponse
+    {
+        abort_if($expense->user_id !== $request->user()->id, 403);
+
+        $expense->reopen();
+
+        return back()->with('success', 'Expense reopened.');
     }
 
     public function create(OptionsService $options): View
@@ -383,6 +432,7 @@ class ExpenseController extends Controller
                     'notes' => $combinedNotes,
                     'receipt_image' => $imagePath,
                     'is_voluntary' => $isVoluntary,
+                    'is_unlogged' => $request->boolean('is_unlogged'),
                     'classification' => $validated['classification'] ?? 'necessary',
                 ]);
 
@@ -443,6 +493,7 @@ class ExpenseController extends Controller
                     'notes' => $validated['notes'] ?? null,
                     'receipt_image' => $imagePath,
                     'is_voluntary' => $isVoluntary,
+                    'is_unlogged' => $request->boolean('is_unlogged'),
                     'classification' => $validated['classification'] ?? 'necessary',
                 ]);
 
@@ -774,6 +825,7 @@ class ExpenseController extends Controller
             'split_my_share' => $splitData['my_share'] ?? null,
             'split_friend_share' => $splitData['friend_share'] ?? null,
             'is_voluntary' => $request->boolean('is_voluntary') || ($category?->is_voluntary ?? false),
+            'is_unlogged' => $request->boolean('is_unlogged'),
         ]);
 
         if ($splitData) {

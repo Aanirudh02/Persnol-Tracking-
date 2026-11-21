@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DailyRecord;
 use App\Models\Expense;
-use App\Models\ExpenseCategory;
 use App\Models\FamilyMember;
 use App\Models\PersonalExpense;
 use App\Models\PersonalExpenseCategory;
@@ -201,7 +199,7 @@ class PersonalExpenseController extends Controller
         ]);
 
         if ($request->boolean('record_as_normal_expense')) {
-            $this->syncNormalExpense($personalExpense);
+            $personalExpense->syncLinkedNormalExpense();
         }
 
         return redirect()->route('personal-expenses.index')->with('success', 'Personal expense recorded successfully!');
@@ -255,7 +253,7 @@ class PersonalExpenseController extends Controller
         ]);
 
         if ($request->boolean('record_as_normal_expense')) {
-            $this->syncNormalExpense($personalExpense);
+            $personalExpense->syncLinkedNormalExpense();
         } else {
             if ($personalExpense->linkedExpense) {
                 $personalExpense->linkedExpense->delete();
@@ -425,11 +423,32 @@ class PersonalExpenseController extends Controller
         return back()->with('success', 'Personal expense restored to Active.');
     }
 
+    /**
+     * Mark a personal expense as settled and closed.
+     */
+    public function close(Request $request, PersonalExpense $personalExpense): RedirectResponse
+    {
+        abort_if($personalExpense->user_id !== $request->user()->id, 403);
+
+        $personalExpense->markClosed();
+
+        return back()->with('success', 'Personal expense marked as settled & closed.');
+    }
+
+    public function reopen(Request $request, PersonalExpense $personalExpense): RedirectResponse
+    {
+        abort_if($personalExpense->user_id !== $request->user()->id, 403);
+
+        $personalExpense->reopen();
+
+        return back()->with('success', 'Personal expense reopened.');
+    }
+
     public function convertToNormal(PersonalExpense $personalExpense): RedirectResponse
     {
         abort_if($personalExpense->user_id !== auth()->id(), 403);
 
-        $this->syncNormalExpense($personalExpense);
+        $personalExpense->syncLinkedNormalExpense();
 
         return back()->with('success', 'Personal expense recorded as a normal expense successfully!');
     }
@@ -455,52 +474,6 @@ class PersonalExpenseController extends Controller
         $personalExpense->delete();
 
         return redirect()->route('personal-expenses.index')->with('success', 'Personal expense deleted.');
-    }
-
-    private function syncNormalExpense(PersonalExpense $personalExpense): void
-    {
-        $categoryName = $personalExpense->category?->name ?? 'Personal';
-        $normalCategory = ExpenseCategory::firstOrCreate(
-            ['name' => $categoryName, 'user_id' => null],
-            ['icon' => 'user', 'color' => '#3b82f6', 'is_archived' => false]
-        );
-
-        $dayRecord = DailyRecord::firstOrCreate([
-            'user_id' => $personalExpense->user_id,
-            'record_date' => $personalExpense->date->toDateString(),
-        ]);
-
-        $desc = '[Personal] '.($personalExpense->description ?: $categoryName);
-
-        if ($personalExpense->linkedExpense) {
-            $personalExpense->linkedExpense->update([
-                'category_id' => $normalCategory->id,
-                'amount' => $personalExpense->amount,
-                'gst_amount' => $personalExpense->gst_amount,
-                'date' => $personalExpense->date->toDateString(),
-                'time' => $personalExpense->time ?: now()->format('H:i'),
-                'description' => $desc,
-                'payment_method' => $personalExpense->payment_method ?: 'Cash',
-                'notes' => $personalExpense->notes,
-                'is_voluntary' => $personalExpense->is_voluntary,
-            ]);
-        } else {
-            $expense = Expense::create([
-                'user_id' => $personalExpense->user_id,
-                'daily_record_id' => $dayRecord->id,
-                'category_id' => $normalCategory->id,
-                'amount' => $personalExpense->amount,
-                'gst_amount' => $personalExpense->gst_amount,
-                'date' => $personalExpense->date->toDateString(),
-                'time' => $personalExpense->time ?: now()->format('H:i'),
-                'description' => $desc,
-                'payment_method' => $personalExpense->payment_method ?: 'Cash',
-                'notes' => $personalExpense->notes,
-                'is_voluntary' => $personalExpense->is_voluntary,
-            ]);
-
-            $personalExpense->update(['expense_id' => $expense->id]);
-        }
     }
 
     private function resolveDates(string $periodType, ?string $start, ?string $end, ?string $customMonth = null): array
