@@ -34,6 +34,8 @@
         .summary span { display: block; font-size: 9.5px; text-transform: uppercase; color: #64748b; font-weight: 700; }
         .summary b { font-size: 14px; }
         .tally-lines td { border-bottom: 0; padding-top: 2px; padding-bottom: 2px; font-size: 11px; color: #334155; }
+        .tally-lines.last td { border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        tr.has-tallies td { border-bottom: 0; }
         .empty { padding: 10px; color: #94a3b8; }
         @media print {
             body { background: #fff; font-size: 10.5px; }
@@ -168,7 +170,7 @@
                 <tbody>
                     @forelse($typeIncomes as $income)
                         @php $tallied = (float) $income->tallies->sum('allocated_amount'); @endphp
-                        <tr>
+                        <tr @class(['has-tallies' => $income->tallies->isNotEmpty()])>
                             <td style="white-space:nowrap">{{ $income->date->format('d M Y') }}</td>
                             <td>
                                 <b>{{ $income->source ?: 'Income' }}</b>
@@ -181,7 +183,7 @@
                             <td class="num">{{ $money(max(0, (float) $income->amount - $tallied)) }}</td>
                         </tr>
                         @foreach($income->tallies as $tally)
-                            <tr class="tally-lines">
+                            <tr @class(['tally-lines', 'last' => $loop->last])>
                                 <td></td>
                                 <td colspan="3">↳ {{ $tally->expense?->date?->format('d M Y') }} · {{ $tally->expense?->description ?? 'Deleted expense' }}@if($tally->notes) <span class="muted">({{ $tally->notes }})</span>@endif</td>
                                 <td class="num out">{{ $money((float) $tally->allocated_amount) }}</td>
@@ -229,7 +231,17 @@
                             <td class="num out">{{ $money((float) $breakdown->sum()) }}</td>
                             <td class="small">
                                 @forelse($expense->incomeTallies as $tally)
-                                    <div>{{ $tally->income?->source ?? 'Income' }} ({{ $tally->income?->date?->format('d M') }}) · {{ $money((float) $tally->allocated_amount) }}</div>
+                                    @php
+                                        $sourceIncome = $tally->income;
+                                        $sourceAmount = (float) ($sourceIncome?->amount ?? 0);
+                                        $sourceTallied = $sourceIncome ? (float) $sourceIncome->tallies->sum('allocated_amount') : 0.0;
+                                    @endphp
+                                    <div>
+                                        {{ $sourceIncome?->source ?? 'Income' }} ({{ $sourceIncome?->date?->format('d M') }}) · {{ $money((float) $tally->allocated_amount) }}
+                                        @if($sourceIncome)
+                                            <span class="muted">— income {{ $money($sourceAmount) }}, tallied {{ $money($sourceTallied) }}, not tallied {{ $money(max(0, $sourceAmount - $sourceTallied)) }}</span>
+                                        @endif
+                                    </div>
                                 @empty
                                     <span class="muted">—</span>
                                 @endforelse

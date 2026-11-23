@@ -323,7 +323,7 @@ class DailyBalanceController extends Controller
             ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
             ->where(fn ($q) => $q->whereNull('paid_by_type')->orWhere('paid_by_type', '!=', 'friend'))
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
-            ->with(['category', 'incomeTallies.income'])
+            ->with(['category', 'incomeTallies.income.tallies'])
             ->orderBy('date')
             ->orderBy('time')
             ->get();
