@@ -256,6 +256,26 @@ class FinanceClosureBulkEntryAndLessonsTest extends TestCase
             ->assertSessionHasErrors('to');
     }
 
+    public function test_statement_expense_row_shows_the_source_incomes_untallied_remainder(): void
+    {
+        $user = User::factory()->create();
+        $income = Income::create([
+            'user_id' => $user->id,
+            'amount' => 300,
+            'source' => 'Pocket Money',
+            'date' => '2026-10-02',
+            'payment_method' => 'UPI',
+        ]);
+        $expense = $this->expenseFor($user, ['description' => 'Team lunch', 'payment_method' => 'UPI', 'amount' => 200, 'date' => '2026-10-02']);
+        IncomeExpenseTally::create(['user_id' => $user->id, 'income_id' => $income->id, 'expense_id' => $expense->id, 'allocated_amount' => 200]);
+
+        $this->actingAs($user)
+            ->get(route('daily-balances.statement', ['from' => '2026-10-01', 'to' => '2026-10-05']))
+            ->assertOk()
+            ->assertSee('of ₹300.00')
+            ->assertSeeInOrder(['Team lunch', 'Pocket Money', '₹100.00']);
+    }
+
     public function test_bulk_entry_saves_every_row_type_together(): void
     {
         $user = User::factory()->create();

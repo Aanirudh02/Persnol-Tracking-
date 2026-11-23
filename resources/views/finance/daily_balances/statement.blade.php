@@ -243,7 +243,13 @@
                                     <span class="muted">—</span>
                                 @endforelse
                             </td>
-                            <td class="num">{{ $money(max(0, $expense->totalAmount() - $tallied)) }}</td>
+                            <td class="num">
+                                @forelse($expense->incomeTallies as $tally)
+                                    <div class="paid-from">{{ $money($tally->income ? max(0, (float) $tally->income->amount - (float) $tally->income->tallies->sum('allocated_amount')) : 0) }}</div>
+                                @empty
+                                    {{ $money(max(0, $expense->totalAmount() - $tallied)) }}
+                                @endforelse
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="6" class="empty">No expenses in this range for {{ implode(', ', $types) }}.</td></tr>
