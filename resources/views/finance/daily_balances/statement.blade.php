@@ -35,6 +35,7 @@
         .summary b { font-size: 14px; }
         .tally-lines td { border-bottom: 0; padding-top: 2px; padding-bottom: 2px; font-size: 11px; color: #334155; }
         .tally-lines.last td { border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        .paid-from { line-height: 1.5; }
         tr.has-tallies td { border-bottom: 0; }
         .empty { padding: 10px; color: #94a3b8; }
         @media print {
@@ -231,15 +232,11 @@
                             <td class="num out">{{ $money((float) $breakdown->sum()) }}</td>
                             <td class="small">
                                 @forelse($expense->incomeTallies as $tally)
-                                    @php
-                                        $sourceIncome = $tally->income;
-                                        $sourceAmount = (float) ($sourceIncome?->amount ?? 0);
-                                        $sourceTallied = $sourceIncome ? (float) $sourceIncome->tallies->sum('allocated_amount') : 0.0;
-                                    @endphp
-                                    <div>
-                                        {{ $sourceIncome?->source ?? 'Income' }} ({{ $sourceIncome?->date?->format('d M') }}) · {{ $money((float) $tally->allocated_amount) }}
-                                        @if($sourceIncome)
-                                            <span class="muted">— income {{ $money($sourceAmount) }}, tallied {{ $money($sourceTallied) }}, not tallied {{ $money(max(0, $sourceAmount - $sourceTallied)) }}</span>
+                                    <div class="paid-from">
+                                        <b>{{ $tally->income?->source ?? 'Income' }}</b>
+                                        <span class="muted">· {{ $tally->income?->date?->format('d M') }}@if($tally->income) · of {{ $money((float) $tally->income->amount) }}@endif</span>
+                                        @if($expense->incomeTallies->count() > 1)
+                                            <span class="muted">· {{ $money((float) $tally->allocated_amount) }}</span>
                                         @endif
                                     </div>
                                 @empty
