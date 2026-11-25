@@ -74,6 +74,20 @@ class IncomeTallyMonthPaginationTest extends TestCase
         $response->assertSee('month=2026-10', false);
     }
 
+    public function test_tally_page_uses_the_in_page_confirm_dialog_instead_of_the_browser_one(): void
+    {
+        $user = $this->createAdminUser();
+        $income = $this->createIncome($user);
+        $this->tally($user, $income, $this->createExpense($user, '2026-09-03', 'September groceries'), 50);
+
+        $response = $this->actingAs($user)->get(route('income.show', $income));
+
+        $response->assertSee('<dialog id="confirm-dialog"', false);
+        $response->assertSee('data-confirm-remove="September groceries"', false);
+        $response->assertDontSee('return confirm(', false);
+        $response->assertDontSee('if (!confirm(', false);
+    }
+
     public function test_tally_page_lists_the_expenses_of_the_requested_month(): void
     {
         $user = $this->createAdminUser();

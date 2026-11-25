@@ -76,7 +76,7 @@
                                     <div class="text-lg font-black text-indigo-700">₹{{ number_format($tally->allocated_amount, 2) }}</div>
                                     <span class="text-[10px] font-semibold uppercase text-slate-400">from this income</span>
                                 </div>
-                                <form action="{{ route('income.untally', [$income, $tally]) }}" method="POST" onsubmit="return confirm('Remove tally link for this expense?');">
+                                <form action="{{ route('income.untally', [$income, $tally]) }}" method="POST" data-confirm-remove="{{ $tally->expense?->description ?: 'Expense' }}" data-confirm-amount="{{ number_format($tally->allocated_amount, 2) }}">
                                     @csrf
                                     @method('DELETE')
                                     <button class="rounded-lg border border-rose-200 bg-white px-2 py-1 font-bold text-rose-600 hover:bg-rose-50" aria-label="Remove tally">&times;</button>
@@ -280,7 +280,25 @@
         </div>
     </div>
 
+    <x-confirm-dialog />
+
     <script>
+        document.querySelectorAll('form[data-confirm-remove]').forEach(form => {
+            form.addEventListener('submit', async event => {
+                event.preventDefault();
+                const confirmed = await window.confirmDialog({
+                    title: 'Remove this tally?',
+                    message: `${form.dataset.confirmRemove} will no longer be funded from this income. ₹${form.dataset.confirmAmount} goes back to the income's available amount.`,
+                    confirmLabel: 'Remove tally',
+                    tone: 'danger',
+                });
+
+                if (confirmed) {
+                    form.submit();
+                }
+            });
+        });
+
         const tallyCheckboxes = Array.from(document.querySelectorAll('.tally-expense-checkbox:not(:disabled)'));
         const tallyLimit = {{ $untalliedTotal }};
         const tallySubmit = document.getElementById('bulk-tally-submit');
@@ -362,7 +380,7 @@
             });
             carrySelectionIntoLinks();
 
-            tallySubmit.form.addEventListener('submit', event => {
+            tallySubmit.form.addEventListener('submit', async event => {
                 const partial = planAllocations().filter(item => item.remaining > 0);
                 confirmPartialInput.value = '0';
 
@@ -370,14 +388,23 @@
                     return;
                 }
 
-                const lines = partial.map(item => `• ${item.description}: ${formatRupees(item.allocated)} will be tallied, ${formatRupees(item.remaining)} will remain`);
+                event.preventDefault();
+                const confirmed = await window.confirmDialog({
+                    title: 'Tally only part of the selection?',
+                    message: `Only ${formatRupees(toPaise(tallyLimit))} is left in this income, so these expenses will be partly tallied:`,
+                    lines: partial.map(item => ({
+                        label: item.description,
+                        detail: `${formatRupees(item.allocated)} tallied · ${formatRupees(item.remaining)} remains`,
+                    })),
+                    footnote: 'You can tally the remaining amount from another income.',
+                    confirmLabel: 'Tally partly',
+                    tone: 'warning',
+                });
 
-                if (!confirm(`Are you sure? Only ${formatRupees(toPaise(tallyLimit))} from this income will be tallied.\n\n${lines.join('\n')}\n\nYou can tally the remaining amount from another income.`)) {
-                    event.preventDefault();
-                    return;
+                if (confirmed) {
+                    confirmPartialInput.value = '1';
+                    tallySubmit.form.submit();
                 }
-
-                confirmPartialInput.value = '1';
             });
 
             updateBulkTallySummary();
