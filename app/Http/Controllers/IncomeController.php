@@ -10,8 +10,10 @@ use App\Models\IncomeExpenseTally;
 use App\Services\AuditService;
 use App\Services\CreditDebtLinkService;
 use App\Services\FinanceService;
+use App\Services\MonthFilter;
 use App\Services\OptionsService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -190,55 +192,109 @@ class IncomeController extends Controller
             'tallies.expense.friendSplits.friend',
         ]);
 
-        $allExpenses = Expense::query()
-            ->where('user_id', $request->user()->id)
-            ->whereNull('parent_id')
-            ->where('is_voluntary', false)
-            ->where('payment_method', $income->payment_method)
-            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+        $monthFilter = MonthFilter::fromRequest($request, $income->date);
+        $showFullyTallied = $request->boolean('show_tallied');
+        $rawSelectedIds = $request->query('selected');
+        $selectedExpenseIds = collect(is_string($rawSelectedIds) ? explode(',', $rawSelectedIds) : [])
+            ->merge((array) $request->old('expense_ids', []))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        $monthExpenses = $this->tallyCandidatesQuery($request, $income)
+            ->whereBetween('date', $monthFilter->dateRange())
             ->with(['category', 'expenseGroup', 'incomeTallies.income', 'friendSplit.friend', 'friendSplits.friend'])
             ->orderByDesc('date')
-            ->take(60)
-            ->get();
+            ->orderByDesc('id')
+            ->get()
+            ->each(fn (Expense $expense) => $this->annotateTallyState($expense));
 
-        $allExpenses->each(function (Expense $exp) use ($income): void {
-            $totalTallied = (float) $exp->incomeTallies->sum('allocated_amount');
-            $thisTally = $exp->incomeTallies->firstWhere('income_id', $income->id);
-            $otherTallies = $exp->incomeTallies->where('income_id', '!=', $income->id);
-            $untalliedExpAmount = round(max(0, $exp->totalAmount() - $totalTallied), 2);
+        $fullyTalliedCount = $monthExpenses->where('is_selectable', false)->count();
+        $expenseOptions = $showFullyTallied
+            ? $monthExpenses
+            : $monthExpenses->where('is_selectable', true)->values();
 
-            $exp->total_tallied_amount = $totalTallied;
-            $exp->available_to_tally = $untalliedExpAmount;
+        $selectedInOtherMonths = $selectedExpenseIds->isEmpty()
+            ? collect()
+            : $this->tallyCandidatesQuery($request, $income)
+                ->whereIn('id', $selectedExpenseIds)
+                ->whereNotBetween('date', $monthFilter->dateRange())
+                ->with(['category', 'incomeTallies.income'])
+                ->orderBy('date')
+                ->orderBy('id')
+                ->get()
+                ->each(fn (Expense $expense) => $this->annotateTallyState($expense))
+                ->where('is_selectable', true)
+                ->values();
 
-            if ($thisTally) {
-                $exp->is_selectable = false;
-                $exp->tally_badge = 'Already tallied in this income (₹'.number_format((float) $thisTally->allocated_amount, 2).')';
-            } elseif ($totalTallied >= $exp->totalAmount() && $exp->totalAmount() > 0) {
-                $exp->is_selectable = false;
-                $otherSource = $otherTallies->first()?->income?->source ?? 'another income';
-                $exp->tally_badge = 'Fully tallied under '.$otherSource.' (₹'.number_format($totalTallied, 2).')';
-            } elseif ($totalTallied > 0) {
-                $exp->is_selectable = true;
-                $exp->tally_badge = 'Partially tallied';
-            } else {
-                $exp->is_selectable = true;
-                $exp->tally_badge = 'Untallied';
-            }
-        });
-
-        $talliedTotal = $income->talliedAmount();
-        $untalliedTotal = $income->untalliedAmount();
-
-        $expenseOptions = $allExpenses
-            ->reject(fn (Expense $expense): bool => $expense->incomeTallies->contains('income_id', $income->id))
+        $unpaidInOtherMonths = $this->tallyCandidatesQuery($request, $income)
+            ->whereNotBetween('date', $monthFilter->dateRange())
+            ->select(['id', 'date', 'amount', 'gst_amount'])
+            ->withSum('incomeTallies as tallied_sum', 'allocated_amount')
+            ->get()
+            ->filter(fn (Expense $expense): bool => round($expense->totalAmount() - (float) $expense->tallied_sum, 2) > 0)
+            ->groupBy(fn (Expense $expense): string => $expense->date->format('Y-m'))
+            ->sortKeys()
+            ->map(fn ($expenses, string $month): array => [
+                'month' => $month,
+                'label' => MonthFilter::parse($month)?->format('M Y') ?? $month,
+                'count' => $expenses->count(),
+            ])
             ->values();
 
         return view('finance.income.show', [
             'income' => $income,
             'expenses' => $expenseOptions,
-            'talliedTotal' => $talliedTotal,
-            'untalliedTotal' => $untalliedTotal,
+            'monthFilter' => $monthFilter,
+            'showFullyTallied' => $showFullyTallied,
+            'fullyTalliedCount' => $fullyTalliedCount,
+            'selectedExpenseIds' => $selectedExpenseIds->all(),
+            'selectedInOtherMonths' => $selectedInOtherMonths,
+            'unpaidInOtherMonths' => $unpaidInOtherMonths,
+            'talliedTotal' => $income->talliedAmount(),
+            'untalliedTotal' => $income->untalliedAmount(),
         ]);
+    }
+
+    /**
+     * Expenses this income may be tallied against, excluding ones it already covers.
+     *
+     * @return Builder<Expense>
+     */
+    private function tallyCandidatesQuery(Request $request, Income $income): Builder
+    {
+        return Expense::query()
+            ->where('user_id', $request->user()->id)
+            ->whereNull('parent_id')
+            ->where('is_voluntary', false)
+            ->where('payment_method', $income->payment_method)
+            ->where(fn ($q) => $q->whereNull('is_archived')->orWhere('is_archived', false))
+            ->whereDoesntHave('incomeTallies', fn ($q) => $q->where('income_id', $income->id));
+    }
+
+    /**
+     * Sets the tally fields the tally page reads: total_tallied_amount,
+     * available_to_tally, is_selectable and tally_badge.
+     */
+    private function annotateTallyState(Expense $expense): void
+    {
+        $totalTallied = (float) $expense->incomeTallies->sum('allocated_amount');
+
+        $expense->total_tallied_amount = $totalTallied;
+        $expense->available_to_tally = round(max(0, $expense->totalAmount() - $totalTallied), 2);
+
+        if ($totalTallied >= $expense->totalAmount() && $expense->totalAmount() > 0) {
+            $expense->is_selectable = false;
+            $otherSource = $expense->incomeTallies->first()?->income?->source ?? 'another income';
+            $expense->tally_badge = 'Fully tallied under '.$otherSource.' (₹'.number_format($totalTallied, 2).')';
+        } elseif ($totalTallied > 0) {
+            $expense->is_selectable = true;
+            $expense->tally_badge = 'Partially tallied';
+        } else {
+            $expense->is_selectable = true;
+            $expense->tally_badge = 'Untallied';
+        }
     }
 
     public function tallyExpense(Request $request, Income $income): RedirectResponse
@@ -345,12 +401,20 @@ class IncomeController extends Controller
             return ['count' => count($allocations), 'amount' => round($totalToTally, 2)];
         });
 
-        return back()->with(
-            'success',
-            $isBulk
-                ? $result['count'].' expenses tallied against income for ₹'.number_format($result['amount'], 2).'.'
-                : 'Expense tallied against income for ₹'.number_format($result['amount'], 2).'.'
-        );
+        if (! $isBulk) {
+            return back()->with('success', 'Expense tallied against income for ₹'.number_format($result['amount'], 2).'.');
+        }
+
+        // Return to the month being viewed, without the now-tallied selection.
+        $returnMonth = MonthFilter::parse((string) $request->input('month', ''))?->format('Y-m');
+
+        return redirect()
+            ->route('income.show', array_filter([
+                'income' => $income,
+                'month' => $returnMonth,
+                'show_tallied' => $request->boolean('show_tallied') ? 1 : null,
+            ]))
+            ->with('success', $result['count'].' expenses tallied against income for ₹'.number_format($result['amount'], 2).'.');
     }
 
     public function untallyExpense(Request $request, Income $income, IncomeExpenseTally $tally): RedirectResponse

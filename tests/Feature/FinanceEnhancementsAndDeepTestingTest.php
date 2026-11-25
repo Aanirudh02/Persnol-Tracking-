@@ -484,11 +484,15 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
             'allocated_amount' => 80,
         ]);
 
-        $response = $this->actingAs($user)->get(route('income.show', $income));
+        $this->actingAs($user)->get(route('income.show', $income))
+            ->assertOk()
+            ->assertDontSee('Already tallied UPI expense')
+            ->assertSee('Show fully tallied (1)');
+
+        $response = $this->actingAs($user)->get(route('income.show', [$income, 'show_tallied' => 1]));
 
         $response->assertSee('Already tallied UPI expense');
         $response->assertSee('₹80.00');
-        $response->assertSee('Fully tallied expenses stay visible but cannot be selected.');
         $response->assertSee('value="'.$matchingExpense->id.'"', false);
         $response->assertSee('aria-label="Already tallied expense"', false);
         $response->assertSee('disabled', false);

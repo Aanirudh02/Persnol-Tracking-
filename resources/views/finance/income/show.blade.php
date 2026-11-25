@@ -93,19 +93,88 @@
                 <p class="text-xs text-slate-400 py-2">No expenses tallied against this income yet.</p>
             @endif
 
-            @if($expenses->isNotEmpty())
-                <form action="{{ route('income.tally', $income) }}" method="POST" class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 text-xs space-y-3">
+            @php
+                $toggleUrl = request()->fullUrlWithQuery(['show_tallied' => $showFullyTallied ? null : 1]);
+                $otherMonthsUnpaidTotal = $unpaidInOtherMonths->sum('count');
+            @endphp
+            <div class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 text-xs space-y-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <div class="font-bold text-indigo-950">Expenses paid via {{ $income->payment_method }} · {{ $monthFilter->label() }}</div>
+                        <p class="mt-1 text-slate-600">Partly tallied expenses can be selected for their remaining amount. Selected expenses stay selected when you change month. Income available: ₹{{ number_format($untalliedTotal, 2) }}</p>
+                    </div>
+                    <x-month-pager :filter="$monthFilter" class="shrink-0" data-carry-selection />
+                </div>
+
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2" data-carry-selection>
+                    <a href="{{ $toggleUrl }}" class="inline-flex items-center gap-2 font-semibold text-slate-600 hover:text-indigo-700" role="switch" aria-checked="{{ $showFullyTallied ? 'true' : 'false' }}">
+                        <span class="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition {{ $showFullyTallied ? 'bg-indigo-600' : 'bg-slate-300' }}">
+                            <span class="absolute h-3 w-3 rounded-full bg-white shadow transition {{ $showFullyTallied ? 'left-3.5' : 'left-0.5' }}"></span>
+                        </span>
+                        Show fully tallied ({{ $fullyTalliedCount }})
+                    </a>
+                    @if($otherMonthsUnpaidTotal > 0)
+                        <div class="flex flex-wrap items-center gap-1.5 text-amber-800">
+                            <span class="font-semibold">{{ $otherMonthsUnpaidTotal }} {{ Str::plural('expense', $otherMonthsUnpaidTotal) }} in other months still {{ $otherMonthsUnpaidTotal === 1 ? 'has' : 'have' }} an unpaid amount:</span>
+                            @foreach($unpaidInOtherMonths as $unpaidMonth)
+                                <a href="{{ request()->fullUrlWithQuery(['month' => $unpaidMonth['month']]) }}" class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold hover:bg-amber-100">{{ $unpaidMonth['label'] }} · {{ $unpaidMonth['count'] }}</a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <form action="{{ route('income.tally', $income) }}" method="POST" class="space-y-3">
                     @csrf
                     <input type="hidden" name="confirm_partial" id="confirm-partial" value="0">
-                    <div>
-                        <div class="font-bold text-indigo-950">Expenses paid via {{ $income->payment_method }}</div>
-                        <p class="mt-1 text-slate-600">Fully tallied expenses stay visible but cannot be selected. Partly tallied expenses can be selected for their remaining amount. Income available: ₹{{ number_format($untalliedTotal, 2) }}</p>
-                    </div>
+                    <input type="hidden" name="month" value="{{ $monthFilter->value() }}">
+                    @if($showFullyTallied)
+                        <input type="hidden" name="show_tallied" value="1">
+                    @endif
                     @if($errors->hasAny(['expense_ids', 'expense_ids.*']))
                         <p class="font-semibold text-rose-600">{{ $errors->first('expense_ids') ?: $errors->first('expense_ids.*') }}</p>
                     @endif
+
+                    @if($selectedInOtherMonths->isNotEmpty())
+                        <div class="rounded-xl border border-indigo-200 bg-white p-3 space-y-2">
+                            <div class="font-bold text-indigo-950">Selected from other months ({{ $selectedInOtherMonths->count() }})</div>
+                            <ul class="divide-y divide-slate-100" data-carry-selection>
+                                @foreach($selectedInOtherMonths as $exp)
+                                    <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+                                        <input
+                                            type="checkbox"
+                                            name="expense_ids[]"
+                                            value="{{ $exp->id }}"
+                                            data-amount="{{ $exp->available_to_tally }}"
+                                            data-id="{{ $exp->id }}"
+                                            data-date="{{ $exp->date->format('Y-m-d') }}"
+                                            data-description="{{ $exp->description ?: 'Expense' }}"
+                                            checked
+                                            @disabled($untalliedTotal <= 0)
+                                            aria-label="Keep {{ $exp->description ?: 'Expense' }} selected"
+                                            class="tally-expense-checkbox rounded border-slate-300 text-indigo-600"
+                                        >
+                                        <span class="font-mono text-slate-500">{{ $exp->date->format('d M Y') }}</span>
+                                        <span class="font-semibold text-slate-900">{{ $exp->description ?: 'Expense' }}</span>
+                                        <span class="text-slate-400">{{ $exp->category?->name ?? 'Uncategorized' }}</span>
+                                        <span class="ml-auto font-bold text-rose-600">₹{{ number_format($exp->available_to_tally, 2) }}{{ $exp->total_tallied_amount > 0 ? ' remaining' : '' }}</span>
+                                        <a href="{{ request()->fullUrlWithQuery(['month' => $exp->date->format('Y-m')]) }}" class="font-semibold text-indigo-600 hover:underline">{{ $exp->date->format('M Y') }}</a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if($expenses->isEmpty())
+                        <p class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-slate-500">
+                            @if($fullyTalliedCount > 0)
+                                Every {{ $income->payment_method }} expense in {{ $monthFilter->label() }} is fully tallied.
+                            @else
+                                No {{ $income->payment_method }} expenses to tally in {{ $monthFilter->label() }}.
+                            @endif
+                        </p>
+                    @else
                     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                        <table class="w-full min-w-[760px]text-left text-xs">
+                        <table class="w-full min-w-[760px] text-left text-xs">
                             <thead class="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                                 <tr>
                                     <th class="px-3 py-3">Select</th>
@@ -130,7 +199,7 @@
                                                     data-id="{{ $exp->id }}"
                                                     data-date="{{ $exp->date->format('Y-m-d') }}"
                                                     data-description="{{ $exp->description ?: 'Expense' }}"
-                                                    @checked(in_array($exp->id, old('expense_ids', [])))
+                                                    @checked(in_array($exp->id, $selectedExpenseIds, true))
                                                     @disabled($untalliedTotal <= 0)
                                                 @else
                                                     value="{{ $exp->id }}"
@@ -166,7 +235,7 @@
                                                 </span>
                                             @endif
                                             @if($exp->is_selectable && $exp->total_tallied_amount > 0)
-                                                <x-tally-progress :expense="$exp" :current-income-id="$income->id" class="mt-2 w-56 whitespace-normal rounded-xlborder border-amber-200 bg-amber-50/60 p-2.5" />
+                                                <x-tally-progress :expense="$exp" :current-income-id="$income->id" class="mt-2 w-56 whitespace-normal rounded-xl border border-amber-200 bg-amber-50/60 p-2.5" />
                                             @elseif(!$exp->is_selectable)
                                                 <span class="mt-1 block text-[10px] font-semibold text-slate-500">{{ $exp->tally_badge }}</span>
                                             @endif
@@ -191,7 +260,8 @@
                             </tbody>
                         </table>
                     </div>
-                    @if($expenses->contains('is_selectable', true) && $untalliedTotal > 0)
+                    @endif
+                    @if(($expenses->contains('is_selectable', true) || $selectedInOtherMonths->isNotEmpty()) && $untalliedTotal > 0)
                         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             <div id="bulk-tally-summary" class="rounded-xl bg-white px-3 py-2 font-semibold text-indigo-800">
                                 0 expenses selected · ₹0.00 total
@@ -206,7 +276,7 @@
                         </div>
                     @endif
                 </form>
-            @endif
+            </div>
         </div>
     </div>
 
@@ -253,10 +323,44 @@
             tallySubmit.disabled = plan.length === 0 || hasUnfunded;
         }
 
+        // Selections travel between months in the ?selected= query value.
+        const selectedExpenseIds = () => tallyCheckboxes.filter(checkbox => checkbox.checked).map(checkbox => checkbox.value).join(',');
+
+        function carrySelectionIntoLinks() {
+            const ids = selectedExpenseIds();
+
+            document.querySelectorAll('[data-carry-selection] a').forEach(link => {
+                const url = new URL(link.href, window.location.href);
+                ids ? url.searchParams.set('selected', ids) : url.searchParams.delete('selected');
+                link.href = url.toString();
+            });
+        }
+
+        document.querySelectorAll('[data-carry-selection] form').forEach(form => {
+            form.addEventListener('submit', () => {
+                const ids = selectedExpenseIds();
+                let input = form.querySelector('input[name="selected"]');
+
+                if (!ids) {
+                    input?.remove();
+                    return;
+                }
+                if (!input) {
+                    input = Object.assign(document.createElement('input'), { type: 'hidden', name: 'selected' });
+                    form.appendChild(input);
+                }
+                input.value = ids;
+            });
+        });
+
         if (tallyCheckboxes.length > 0 && tallySubmit && tallySummary) {
             tallyCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', updateBulkTallySummary);
+                checkbox.addEventListener('change', () => {
+                    updateBulkTallySummary();
+                    carrySelectionIntoLinks();
+                });
             });
+            carrySelectionIntoLinks();
 
             tallySubmit.form.addEventListener('submit', event => {
                 const partial = planAllocations().filter(item => item.remaining > 0);
