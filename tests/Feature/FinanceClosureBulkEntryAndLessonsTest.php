@@ -276,6 +276,25 @@ class FinanceClosureBulkEntryAndLessonsTest extends TestCase
             ->assertSeeInOrder(['Team lunch', 'Pocket Money', '₹100.00']);
     }
 
+    public function test_statement_shows_the_remaining_amount_of_a_partly_tallied_expense(): void
+    {
+        $user = User::factory()->create();
+        $income = Income::create([
+            'user_id' => $user->id,
+            'amount' => 100,
+            'source' => 'Pocket Money',
+            'date' => '2026-10-02',
+            'payment_method' => 'UPI',
+        ]);
+        $expense = $this->expenseFor($user, ['description' => 'Bakery snacks', 'payment_method' => 'UPI', 'amount' => 200, 'date' => '2026-10-02']);
+        IncomeExpenseTally::create(['user_id' => $user->id, 'income_id' => $income->id, 'expense_id' => $expense->id, 'allocated_amount' => 100]);
+
+        $this->actingAs($user)
+            ->get(route('daily-balances.statement', ['from' => '2026-10-01', 'to' => '2026-10-05']))
+            ->assertOk()
+            ->assertSeeInOrder(['Expense remaining', 'Bakery snacks', '₹100.00 tallied', '₹0.00', '₹100.00', '₹100.00 tallied']);
+    }
+
     public function test_bulk_entry_saves_every_row_type_together(): void
     {
         $user = User::factory()->create();

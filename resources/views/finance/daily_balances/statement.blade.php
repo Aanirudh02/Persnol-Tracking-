@@ -29,6 +29,7 @@
         .adj { color: #b45309; }
         .tag { display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 9.5px; font-weight: 700; background: #ede9fe; color: #6d28d9; }
         .tag-closed { background: #e2e8f0; color: #0f172a; }
+        .tag-done { background: #d1fae5; color: #065f46; }
         .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0 4px; }
         .summary div { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; }
         .summary span { display: block; font-size: 9.5px; text-transform: uppercase; color: #64748b; font-weight: 700; }
@@ -212,7 +213,8 @@
                         <th>Type</th>
                         <th class="num">Amount</th>
                         <th>Paid from income</th>
-                        <th class="num">Not tallied</th>
+                        <th class="num">Income left</th>
+                        <th class="num">Expense remaining</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -220,6 +222,7 @@
                         @php
                             $breakdown = collect($expense->paymentBreakdownAmounts())->only($types);
                             $tallied = (float) $expense->incomeTallies->sum('allocated_amount');
+                            $remaining = round($expense->untalliedAmount(), 2);
                         @endphp
                         <tr>
                             <td style="white-space:nowrap">{{ $expense->date->format('d M Y') }}</td>
@@ -235,8 +238,8 @@
                                     <div class="paid-from">
                                         <b>{{ $tally->income?->source ?? 'Income' }}</b>
                                         <span class="muted">· {{ $tally->income?->date?->format('d M') }}@if($tally->income) · of {{ $money((float) $tally->income->amount) }}@endif</span>
-                                        @if($expense->incomeTallies->count() > 1)
-                                            <span class="muted">· {{ $money((float) $tally->allocated_amount) }}</span>
+                                        @if($expense->incomeTallies->count() > 1 || $remaining > 0)
+                                            <span class="tag">{{ $money((float) $tally->allocated_amount) }} tallied</span>
                                         @endif
                                     </div>
                                 @empty
@@ -247,12 +250,22 @@
                                 @forelse($expense->incomeTallies as $tally)
                                     <div class="paid-from">{{ $money($tally->income ? max(0, (float) $tally->income->amount - (float) $tally->income->tallies->sum('allocated_amount')) : 0) }}</div>
                                 @empty
-                                    {{ $money(max(0, $expense->totalAmount() - $tallied)) }}
+                                    <span class="muted">—</span>
                                 @endforelse
+                            </td>
+                            <td class="num">
+                                @if($remaining <= 0)
+                                    <span class="tag tag-done">✓ Nil</span>
+                                @else
+                                    <b class="adj">{{ $money($remaining) }}</b>
+                                    @if($tallied > 0)
+                                        <div class="small muted">{{ $money($tallied) }} tallied</div>
+                                    @endif
+                                @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="empty">No expenses in this range for {{ implode(', ', $types) }}.</td></tr>
+                        <tr><td colspan="7" class="empty">No expenses in this range for {{ implode(', ', $types) }}.</td></tr>
                     @endforelse
                 </tbody>
             </table>

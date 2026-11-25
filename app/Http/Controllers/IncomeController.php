@@ -185,6 +185,7 @@ class IncomeController extends Controller
         $income->load([
             'category',
             'tallies.expense.category',
+            'tallies.expense.incomeTallies.income',
             'tallies.expense.friendSplit.friend',
             'tallies.expense.friendSplits.friend',
         ]);
@@ -204,7 +205,7 @@ class IncomeController extends Controller
             $totalTallied = (float) $exp->incomeTallies->sum('allocated_amount');
             $thisTally = $exp->incomeTallies->firstWhere('income_id', $income->id);
             $otherTallies = $exp->incomeTallies->where('income_id', '!=', $income->id);
-            $untalliedExpAmount = max(0, $exp->totalAmount() - $totalTallied);
+            $untalliedExpAmount = round(max(0, $exp->totalAmount() - $totalTallied), 2);
 
             $exp->total_tallied_amount = $totalTallied;
             $exp->available_to_tally = $untalliedExpAmount;
@@ -217,8 +218,8 @@ class IncomeController extends Controller
                 $otherSource = $otherTallies->first()?->income?->source ?? 'another income';
                 $exp->tally_badge = 'Fully tallied under '.$otherSource.' (₹'.number_format($totalTallied, 2).')';
             } elseif ($totalTallied > 0) {
-                $exp->is_selectable = false;
-                $exp->tally_badge = 'Partially tallied (₹'.number_format($totalTallied, 2).' / ₹'.number_format($exp->totalAmount(), 2).')';
+                $exp->is_selectable = true;
+                $exp->tally_badge = 'Partially tallied';
             } else {
                 $exp->is_selectable = true;
                 $exp->tally_badge = 'Untallied';
@@ -251,6 +252,7 @@ class IncomeController extends Controller
             ? $request->validate([
                 'expense_ids' => ['required', 'array', 'min:1'],
                 'expense_ids.*' => ['required', 'integer', 'distinct', 'exists:expenses,id'],
+                'confirm_partial' => ['nullable', 'boolean'],
                 'notes' => ['nullable', 'string'],
             ])
             : $request->validate([
@@ -276,6 +278,7 @@ class IncomeController extends Controller
                 ->where(fn ($query) => $query->whereNull('is_archived')->orWhere('is_archived', false))
                 ->whereIn('id', $expenseIds)
                 ->with('incomeTallies')
+                ->orderBy('date')
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
@@ -286,17 +289,32 @@ class IncomeController extends Controller
                 ]);
             }
 
+            $incomeAvailable = round($lockedIncome->untalliedAmount(), 2);
+            $allowPartial = $isBulk && $request->boolean('confirm_partial');
+            $incomeLeft = $incomeAvailable;
             $allocations = [];
             $totalToTally = 0.0;
             foreach ($expenses as $expense) {
-                if ($expense->incomeTallies->isNotEmpty()) {
+                if ($expense->incomeTallies->contains('income_id', $lockedIncome->id)) {
                     throw ValidationException::withMessages([
-                        ($isBulk ? 'expense_ids' : 'expense_id') => 'An expense that already has an income tally cannot be selected again.',
+                        ($isBulk ? 'expense_ids' : 'expense_id') => 'This income is already tallied against a selected expense.',
                     ]);
                 }
 
-                $availableAmount = $expense->untalliedAmount();
+                $availableAmount = round($expense->untalliedAmount(), 2);
                 $allocatedAmount = $isBulk ? $availableAmount : (float) $validated['allocated_amount'];
+
+                // Oldest expenses are covered first; the one that exceeds the income gets what is left.
+                if ($allowPartial && $availableAmount > 0) {
+                    if ($incomeLeft <= 0) {
+                        throw ValidationException::withMessages([
+                            'expense_ids' => 'The income runs out before every selected expense is reached. Select fewer expenses.',
+                        ]);
+                    }
+
+                    $allocatedAmount = min($availableAmount, $incomeLeft);
+                    $incomeLeft = round($incomeLeft - $allocatedAmount, 2);
+                }
 
                 if ($allocatedAmount <= 0 || $allocatedAmount > $availableAmount + 0.01) {
                     throw ValidationException::withMessages([
@@ -308,7 +326,7 @@ class IncomeController extends Controller
                 $totalToTally += $allocatedAmount;
             }
 
-            if ($totalToTally > $lockedIncome->untalliedAmount() + 0.01) {
+            if ($totalToTally > $incomeAvailable + 0.01) {
                 throw ValidationException::withMessages([
                     ($isBulk ? 'expense_ids' : 'allocated_amount') => 'The selected amount is greater than the income amount still available to tally.',
                 ]);

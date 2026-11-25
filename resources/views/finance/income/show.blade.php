@@ -46,10 +46,12 @@
             </h3>
 
             @if($income->tallies->isNotEmpty())
-                <div class="divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-slate-50/50 overflow-hidden">
+                <div class="space-y-3">
                     @foreach($income->tallies as $tally)
-                        <div class="flex items-center justify-between p-3.5 text-xs">
-                            <div class="space-y-0.5">
+                        @php $isPartlyTallied = ($tally->expense?->untalliedAmount() ?? 0) > 0; @endphp
+                        <div class="rounded-2xl border p-4 text-xs space-y-3 {{ $isPartlyTallied ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-slate-50/50' }}">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 space-y-0.5">
                                 <span class="font-bold text-slate-800 text-sm">{{ $tally->expense?->description ?: 'Expense' }}</span>
                                 <div class="text-slate-500">
                                     {{ $tally->expense?->date?->format('d M Y') }} · {{ $tally->expense?->category?->name ?? 'Uncategorized' }} · {{ $tally->expense?->payment_method }} · Paid by {{ $tally->expense?->paid_by ?: 'Me' }}
@@ -71,15 +73,19 @@
                             </div>
                             <div class="flex items-center gap-3">
                                 <div class="text-right">
-                                    <div class="font-bold text-indigo-700 text-sm">₹{{ number_format($tally->allocated_amount, 2) }}</div>
-                                    <span class="text-[10px] text-slate-400">of total ₹{{ number_format($tally->expense?->totalAmount() ?? 0, 2) }}</span>
+                                    <div class="text-lg font-black text-indigo-700">₹{{ number_format($tally->allocated_amount, 2) }}</div>
+                                    <span class="text-[10px] font-semibold uppercase text-slate-400">from this income</span>
                                 </div>
                                 <form action="{{ route('income.untally', [$income, $tally]) }}" method="POST" onsubmit="return confirm('Remove tally link for this expense?');">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="rounded-lg border border-rose-200 bg-white px-2 py-1 font-bold text-rose-600 hover:bg-rose-50">&times;</button>
+                                    <button class="rounded-lg border border-rose-200 bg-white px-2 py-1 font-bold text-rose-600 hover:bg-rose-50" aria-label="Remove tally">&times;</button>
                                 </form>
                             </div>
+                        </div>
+                        @if($tally->expense)
+                            <x-tally-progress :expense="$tally->expense" :current-income-id="$income->id" />
+                        @endif
                         </div>
                     @endforeach
                 </div>
@@ -90,12 +96,16 @@
             @if($expenses->isNotEmpty())
                 <form action="{{ route('income.tally', $income) }}" method="POST" class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 text-xs space-y-3">
                     @csrf
+                    <input type="hidden" name="confirm_partial" id="confirm-partial" value="0">
                     <div>
                         <div class="font-bold text-indigo-950">Expenses paid via {{ $income->payment_method }}</div>
-                        <p class="mt-1 text-slate-600">Already tallied expenses stay visible at their full amount but cannot be selected. Income available: ₹{{ number_format($untalliedTotal, 2) }}</p>
+                        <p class="mt-1 text-slate-600">Fully tallied expenses stay visible but cannot be selected. Partly tallied expenses can be selected for their remaining amount. Income available: ₹{{ number_format($untalliedTotal, 2) }}</p>
                     </div>
+                    @if($errors->hasAny(['expense_ids', 'expense_ids.*']))
+                        <p class="font-semibold text-rose-600">{{ $errors->first('expense_ids') ?: $errors->first('expense_ids.*') }}</p>
+                    @endif
                     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                        <table class="w-full min-w-[900px] text-left text-xs">
+                        <table class="w-full min-w-[760px]text-left text-xs">
                             <thead class="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                                 <tr>
                                     <th class="px-3 py-3">Select</th>
@@ -117,6 +127,9 @@
                                                     name="expense_ids[]"
                                                     value="{{ $exp->id }}"
                                                     data-amount="{{ $exp->available_to_tally }}"
+                                                    data-id="{{ $exp->id }}"
+                                                    data-date="{{ $exp->date->format('Y-m-d') }}"
+                                                    data-description="{{ $exp->description ?: 'Expense' }}"
                                                     @checked(in_array($exp->id, old('expense_ids', [])))
                                                     @disabled($untalliedTotal <= 0)
                                                 @else
@@ -152,7 +165,9 @@
                                                     Split: <strong>{{ $exp->friendSplit->friend?->name ?? 'Friend' }}: ₹{{ number_format($exp->friendSplit->paid_by_friend_amount, 2) }}{{ $exp->friendSplit->payment_method ? ' via '.$exp->friendSplit->payment_method : '' }}</strong>
                                                 </span>
                                             @endif
-                                            @if(!$exp->is_selectable)
+                                            @if($exp->is_selectable && $exp->total_tallied_amount > 0)
+                                                <x-tally-progress :expense="$exp" :current-income-id="$income->id" class="mt-2 w-56 whitespace-normal rounded-xlborder border-amber-200 bg-amber-50/60 p-2.5" />
+                                            @elseif(!$exp->is_selectable)
                                                 <span class="mt-1 block text-[10px] font-semibold text-slate-500">{{ $exp->tally_badge }}</span>
                                             @endif
                                         </td>
@@ -161,7 +176,9 @@
                                         </td>
                                         <td class="whitespace-nowrap px-3 py-3 font-bold {{ $exp->is_selectable ? 'text-rose-600' : 'text-slate-500' }}">
                                             ₹{{ number_format($exp->totalAmount(), 2) }}
-                                            @if($exp->is_selectable)
+                                            @if($exp->is_selectable && $exp->total_tallied_amount > 0)
+                                                <span class="block text-[10px] font-semibold text-amber-600">₹{{ number_format($exp->available_to_tally, 2) }} remaining</span>
+                                            @elseif($exp->is_selectable)
                                                 <span class="block text-[10px] font-normal text-slate-400">full amount</span>
                                             @else
                                                 <span class="block text-[10px] font-normal text-slate-400">already tallied</span>
@@ -199,18 +216,66 @@
         const tallySubmit = document.getElementById('bulk-tally-submit');
         const tallySummary = document.getElementById('bulk-tally-summary');
 
-        function updateBulkTallySummary() {
-            const selected = tallyCheckboxes.filter(checkbox => checkbox.checked);
-            const total = selected.reduce((sum, checkbox) => sum + Number(checkbox.dataset.amount || 0), 0);
-            tallySummary.textContent = `${selected.length} expense(s) selected · ₹${total.toFixed(2)} total${total > tallyLimit ? ' (over available income)' : ''}`;
-            tallySubmit.disabled = selected.length === 0 || total > tallyLimit + 0.01;
+        const confirmPartialInput = document.getElementById('confirm-partial');
+        const toPaise = value => Math.round(Number(value || 0) * 100);
+        const formatRupees = paise => `₹${(paise / 100).toFixed(2)}`;
+
+        // Mirrors the server: oldest expenses are covered first.
+        function planAllocations() {
+            let incomeLeft = toPaise(tallyLimit);
+
+            return tallyCheckboxes
+                .filter(checkbox => checkbox.checked)
+                .sort((a, b) => a.dataset.date.localeCompare(b.dataset.date) || a.dataset.id - b.dataset.id)
+                .map(checkbox => {
+                    const amount = toPaise(checkbox.dataset.amount);
+                    const allocated = Math.min(amount, incomeLeft);
+                    incomeLeft -= allocated;
+
+                    return { description: checkbox.dataset.description, allocated, remaining: amount - allocated };
+                });
         }
 
-        tallyCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateBulkTallySummary);
-        });
+        function updateBulkTallySummary() {
+            const plan = planAllocations();
+            const total = plan.reduce((sum, item) => sum + item.allocated + item.remaining, 0);
+            const shortfall = total - toPaise(tallyLimit);
+            const hasUnfunded = plan.some(item => item.allocated === 0);
+            let note = '';
+
+            if (hasUnfunded) {
+                note = ' (income runs out, select fewer expenses)';
+            } else if (shortfall > 0) {
+                note = ` (only ${formatRupees(toPaise(tallyLimit))} will be tallied, ${formatRupees(shortfall)} will remain)`;
+            }
+
+            tallySummary.textContent = `${plan.length} expense(s) selected · ${formatRupees(total)} total${note}`;
+            tallySubmit.disabled = plan.length === 0 || hasUnfunded;
+        }
 
         if (tallyCheckboxes.length > 0 && tallySubmit && tallySummary) {
+            tallyCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', updateBulkTallySummary);
+            });
+
+            tallySubmit.form.addEventListener('submit', event => {
+                const partial = planAllocations().filter(item => item.remaining > 0);
+                confirmPartialInput.value = '0';
+
+                if (partial.length === 0) {
+                    return;
+                }
+
+                const lines = partial.map(item => `• ${item.description}: ${formatRupees(item.allocated)} will be tallied, ${formatRupees(item.remaining)} will remain`);
+
+                if (!confirm(`Are you sure? Only ${formatRupees(toPaise(tallyLimit))} from this income will be tallied.\n\n${lines.join('\n')}\n\nYou can tally the remaining amount from another income.`)) {
+                    event.preventDefault();
+                    return;
+                }
+
+                confirmPartialInput.value = '1';
+            });
+
             updateBulkTallySummary();
         }
     </script>

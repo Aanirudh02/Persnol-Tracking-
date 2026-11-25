@@ -481,14 +481,14 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
             'user_id' => $user->id,
             'income_id' => $previousIncome->id,
             'expense_id' => $matchingExpense->id,
-            'allocated_amount' => 20,
+            'allocated_amount' => 80,
         ]);
 
         $response = $this->actingAs($user)->get(route('income.show', $income));
 
         $response->assertSee('Already tallied UPI expense');
         $response->assertSee('₹80.00');
-        $response->assertSee('Already tallied expenses stay visible at their full amount but cannot be selected.');
+        $response->assertSee('Fully tallied expenses stay visible but cannot be selected.');
         $response->assertSee('value="'.$matchingExpense->id.'"', false);
         $response->assertSee('aria-label="Already tallied expense"', false);
         $response->assertSee('disabled', false);
@@ -496,7 +496,77 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         $response->assertDontSee('value="'.$differentMethodExpense->id.'"', false);
     }
 
-    public function test_income_tally_rejects_an_expense_already_tallied_to_another_income(): void
+    public function test_confirmed_partial_tally_lets_a_second_income_cover_the_remaining_amount(): void
+    {
+        $user = $this->createAdminUser();
+        [$firstIncome, $secondIncome] = array_map(fn (string $source): Income => Income::query()->create([
+            'user_id' => $user->id,
+            'amount' => 100,
+            'source' => $source,
+            'date' => '2026-09-10',
+            'payment_method' => 'Cash',
+        ]), ['Pocket Money', 'Gift']);
+        $expense = Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => 200,
+            'date' => '2026-09-05',
+            'description' => 'Bakery snacks',
+            'payment_method' => 'Cash',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('income.tally', $firstIncome), ['expense_ids' => [$expense->id]])
+            ->assertInvalid(['expense_ids' => 'The selected amount is greater than the income amount still available to tally.']);
+        $this->assertDatabaseMissing('income_expense_tallies', ['expense_id' => $expense->id]);
+
+        $this->actingAs($user)
+            ->post(route('income.tally', $firstIncome), ['expense_ids' => [$expense->id], 'confirm_partial' => 1])
+            ->assertValid();
+        $this->assertSame(100.0, $expense->fresh()->untalliedAmount());
+
+        $this->actingAs($user)
+            ->get(route('income.show', $secondIncome))
+            ->assertSeeInOrder(['₹100.00 tallied of ₹200.00', '₹100.00 remaining', 'Pocket Money'])
+            ->assertSee('name="expense_ids[]"', false);
+
+        $this->actingAs($user)
+            ->post(route('income.tally', $secondIncome), ['expense_ids' => [$expense->id]])
+            ->assertValid();
+        $this->assertSame(0.0, $expense->fresh()->untalliedAmount());
+        $this->assertSame(100.0, $secondIncome->fresh()->talliedAmount());
+    }
+
+    public function test_confirmed_partial_tally_covers_oldest_first_and_rejects_unfunded_expenses(): void
+    {
+        $user = $this->createAdminUser();
+        $income = Income::query()->create([
+            'user_id' => $user->id,
+            'amount' => 100,
+            'source' => 'Pocket Money',
+            'date' => '2026-09-10',
+            'payment_method' => 'Cash',
+        ]);
+        [$newest, $middle, $oldest] = array_map(fn (array $row): Expense => Expense::query()->create([
+            'user_id' => $user->id,
+            'amount' => $row[0],
+            'date' => $row[1],
+            'description' => 'Expense on '.$row[1],
+            'payment_method' => 'Cash',
+        ]), [[10, '2026-09-07'], [80, '2026-09-06'], [60, '2026-09-05']]);
+
+        $this->actingAs($user)
+            ->post(route('income.tally', $income), ['expense_ids' => [$newest->id, $middle->id, $oldest->id], 'confirm_partial' => 1])
+            ->assertInvalid(['expense_ids' => 'The income runs out before every selected expense is reached. Select fewer expenses.']);
+        $this->assertDatabaseMissing('income_expense_tallies', ['income_id' => $income->id]);
+
+        $this->actingAs($user)
+            ->post(route('income.tally', $income), ['expense_ids' => [$middle->id, $oldest->id], 'confirm_partial' => 1])
+            ->assertValid();
+        $this->assertSame(0.0, $oldest->fresh()->untalliedAmount());
+        $this->assertSame(40.0, $middle->fresh()->untalliedAmount());
+    }
+
+    public function test_income_tally_rejects_the_same_income_twice_on_one_expense(): void
     {
         $user = $this->createAdminUser();
         $income = Income::query()->create([
@@ -504,13 +574,6 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
             'amount' => 100,
             'source' => 'Current UPI income',
             'date' => '2026-09-10',
-            'payment_method' => 'UPI',
-        ]);
-        $previousIncome = Income::query()->create([
-            'user_id' => $user->id,
-            'amount' => 100,
-            'source' => 'Earlier UPI income',
-            'date' => '2026-09-09',
             'payment_method' => 'UPI',
         ]);
         $expense = Expense::query()->create([
@@ -522,7 +585,7 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         ]);
         IncomeExpenseTally::query()->create([
             'user_id' => $user->id,
-            'income_id' => $previousIncome->id,
+            'income_id' => $income->id,
             'expense_id' => $expense->id,
             'allocated_amount' => 20,
         ]);
@@ -533,12 +596,9 @@ class FinanceEnhancementsAndDeepTestingTest extends TestCase
         ]);
 
         $response->assertInvalid([
-            'expense_id' => 'An expense that already has an income tally cannot be selected again.',
+            'expense_id' => 'This income is already tallied against a selected expense.',
         ]);
-        $this->assertDatabaseMissing('income_expense_tallies', [
-            'income_id' => $income->id,
-            'expense_id' => $expense->id,
-        ]);
+        $this->assertDatabaseCount('income_expense_tallies', 1);
     }
 
     public function test_income_tally_rejects_an_expense_with_a_different_payment_method(): void
