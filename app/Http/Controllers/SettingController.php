@@ -123,7 +123,11 @@ class SettingController extends Controller
             $q->where('user_id', $user->id);
         }])->get();
 
-        $auditLogs = AuditLog::with('user')->orderByDesc('created_at')->take(20)->get();
+        $auditLogs = AuditLog::with('user')
+            ->unless($user->isAdmin(), fn ($query) => $query->where('user_id', $user->id))
+            ->orderByDesc('created_at')
+            ->take(20)
+            ->get();
 
         $users = $user->isAdmin() ? User::with('roles')->get() : [];
         $roles = $user->isAdmin() ? Role::with('permissions')->get() : [];

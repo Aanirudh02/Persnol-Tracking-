@@ -304,7 +304,7 @@ class FoodController extends Controller
                 'is_snack' => $request->boolean('is_snack'),
                 'expense_id' => $expenseId,
                 'auto_create_expense' => $keepsOwnAutoExpense,
-                'notes' => $validated['notes'] ?? null,
+                'notes' => array_key_exists('notes', $validated) ? $validated['notes'] : $food->notes,
             ]);
 
             if ($ownAutoExpenseId) {

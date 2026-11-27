@@ -49,6 +49,7 @@
                         <span>Statement Taken: <strong class="text-slate-800 font-bold">{{ $statement->created_at->format('l, F j, Y \a\t h:i A') }}</strong></span>
                     </p>
                 </div>
+                <x-saved-note :text="$statement->notes" />
                 <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 sm:text-right">
                     <span class="text-[10px] uppercase font-semibold text-slate-400 block">Total Statement Value</span>
                     <span class="text-2xl font-bold {{ $statement->isPersonal() ? 'text-pink-600' : 'text-slate-900' }}">

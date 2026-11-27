@@ -93,6 +93,24 @@ class ExpensePaymentBreakdownTest extends TestCase
         $this->assertSame(300.0, $expense->originalBillTotal());
     }
 
+    public function test_details_page_shows_the_notes_and_reason_for_change(): void
+    {
+        $user = User::factory()->create();
+        $expense = $this->createExpense($user, 400);
+
+        $this->actingAs($user)->put(route('expenses.update', $expense), $this->payload([
+            'amount' => 400,
+            'notes' => 'Last day treat with the team',
+            'reason' => 'Forgot details',
+        ]));
+
+        $this->actingAs($user)->get(route('expenses.show', $expense))
+            ->assertOk()
+            ->assertSeeText('Last day treat with the team')
+            ->assertSeeText('Edit history')
+            ->assertSeeText('Forgot details');
+    }
+
     private function createExpense(User $user, float $amount): Expense
     {
         $this->actingAs($user)->post(route('expenses.store'), $this->payload(['amount' => $amount]));

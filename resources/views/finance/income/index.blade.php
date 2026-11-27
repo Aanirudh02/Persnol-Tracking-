@@ -50,7 +50,7 @@
                                             <span class="ml-1 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700" title="Shown in the Daily Cash Register on its day, not carried to the next day">Separate</span>
                                         @endif
                                     </td>
-                                    <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->description ?? '--' }}</td>
+                                    <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->description ?? '--' }}<x-saved-note :text="$inc->notes" /></td>
                                     <td class="py-3 px-4 font-bold text-emerald-600 dark:text-emerald-400 text-sm whitespace-nowrap">₹{{ number_format($inc->amount, 2) }}</td>
                                     <td class="py-3 px-4 text-slate-600 dark:text-slate-400">{{ $inc->payment_method }}</td>
                                     <td class="py-3 px-4 whitespace-nowrap">

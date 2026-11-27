@@ -103,6 +103,7 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
                             <div class="min-w-0">
                                 <p class="font-bold text-slate-900">{{ $item->friend?->name ?? 'Friend' }}</p>
+                                <x-saved-note :text="$item->notes" />
                                 <p class="text-slate-500 flex items-center gap-1.5 flex-wrap">
                                     <span>{{ $item->description ?: 'No description' }} · {{ \Carbon\Carbon::parse($item->date)->format('d M Y') }}</span>
                                     @if($item->payment_method)

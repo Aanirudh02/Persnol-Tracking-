@@ -107,7 +107,7 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td class="py-3 px-4 font-medium">{{ $fuel->litres }} L</td>
+                                <td class="py-3 px-4 font-medium">{{ $fuel->litres }} L<x-saved-note :text="$fuel->notes" /></td>
                                 <td class="py-3 px-4 font-mono text-slate-500">₹{{ $fuel->price_per_litre }}</td>
                                 @php $fill = $fillLog[$fuel->id] ?? null; @endphp
                                 <td class="py-3 px-4 font-mono whitespace-nowrap">

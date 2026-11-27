@@ -94,6 +94,7 @@
                                     @endif
                                 </div>
 
+                                <x-saved-note :text="$t->notes" />
                                 <!-- Route: Source → Stops → Destination -->
                                 <div class="text-xs text-slate-500 space-y-0.5">
                                     <div class="flex items-start gap-1.5">

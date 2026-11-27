@@ -7,6 +7,7 @@
                 <span>Back to Odometer Dashboard</span>
             </a>
 
+            <x-saved-note :text="$group->notes" />
             <div class="flex items-center gap-2">
                 <button type="button"
                     onclick="openFuelModalFromButton(this)"

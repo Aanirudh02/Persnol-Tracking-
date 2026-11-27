@@ -703,6 +703,7 @@
                             <th class="pb-3 pr-4">User</th>
                             <th class="pb-3 pr-4">Action</th>
                             <th class="pb-3 pr-4">Target</th>
+                            <th class="pb-3 pr-4">Reason</th>
                             <th class="pb-3">Time</th>
                         </tr>
                     </thead>
@@ -711,7 +712,8 @@
                         <tr>
                             <td class="py-3 pr-4 text-slate-900 dark:text-white font-medium">{{ $log->user?->name ?? 'System' }}</td>
                             <td class="py-3 pr-4"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">{{ $log->action }}</span></td>
-                            <td class="py-3 pr-4 text-slate-600 dark:text-slate-400 text-xs">{{ $log->auditable_type }}#{{ $log->auditable_id }}</td>
+                            <td class="py-3 pr-4 text-slate-600 dark:text-slate-400 text-xs">{{ ucfirst($log->module) }} #{{ $log->record_id }}</td>
+                            <td class="py-3 pr-4 text-slate-600 dark:text-slate-400 text-xs">{{ $log->reason ?: '—' }}</td>
                             <td class="py-3 text-slate-500 dark:text-slate-400 text-xs">{{ $log->created_at->diffForHumans() }}</td>
                         </tr>
                         @endforeach

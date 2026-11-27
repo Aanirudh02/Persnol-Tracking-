@@ -13,6 +13,7 @@
                     <span class="rounded-lg bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-800 uppercase">{{ $income->category?->name ?? 'Income' }}</span>
                     <h2 class="mt-2 text-2xl font-black text-slate-900">{{ $income->source }}</h2>
                     <p class="text-xs text-slate-500">{{ $income->date->format('d M Y') }} · {{ $income->payment_method }}</p>
+                    <x-saved-note :text="$income->notes" />
                 </div>
                 <div class="text-left sm:text-right">
                     <span class="text-xs font-bold uppercase text-slate-400">Total Income Amount</span>

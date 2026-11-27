@@ -144,7 +144,7 @@
                         @forelse($entries as $item)
                             <tr>
                                 <td class="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">{{ $item->date->format('d M') }}</td>
-                                <td class="py-3 px-4 font-bold">{{ $item->item_name }}</td>
+                                <td class="py-3 px-4 font-bold">{{ $item->item_name }}<x-saved-note :text="$item->notes" /></td>
                                 <td class="py-3 px-4">{{ $item->category?->name ?? '—' }}</td>
                                 <td class="py-3 px-4">{{ $item->quantity }}</td>
                                 <td class="py-3 px-4 font-bold">₹{{ number_format($item->totalAmount(), 2) }}@if((float) $item->gst_amount > 0) <span class="block text-[10px] text-slate-400">GST ₹{{ number_format($item->gst_amount, 2) }}</span>@endif</td>
@@ -193,6 +193,7 @@
                                                 <option value="{{ $pe->id }}" @selected($item->expense_id === $pe->id) @disabled($pe->remaining_amount <= 0 && $item->expense_id !== $pe->id)>{{ $pe->description }} · ₹{{ number_format($pe->remaining_amount, 2) }} remaining</option>
                                             @endforeach
                                         </select>
+                                        <input type="text" name="notes" value="{{ $item->notes }}" placeholder="Notes" class="px-2 py-2 border border-slate-300 rounded-xl sm:col-span-2">
                                         <label class="flex items-center gap-2"><input type="checkbox" name="is_snack" value="1" @checked($item->is_snack)> Snack</label>
                                         <button class="px-3 py-2 rounded-xl bg-slate-900 text-white font-semibold">Save</button>
                                     </form>

@@ -44,6 +44,7 @@
                         <div>
                             <h2 class="text-lg font-bold text-slate-900">{{ $friend->name }}</h2>
                             <p class="text-xs text-slate-400">{{ $friend->phone ?: ($friend->email ?: 'No contact added') }}</p>
+                            <x-saved-note :text="$friend->notes" />
                             <span class="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{{ $friend->role }}</span>
                         </div>
                         <div class="rounded-2xl bg-slate-50 px-3 py-2 text-right text-xs">
@@ -164,6 +165,7 @@
                                     <div>
                                         <div class="font-semibold text-slate-800">{{ $settlement->direction === 'i_paid_friend' ? 'You paid friend' : 'Friend paid you' }}</div>
                                         <div class="text-slate-500">{{ $settlement->date->format('d M Y') }} · {{ $settlement->payment_method }}</div>
+                                        <x-saved-note :text="$settlement->notes" />
                                     </div>
                                     <div class="font-bold text-slate-900">₹{{ number_format($settlement->amount, 2) }}</div>
                                 </div>

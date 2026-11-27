@@ -3,7 +3,7 @@
         <div>
             <a href="{{ route('expenses.index') }}" class="text-sm font-semibold text-slate-600 hover:underline">&larr; Expenses</a>
             <h1 class="text-2xl font-bold text-slate-900 mt-2">{{ $expense->description }}</h1>
-            <p class="text-sm text-slate-500">₹{{ number_format($expense->totalAmount(), 2) }} · {{ $expense->category?->name ?? 'Uncategorized' }} · {{ $expense->date->format('d M Y') }}</p>
+            <p class="text-sm text-slate-500">₹{{ number_format($expense->totalAmount(), 2) }} · {{ $expense->category?->name ?? 'Uncategorized' }} · {{ $expense->date->format('d M Y') }}@if($expense->time) · {{ \Illuminate\Support\Carbon::parse($expense->time)->format('h:i A') }}@endif</p>
             @if($expense->is_voluntary)<span class="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-pink-50 text-pink-700">Voluntary</span>@endif
             @if($expense->is_unlogged)<span class="inline-block mt-2 text-xs font-bold px-2 py-1 rounded-full bg-violet-100 text-violet-700">🕰️ Unlogged</span>@endif
 
@@ -111,7 +111,12 @@
             @if(abs($expense->subItemsExplainedTotal() - (float) $expense->amount) > 0.01 && $expense->subItemsExplainedTotal() > 0)
                 <p class="text-amber-700 text-xs">Breakdown does not match parent total yet — edit amounts or add remaining items.</p>
             @endif
-            @if($expense->notes)<p class="text-slate-500">{{ $expense->notes }}</p>@endif
+            @if($expense->notes)
+                <div class="pt-2 border-t border-slate-100">
+                    <p class="text-xs font-semibold text-slate-700">Notes</p>
+                    <p class="text-slate-500 whitespace-pre-line">{{ $expense->notes }}</p>
+                </div>
+            @endif
             @if($expense->receipt_image)
                 <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
                     <span class="text-xs text-slate-500 font-medium">Attached Receipt:</span>
@@ -123,6 +128,18 @@
             @endif
             <a href="{{ route('expenses.edit', $expense) }}" class="inline-block text-sm font-semibold text-slate-800 hover:underline">Edit expense</a>
         </div>
+
+        @if($editHistory->isNotEmpty())
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-2 text-sm">
+                <h2 class="font-bold text-slate-900">Edit history</h2>
+                @foreach($editHistory as $log)
+                    <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-2">
+                        <span class="text-slate-700">{{ $log->reason ?: 'No reason given' }}</span>
+                        <span class="shrink-0 text-xs text-slate-400">{{ $log->created_at->format('d M Y, h:i A') }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
 
         @if($expense->expenseGroup)
             <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">

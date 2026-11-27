@@ -47,6 +47,7 @@
                         </div>
                     </div>
                     <p class="whitespace-pre-line rounded-2xl bg-sky-50/70 p-3 text-sm text-sky-950 dark:bg-sky-950/30 dark:text-sky-100">{{ $lesson->lesson }}</p>
+                    <x-saved-note :text="$lesson->notes" />
                     @if($lesson->mistake)
                         <a href="{{ route('mistakes.show', $lesson->mistake) }}" class="text-[11px] font-semibold text-rose-600 hover:underline">From mistake: {{ $lesson->mistake->title }}</a>
                     @endif

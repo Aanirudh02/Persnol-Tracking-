@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\DailyRecord;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
@@ -666,7 +667,14 @@ class ExpenseController extends Controller
 
         $paymentMethods = $options->names('payment_method');
 
-        return view('finance.expenses.show', compact('expense', 'unlinkableFoods', 'paymentMethods'));
+        $editHistory = AuditLog::query()
+            ->where('module', 'expense')
+            ->where('record_id', $expense->id)
+            ->where('action', 'updated')
+            ->latest('id')
+            ->get();
+
+        return view('finance.expenses.show', compact('expense', 'unlinkableFoods', 'paymentMethods', 'editHistory'));
     }
 
     public function linkFood(Request $request, Expense $expense): RedirectResponse
