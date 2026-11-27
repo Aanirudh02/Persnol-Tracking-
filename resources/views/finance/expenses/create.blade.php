@@ -6,7 +6,7 @@
         </div>
 
         <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <form action="{{ route('expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4 text-sm" id="expense-form">
+            <form action="{{ route('expenses.store') }}" method="POST" enctype="multipart/form-data" class="space-y-4 text-sm" id="expense-form" data-enter-next>
                 @csrf
 
                 @if ($errors->any())
@@ -78,6 +78,8 @@
                         </select>
                     </div>
                 </div>
+
+                <x-payment-breakdown :methods="$paymentMethods" :enabled="(bool) old('add_group_expense')" :lines="old('group_expenses', [])" />
 
                 <!-- OPTION AT TOP: Record as Combination Payment -->
                 <div class="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-white p-3.5 sm:p-4 transition shadow-xs">
@@ -174,23 +176,6 @@
                             <span id="sum-my-registered" class="font-bold text-emerald-600">₹0.00</span>
                         </div>
                         <div id="split-payer-hint" class="text-[11px] text-indigo-700 pt-1"></div>
-                    </div>
-                </div>
-
-                <!-- PAYMENT BREAKDOWN / MULTI-METHOD GROUPED EXPENSE -->
-                <div class="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 space-y-3">
-                    <label class="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
-                        <input id="add-group-expense" type="checkbox" name="add_group_expense" value="1" @checked(old('add_group_expense')) class="rounded border-slate-300 text-sky-600">
-                        <span>Add payment breakdown (Separate payment methods for what you paid)</span>
-                    </label>
-
-                    <div id="group-expense-lines" class="hidden space-y-3 pt-1">
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs text-slate-600">Specify how you paid (e.g. ₹5 UPI + ₹15 Cash):</p>
-                            <button type="button" id="add-group-line" class="text-xs font-semibold text-sky-700 hover:underline">+ Add payment line</button>
-                        </div>
-                        <div id="group-line-list" class="space-y-2"></div>
-                        <p id="group-total-hint" class="text-xs font-semibold text-slate-600"></p>
                     </div>
                 </div>
 
@@ -374,7 +359,6 @@
                 card.remove();
                 ensureSplitPaymentMethodOption();
                 recalculateSplits();
-                updateGroupHint();
             });
 
             card.querySelectorAll('input, select').forEach(el => {
@@ -382,14 +366,12 @@
                     // Do NOT auto-prefill friend share when friend paid is entered (Error 1 & Error 4)
                     ensureSplitPaymentMethodOption();
                     recalculateSplits();
-                    updateGroupHint();
                 });
             });
 
             friendsContainer.appendChild(card);
             ensureSplitPaymentMethodOption();
             recalculateSplits();
-            updateGroupHint();
         }
 
         document.getElementById('add-friend-btn').addEventListener('click', () => {
@@ -507,7 +489,6 @@
             });
             onCombinationToggle();
             recalculateSplits();
-            updateGroupHint();
         };
 
         window.quickSplitEqual = function() {
@@ -526,7 +507,6 @@
                 r.querySelector('.friend-share-input').value = each.toFixed(2);
             });
             recalculateSplits();
-            updateGroupHint();
         };
 
         window.quickSplitMineOnly = function() {
@@ -537,7 +517,6 @@
                 r.querySelector('.friend-share-input').value = '0.00';
             });
             recalculateSplits();
-            updateGroupHint();
         };
 
         window.quickSplitFriendsOnly = function() {
@@ -550,7 +529,6 @@
                 r.querySelector('.friend-share-input').value = each;
             });
             recalculateSplits();
-            updateGroupHint();
         };
 
         window.quickPaidIPaidAll = function() {
@@ -561,7 +539,6 @@
                 r.querySelector('.friend-paid-input').value = '0.00';
             });
             recalculateSplits();
-            updateGroupHint();
         };
 
         window.quickPaidFriendsPaidAll = function() {
@@ -574,7 +551,6 @@
                 r.querySelector('.friend-paid-input').value = each;
             });
             recalculateSplits();
-            updateGroupHint();
         };
 
         window.quickPaidEachOwnShare = function() {
@@ -585,16 +561,13 @@
                 r.querySelector('.friend-paid-input').value = s.toFixed(2);
             });
             recalculateSplits();
-            updateGroupHint();
         };
 
         totalInput.addEventListener('input', () => {
             recalculateSplits();
-            updateGroupHint();
         });
         gstInput.addEventListener('input', () => {
             recalculateSplits();
-            updateGroupHint();
         });
         document.getElementById('expense-has-gst').addEventListener('change', event => {
             const enabled = event.target.checked;
@@ -604,74 +577,14 @@
                 gstInput.value = '0';
             }
             recalculateSplits();
-            updateGroupHint();
         });
         myShareInput.addEventListener('input', () => {
             recalculateSplits();
-            updateGroupHint();
         });
         myPaidInput.addEventListener('input', () => {
             ensureSplitPaymentMethodOption();
             recalculateSplits();
-            updateGroupHint();
         });
-
-        // PAYMENT BREAKDOWN (Group lines)
-        const groupToggle = document.getElementById('add-group-expense');
-        const groupLines = document.getElementById('group-expense-lines');
-        const groupList = document.getElementById('group-line-list');
-        const groupHint = document.getElementById('group-total-hint');
-        let groupLineCount = 0;
-
-        function addGroupLine(amount = '', method = null) {
-            const index = groupLineCount++;
-            method = method || paymentMethods[index] || paymentMethods[0] || 'Cash';
-            const options = paymentMethods.map(item => `<option value="${item}">${item}</option>`).join('');
-            const row = document.createElement('div');
-            row.className = 'grid grid-cols-[1fr_1fr_auto] gap-2';
-            row.innerHTML = `
-                <input type="number" step="0.01" min="0.01" name="group_expenses[${index}][amount]" value="${amount}" placeholder="Amount" class="group-amount w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm">
-                <select name="group_expenses[${index}][payment_method]" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm">${options}</select>
-                <button type="button" class="px-2 text-rose-600 font-bold" aria-label="Remove payment">&times;</button>
-            `;
-            row.querySelector('select').value = method;
-            row.querySelector('button').addEventListener('click', () => {
-                if (groupList.children.length <= 2) return;
-                row.remove();
-                updateGroupHint();
-            });
-            groupList.appendChild(row);
-            row.querySelector('input').addEventListener('input', updateGroupHint);
-            updateGroupHint();
-        }
-
-        function updateGroupHint() {
-            const total = [...document.querySelectorAll('.group-amount')].reduce((sum, input) => sum + (Number(input.value) || 0), 0);
-            const activeFriends = getActiveFriendRows();
-            const isFriendSplit = activeFriends.length > 0;
-            const myPaid = Number(myPaidInput.value) || 0;
-            // Target for breakdown: if friend split is active, breakdown what I paid! Otherwise the full bill.
-            const expected = isFriendSplit ? (myPaid > 0 ? myPaid : getFullBillTotal()) : (Number(totalInput.value) || 0);
-            const label = isFriendSplit ? 'your paid amount' : 'total amount';
-
-            groupHint.textContent = `Breakdown: ₹${total.toFixed(2)} of ₹${expected.toFixed(2)} (${label})`;
-            const ok = Math.abs(total - expected) < 0.05;
-            groupHint.className = `text-xs font-semibold ${ok ? 'text-emerald-700' : 'text-amber-700'}`;
-        }
-
-        groupToggle.addEventListener('change', () => {
-            groupLines.classList.toggle('hidden', !groupToggle.checked);
-            groupList.querySelectorAll('input, select').forEach(el => el.disabled = !groupToggle.checked);
-            if (groupToggle.checked) {
-                if (groupList.children.length === 0) {
-                    addGroupLine();
-                    addGroupLine();
-                } else {
-                    groupList.querySelectorAll('input, select').forEach(el => el.disabled = false);
-                }
-            }
-        });
-        document.getElementById('add-group-line').addEventListener('click', () => addGroupLine());
 
         // Initialize payer rows from submitted values.
         @if(old('split_with_friend_id'))

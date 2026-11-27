@@ -8,9 +8,16 @@
 
         <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             @php
+                $hasOldInput = session()->hasOldInput();
+                $breakdownEnabled = $hasOldInput ? (bool) old('add_group_expense') : $expense->hasPaymentBreakdown();
+                $breakdownLines = $hasOldInput
+                    ? old('group_expenses', [])
+                    : ($expense->hasPaymentBreakdown()
+                        ? collect($expense->paymentBreakdownAmounts())->map(fn ($amount, $method) => ['amount' => $amount, 'payment_method' => $method])->values()->all()
+                        : []);
                 $splits = $expense->friendSplits->isNotEmpty() ? $expense->friendSplits : ($expense->friendSplit ? collect([$expense->friendSplit]) : collect());
             @endphp
-            <form action="{{ route('expenses.update', $expense) }}" method="POST" enctype="multipart/form-data" class="space-y-5 text-sm" id="edit-expense-form">
+            <form action="{{ route('expenses.update', $expense) }}" method="POST" enctype="multipart/form-data" class="space-y-5 text-sm" id="edit-expense-form" data-enter-next>
                 @csrf
                 @method('PUT')
 
@@ -75,6 +82,8 @@
                         </select>
                     </div>
                 </div>
+
+                <x-payment-breakdown :methods="$paymentMethods" :enabled="$breakdownEnabled" :lines="$breakdownLines" include-gst />
 
                 <!-- OPTION AT TOP: Record as Combination Payment -->
                 <div class="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/80 via-indigo-50/50 to-white p-3.5 sm:p-4 transition shadow-xs">
@@ -209,7 +218,7 @@
 
                 <div>
                     <label class="mb-1 block font-semibold text-slate-700">Notes</label>
-                    <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">{{ old('notes', $expense->notes) }}</textarea>
+                    <textarea name="notes" rows="2" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5">{{ old('notes', \App\Models\Expense::withoutPaymentBreakdown($expense->notes)) }}</textarea>
                 </div>
 
                 <button type="submit" class="w-full rounded-xl bg-indigo-600 py-3 font-semibold text-white shadow-md hover:bg-indigo-700 transition active:scale-[0.99] cursor-pointer">

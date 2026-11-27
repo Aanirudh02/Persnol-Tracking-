@@ -284,6 +284,20 @@ class Expense extends Model
     }
 
     /**
+     * Whether this single record was paid with more than one method.
+     */
+    public function hasPaymentBreakdown(): bool
+    {
+        return str_contains((string) $this->payment_method, '+')
+            || preg_match('/Payment breakdown:/i', (string) $this->notes) === 1;
+    }
+
+    public static function withoutPaymentBreakdown(?string $notes): string
+    {
+        return trim((string) preg_replace('/(?:\r?\n)?Payment breakdown:[^\r\n]*/i', '', (string) $notes));
+    }
+
+    /**
      * Breakdown of amounts paid by payment method for this expense.
      * E.g. ['UPI' => 120.0, 'Cash' => 50.0].
      *
@@ -294,7 +308,8 @@ class Expense extends Model
         // 1. Try parsing "Payment breakdown: UPI ₹120.00, Cash ₹50.00" from notes
         if ($this->notes && preg_match('/Payment breakdown:\s*([^\r\n]+)/i', $this->notes, $matches)) {
             $breakdown = [];
-            $parts = explode(',', $matches[1]);
+            // Entries are separated by ", "; a bare comma is a thousands separator
+            $parts = preg_split('/,\s+/', $matches[1]);
             foreach ($parts as $part) {
                 if (preg_match('/^\s*(.+?)\s*:?\s*(?:₹|Rs\.?)?\s*([0-9,]+(?:\.[0-9]+)?)\s*$/u', trim($part), $m)) {
                     $method = trim($m[1]);

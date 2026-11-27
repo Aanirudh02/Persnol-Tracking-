@@ -21,9 +21,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ExpenseController extends Controller
@@ -407,7 +409,7 @@ class ExpenseController extends Controller
 
             // If friend split is active with grouped lines, record as a single top-level expense with payment breakdown in notes
             if ($splitData !== null && $isGrouped) {
-                $breakdownText = 'Payment breakdown: '.$groupLines->map(fn (array $line) => ($line['payment_method'] ?? 'Other').' ₹'.number_format((float) $line['amount'], 2))->implode(', ');
+                $breakdownText = $this->paymentBreakdownText($groupLines);
                 $combinedNotes = trim(($validated['notes'] ?? '')."\n".$breakdownText);
                 $combinedMethod = $groupLines->pluck('payment_method')->unique()->implode(' + ');
 
@@ -753,6 +755,15 @@ class ExpenseController extends Controller
             'amount' => $expense->totalAmount(),
         ];
 
+        $category = ! empty($validated['category_id']) ? ExpenseCategory::query()->find($validated['category_id']) : null;
+        $totalBill = round((float) $validated['amount'] + (float) ($validated['gst_amount'] ?? 0), 2);
+        $splitData = $this->buildSplitData($validated, $totalBill);
+        [$paidByLabel, $paidByType, $paidByFriendId] = $this->displayPayerFields($splitData);
+
+        // Checked before the receipt upload so a rejected form leaves no orphan file
+        $paidByUser = $splitData ? (float) ($splitData['paid_by_me_amount'] ?? 0) : $totalBill;
+        $breakdownLines = $this->validatePaymentBreakdown($request, $paidByUser);
+
         if ($request->hasFile('receipt_image')) {
             $validated['receipt_image'] = app(CloudinaryService::class)->upload($request->file('receipt_image'), 'receipts');
         } elseif ($uploadedFile = $request->file('receipt_image')) {
@@ -760,11 +771,6 @@ class ExpenseController extends Controller
                 return back()->withInput()->with('error', 'Receipt upload failed: '.$uploadedFile->getErrorMessage().' (Server limit: '.ini_get('upload_max_filesize').')');
             }
         }
-
-        $category = ! empty($validated['category_id']) ? ExpenseCategory::query()->find($validated['category_id']) : null;
-        $totalBill = round((float) $validated['amount'] + (float) ($validated['gst_amount'] ?? 0), 2);
-        $splitData = $this->buildSplitData($validated, $totalBill);
-        [$paidByLabel, $paidByType, $paidByFriendId] = $this->displayPayerFields($splitData);
 
         $paidByMe = $splitData ? (float) ($splitData['paid_by_me_amount'] ?? 0) : null;
         $paidByFriends = $splitData ? (float) ($splitData['paid_by_friend_amount'] ?? 0) : 0;
@@ -803,6 +809,13 @@ class ExpenseController extends Controller
                 $validated['notes'] = trim($validated['notes']."\n".$payerNote);
             }
         }
+        // The breakdown lives on this one record, as method "UPI + Cash" plus a notes line
+        $validated['notes'] = Expense::withoutPaymentBreakdown($validated['notes']);
+        if ($breakdownLines->isNotEmpty()) {
+            $validated['payment_method'] = $breakdownLines->pluck('payment_method')->implode(' + ');
+            $validated['notes'] = trim($validated['notes']."\n".$this->paymentBreakdownText($breakdownLines));
+        }
+
         $validated['amount'] = $registeredAmount;
         $validated['gst_amount'] = $registeredGst;
         if (! empty($validated['time'])) {
@@ -964,6 +977,50 @@ class ExpenseController extends Controller
         }
 
         return redirect()->route('expenses.index')->with('success', 'Expense moved to Historical records.');
+    }
+
+    /**
+     * Payment lines for an edited expense. Empty when the breakdown is off, or when
+     * a friend paid the whole bill and there is nothing of the user's to break down.
+     *
+     * @return Collection<int, array{amount: mixed, payment_method: string}>
+     */
+    private function validatePaymentBreakdown(Request $request, float $paidByUser): Collection
+    {
+        if (! $request->boolean('add_group_expense') || $paidByUser <= 0) {
+            return collect();
+        }
+
+        $validated = $request->validate([
+            'group_expenses' => ['required', 'array', 'min:2'],
+            'group_expenses.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'group_expenses.*.payment_method' => ['required', 'string', 'max:50', 'distinct'],
+        ], [
+            'group_expenses.required' => 'Add at least two payment lines for a payment breakdown.',
+            'group_expenses.min' => 'Add at least two payment lines for a payment breakdown.',
+            'group_expenses.*.amount.required' => 'Enter an amount on every payment line.',
+            'group_expenses.*.payment_method.distinct' => 'Use each payment method only once in the breakdown.',
+        ]);
+
+        $lines = collect($validated['group_expenses'])->values();
+
+        if (abs((float) $lines->sum('amount') - $paidByUser) > 0.05) {
+            throw ValidationException::withMessages([
+                'group_expenses' => 'Payment breakdown must add up to what you paid (₹'.number_format($paidByUser, 2).').',
+            ]);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * @param  Collection<int, array{amount: mixed, payment_method: string}>  $lines
+     */
+    private function paymentBreakdownText(Collection $lines): string
+    {
+        return 'Payment breakdown: '.$lines
+            ->map(fn (array $line): string => $line['payment_method'].' ₹'.number_format((float) $line['amount'], 2))
+            ->implode(', ');
     }
 
     /**

@@ -88,6 +88,25 @@ document.addEventListener('keydown', (event) => {
     });
 });
 
+// Forms marked data-enter-next: Enter moves to the next field instead of submitting.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.isComposing) return;
+
+    const field = event.target;
+    const form = field.closest?.('form[data-enter-next]');
+    if (!form || !field.matches('input, select')) return;
+
+    event.preventDefault();
+
+    const targets = [...form.querySelectorAll('input, select, textarea, [type="submit"]')].filter((element) => (
+        element === field
+        || (!element.disabled
+            && !['hidden', 'checkbox', 'radio', 'file'].includes(element.type)
+            && element.getClientRects().length > 0)
+    ));
+    targets[targets.indexOf(field) + 1]?.focus();
+});
+
 const syncModalScrollLock = () => {
     const hasOpenModal = [...document.querySelectorAll('.fixed.z-50')]
         .some((element) => !element.classList.contains('hidden'));

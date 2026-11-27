@@ -24,7 +24,7 @@
         <!-- Tab Contents -->
         <div class="p-6 max-h-[70vh] overflow-y-auto">
             <!-- 1. Quick Expense Form -->
-            <form id="qtab-expense" action="{{ route('expenses.store') }}" method="POST" class="qtab-pane space-y-3">
+            <form id="qtab-expense" action="{{ route('expenses.store') }}" method="POST" class="qtab-pane space-y-3" data-enter-next>
                 @csrf
                 <input type="hidden" name="date" value="{{ date('Y-m-d') }}">
                 <input type="hidden" name="time" value="{{ date('H:i') }}">
